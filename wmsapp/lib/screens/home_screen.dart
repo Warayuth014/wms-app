@@ -2,14 +2,16 @@
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:wmsapp/screens/flow2/replenishment_menu_screen.dart';
 import '../theme/theme.dart';
 import '../widgets/common_widgets.dart';
 import '../services/connectivity_service.dart';
 import '../services/offline_service.dart';
 import 'login_screen.dart';
-import 'package:wmsapp/screens/flow1/scan_po_screen.dart';
-import 'package:wmsapp/screens/flow2/scan_pallet_screen.dart';
+import 'package:wmsapp/screens/flow1/flow1_menu_screen.dart';
 import 'package:wmsapp/screens/supervisor/cancel_screen.dart';
+import 'package:wmsapp/screens/putaway/putaway_screen.dart';
+import 'package:wmsapp/screens/picking/picking_session_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -58,7 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
           } else if (result.total > 0) {
             showSuccessSnackbar(
               context,
-              'Sync สำเร็จ ${result.success} รายการ ✅',
+              'Sync สำเร็จ ${result.success} รายการ',
             );
           }
           _updatePendingCount();
@@ -158,17 +160,24 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Expanded(
                         child: _FlowCard(
-                          icon: Icons.move_to_inbox,
-                          title: 'Flow 1',
+                          icon: const _CompositeIcon(
+                            mainIcon: Icons.local_shipping,
+                            accentIcon: Icons.south,
+                            accentColor: Color(0xFFFFC107),
+                          ),
+                          title: 'Receive',
                           subtitle: 'รับสินค้าเข้า',
-                          color: AppTheme.primary,
+                          gradientColors: const [
+                            Color(0xFF1B5E20),
+                            Color(0xFF4CAF50),
+                          ],
                           onTap: () async {
                             if (!await _requireLogin()) return;
                             if (!context.mounted) return;
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => ScanPoScreen(
+                                builder: (_) => Flow1MenuScreen(
                                   userId: _userId!,
                                   fullName: _fullName!,
                                 ),
@@ -180,17 +189,88 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: _FlowCard(
-                          icon: Icons.output,
-                          title: 'Flow 2',
-                          subtitle: 'Unload สินค้า',
-                          color: AppTheme.secondary,
+                          icon: const _CompositeIcon(
+                            mainIcon: Icons.warehouse,
+                            accentIcon: Icons.add,
+                            accentColor: Color(0xFF00BCD4),
+                          ),
+                          title: 'Putaway',
+                          subtitle: 'เก็บ Pallet เข้าคลัง',
+                          gradientColors: const [
+                            Color(0xFF0D47A1),
+                            Color(0xFF42A5F5),
+                          ],
                           onTap: () async {
                             if (!await _requireLogin()) return;
                             if (!context.mounted) return;
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => ScanPalletScreen(
+                                builder: (_) => PutawayScreen(
+                                  userId: _userId!,
+                                  fullName: _fullName!,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _FlowCard(
+                          icon: const _CompositeIcon(
+                            mainIcon: Icons.inventory_2,
+                            accentIcon: Icons.autorenew,
+                            accentColor: Color(0xFFFFC107),
+                          ),
+                          title: 'Replenishment',
+                          subtitle: 'เติมสินค้า',
+                          gradientColors: const [
+                            Color(0xFFE65100),
+                            Color(0xFFFF9800),
+                          ],
+                          onTap: () async {
+                            if (!await _requireLogin()) return;
+                            if (!context.mounted) return;
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ReplenishmentMenuScreen(
+                                  userId: _userId!,
+                                  fullName: _fullName!,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _FlowCard(
+                          icon: const _CompositeIcon(
+                            mainIcon: Icons.content_cut,
+                            accentIcon: Icons.arrow_forward,
+                            accentColor: Color(0xFF7C4DFF),
+                          ),
+                          title: 'Picking',
+                          subtitle: 'เบิกสินค้า Pick/Pack',
+                          gradientColors: const [
+                            Color(0xFF4A148C),
+                            Color(0xFF9C27B0),
+                          ],
+                          onTap: () async {
+                            if (!await _requireLogin()) return;
+                            if (!context.mounted) return;
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PickingSessionScreen(
                                   userId: _userId!,
                                   fullName: _fullName!,
                                 ),
@@ -321,20 +401,80 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // =============================================
+// _CompositeIcon — ไอคอนซ้อนสองชั้น
+// =============================================
+class _CompositeIcon extends StatelessWidget {
+  final IconData mainIcon;
+  final IconData accentIcon;
+  final Color accentColor;
+
+  const _CompositeIcon({
+    required this.mainIcon,
+    required this.accentIcon,
+    required this.accentColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 76,
+      height: 76,
+      child: Stack(
+        children: [
+          // shadow layer (depth effect)
+          Positioned(
+            left: 6,
+            top: 6,
+            child: Icon(
+              mainIcon,
+              color: Colors.white.withValues(alpha: 0.18),
+              size: 62,
+            ),
+          ),
+          // main icon
+          Icon(mainIcon, color: Colors.white, size: 62),
+          // accent badge
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: accentColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Icon(accentIcon, color: Colors.white, size: 16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =============================================
 // _FlowCard
 // =============================================
 class _FlowCard extends StatelessWidget {
-  final IconData icon;
+  final Widget icon;
   final String title;
   final String subtitle;
-  final Color color;
+  final List<Color> gradientColors;
   final VoidCallback onTap;
 
   const _FlowCard({
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.color,
+    required this.gradientColors,
     required this.onTap,
   });
 
@@ -343,34 +483,88 @@ class _FlowCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(16),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: color.withValues(alpha: 0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+              color: gradientColors.first.withValues(alpha: 0.28),
+              blurRadius: 14,
+              offset: const Offset(0, 7),
             ),
           ],
         ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Icon(icon, color: Colors.white, size: 36),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
+            // icon area with gradient + decorative circles
+            Container(
+              height: 118,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: gradientColors,
+                ),
+              ),
+              child: Stack(
+                children: [
+                  // decorative circle top-right
+                  Positioned(
+                    right: -22,
+                    top: -22,
+                    child: Container(
+                      width: 90,
+                      height: 90,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.10),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                  // decorative circle bottom-left
+                  Positioned(
+                    left: -12,
+                    bottom: -18,
+                    child: Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.07),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                  // icon centered
+                  Center(child: icon),
+                ],
               ),
             ),
-            Text(
-              subtitle,
-              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            // text area
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textGrey,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

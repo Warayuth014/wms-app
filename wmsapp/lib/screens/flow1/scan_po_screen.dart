@@ -24,6 +24,7 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
   final _api = ApiService();
 
   POResponse? _po;
+  ReceivingSession? _activeSession; // session ที่ยังค้างอยู่ของ PO นี้
   bool _loadingPO = false;
   bool _loadingSession = false;
   bool _isOnline = true;
@@ -86,9 +87,28 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
 
     // cache ไว้ใช้ตอน offline
     await OfflineService().savePO(result.data!);
+
+    // เช็ค session ที่ยังค้างอยู่ของ PO นี้
+    final active = await _api.getActiveReceivingSession(result.data!.poId);
+    if (mounted) setState(() => _activeSession = active);
   }
 
-  // ── เปิด Session ─────────────────────────────
+  // ── Resume หรือ เปิด Session ใหม่ ──────────────
+  Future<void> _resumeSession() async {
+    if (_po == null || _activeSession == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ScanPartScreen(
+          userId: widget.userId,
+          fullName: widget.fullName,
+          session: _activeSession!,
+          po: _po!,
+        ),
+      ),
+    );
+  }
+
   Future<void> _openSession() async {
     if (_po == null) return;
 
@@ -135,7 +155,7 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: WmsAppBar(title: 'Flow 1 — รับสินค้า', userName: widget.fullName),
+      appBar: WmsAppBar(title: 'รับสินค้าจาก PO', userName: widget.fullName),
       body: Column(
         children: [
           if (!_isOnline) const OfflineBanner(pendingCount: 0),
@@ -191,14 +211,31 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
                       _buildPOItems(),
                       const SizedBox(height: 16),
 
-                      // ปุ่มเริ่มรับสินค้า
-                      if (_po!.status != 'RECEIVED')
-                        PrimaryButton(
-                          label: 'เริ่มรับสินค้า',
-                          icon: Icons.play_arrow,
-                          onPressed: _openSession,
-                        )
-                      else
+                      // ปุ่มเริ่ม/ทำต่อ session
+                      if (_po!.status != 'RECEIVED') ...[
+                        if (_activeSession != null) ...[
+                          PrimaryButton(
+                            label:
+                                'ทำต่อจาก session เดิม (${_activeSession!.sessionId})',
+                            icon: Icons.play_circle,
+                            onPressed: _resumeSession,
+                          ),
+                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
+                            onPressed: _openSession,
+                            icon: const Icon(
+                              Icons.add_circle_outline,
+                              size: 18,
+                            ),
+                            label: const Text('เปิด session ใหม่'),
+                          ),
+                        ] else
+                          PrimaryButton(
+                            label: 'เริ่มรับสินค้า',
+                            icon: Icons.play_arrow,
+                            onPressed: _openSession,
+                          ),
+                      ] else
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
@@ -303,7 +340,7 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
                     color: item.status == 'RECEIVED'
                         ? AppTheme.success
                         : item.status == 'PARTIAL'
-                        ? Colors.orange
+                        ? AppTheme.warning
                         : Colors.grey,
                     size: 20,
                   ),

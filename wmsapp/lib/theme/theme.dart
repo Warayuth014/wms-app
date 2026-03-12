@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 
 class AppTheme {
   // ── Colors ──────────────────────────────────
-  static const primary = Color(0xFF1565C0); // น้ำเงินเข้ม
-  static const secondary = Color(0xFF0288D1); // น้ำเงินอ่อน
-  static const success = Color(0xFF2E7D32); // เขียว
-  static const warning = Color(0xFFF57F17); // เหลือง
-  static const danger = Color(0xFFC62828); // แดง
+  static const primary    = Color(0xFF1565C0); // น้ำเงินเข้ม
+  static const secondary  = Color(0xFF0288D1); // น้ำเงินอ่อน
+  static const teal       = Color(0xFF00838F); // เขียวอมฟ้า (Putaway)
+  static const success    = Color(0xFF2E7D32); // เขียว
+  static const warning    = Color(0xFFF57F17); // ส้ม/เหลือง
+  static const danger     = Color(0xFFC62828); // แดง
   static const background = Color(0xFFF5F7FA); // พื้นหลัง
-  static const surface = Color(0xFFFFFFFF); // card
+  static const surface    = Color(0xFFFFFFFF); // card
   static const textPrimary = Color(0xFF1A1A2E); // ตัวอักษรหลัก
-  static const textGrey = Color(0xFF6B7280); // ตัวอักษรรอง
+  static const textGrey    = Color(0xFF6B7280); // ตัวอักษรรอง
+  static const border      = Color(0xFFE0E0E0); // เส้นขอบ
 
   static ThemeData get light => ThemeData(
     useMaterial3: true,
@@ -78,11 +80,11 @@ class AppTheme {
       fillColor: Colors.white,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+        borderSide: const BorderSide(color: border),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+        borderSide: const BorderSide(color: border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),

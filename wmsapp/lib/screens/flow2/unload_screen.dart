@@ -1,143 +1,184 @@
 // lib/screens/flow2/unload_screen.dart
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
-import '../../services/offline_service.dart';
-import '../../services/connectivity_service.dart';
 import '../../models/wms_models.dart';
-import 'load_basket_screen.dart';
 
 class UnloadScreen extends StatefulWidget {
   final String userId;
   final String fullName;
-  final UnloadSession session;
-  final PalletScanResponse pallet;
 
-  const UnloadScreen({
-    super.key,
-    required this.userId,
-    required this.fullName,
-    required this.session,
-    required this.pallet,
-  });
+  const UnloadScreen({super.key, required this.userId, required this.fullName});
 
   @override
   State<UnloadScreen> createState() => _UnloadScreenState();
 }
 
-class _UnloadScreenState extends State<UnloadScreen> {
+class _UnloadScreenState extends State<UnloadScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _arrowController;
+  late Animation<double> _arrowAnimation;
+  final _palletController = TextEditingController();
+  final _palletFocus = FocusNode();
   final _partController = TextEditingController();
-  final _api = ApiService();
+  final _partFocus = FocusNode();
 
-  // track status แต่ละ Part
-  // key = partId, value = PENDING | CONFIRMED
-  late Map<String, String> _partStatus;
-
+  PalletScanResponse? _pallet;
+  int? _sessionId;
   bool _loading = false;
-  bool _isOnline = true;
+  bool _sessionOpen = false;
+  bool _returning = false;
+
+  // partId → PENDING | CONFIRMED
+  final Map<String, String> _partStatus = {};
 
   @override
   void initState() {
     super.initState();
-    _checkConnectivity();
-
-    // init ทุก Part เป็น PENDING
-    _partStatus = {
-      for (final item in widget.session.items) item.partId: 'PENDING',
-    };
-  }
-
-  Future<void> _checkConnectivity() async {
-    final online = await ConnectivityService().checkNow();
-    setState(() => _isOnline = online);
+    _arrowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..repeat(reverse: true);
+    _arrowAnimation = Tween<double>(begin: 0, end: -20).animate(
+      CurvedAnimation(parent: _arrowController, curve: Curves.easeInOut),
+    );
   }
 
   int get _confirmedCount =>
       _partStatus.values.where((s) => s == 'CONFIRMED').length;
-
   int get _totalCount => _partStatus.length;
+  bool get _allConfirmed => _totalCount > 0 && _confirmedCount == _totalCount;
 
-  bool get _allConfirmed => _confirmedCount == _totalCount;
+  // ── สแกน Pallet ───────────────────────────
+  Future<void> _scanPallet() async {
+    final palletId = _palletController.text.trim().toUpperCase();
+    if (palletId.isEmpty) return;
 
-  // ── Confirm Unload ────────────────────────────
-  Future<void> _confirmUnload() async {
+    setState(() => _loading = true);
+
+    final result = await ApiService().scanPalletForUnload(palletId);
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (!result.success) {
+      showErrorDialog(context, message: result.error ?? 'ไม่พบ Pallet นี้');
+      _palletController.clear();
+      _palletFocus.requestFocus();
+      return;
+    }
+
+    setState(() => _pallet = result.data);
+
+    // PW → ต้องติดสติ๊กเกอร์ก่อน
+    if (_pallet!.needsLabeling) {
+      _showLabelingDialog();
+      return;
+    }
+
+    await _openSession();
+  }
+
+  // ── PW Labeling Dialog ─────────────────────
+  Future<void> _showLabelingDialog() async {
+    final confirm = await showConfirmDialog(
+      context,
+      title: '⚠️ ต้องติดสติ๊กเกอร์',
+      message:
+          'Pallet ${_pallet!.palletId} เป็นประเภท PW\n'
+          'กรุณาส่งไปจุด Labeling ก่อน\n'
+          'แล้วกดยืนยันเมื่อติดเรียบร้อย',
+      confirmLabel: 'ติดแล้ว ยืนยัน',
+    );
+    if (!confirm || !mounted) return;
+
+    setState(() => _loading = true);
+
+    final result = await ApiService().confirmLabeling(
+      palletId: _pallet!.palletId,
+      operatorId: widget.userId,
+    );
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (!result.success) {
+      showErrorDialog(context, message: result.error ?? 'เกิดข้อผิดพลาด');
+      return;
+    }
+
+    showSuccessSnackbar(context, 'เปลี่ยนเป็น FG แล้ว');
+    await _openSession();
+  }
+
+  // ── เปิด Unload Session ────────────────────
+  Future<void> _openSession() async {
+    if (_pallet == null) return;
+    setState(() => _loading = true);
+
+    final result = await ApiService().openUnloadSession(
+      palletId: _pallet!.palletId,
+      operatorId: widget.userId,
+    );
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (!result.success) {
+      showErrorDialog(context, message: result.error ?? 'เปิด session ไม่ได้');
+      return;
+    }
+
+    final session = result.data!;
+    setState(() {
+      _sessionId = session.sessionId;
+      _sessionOpen = true;
+      _partStatus.clear();
+      for (final item in session.items) {
+        _partStatus[item.partId] =
+            session.confirmedPartIds.contains(item.partId)
+            ? 'CONFIRMED'
+            : 'PENDING';
+      }
+    });
+
+    _partFocus.requestFocus();
+  }
+
+  // ── Confirm Unload Part ────────────────────
+  Future<void> _confirmPart() async {
     final partId = _partController.text.trim().toUpperCase();
-    if (partId.isEmpty) {
-      showErrorDialog(context, message: 'กรุณาใส่ Part ID');
-      return;
-    }
+    if (partId.isEmpty) return;
 
-    // ตรวจว่า Part อยู่ใน session ไหม
     if (!_partStatus.containsKey(partId)) {
-      showErrorDialog(context, message: 'Part $partId ไม่อยู่ใน session นี้');
+      showErrorDialog(context, message: 'Part $partId ไม่อยู่ใน Pallet นี้');
+      _partController.clear();
       return;
     }
 
-    // ตรวจว่า confirm ไปแล้วหรือยัง
     if (_partStatus[partId] == 'CONFIRMED') {
       showWarningSnackbar(context, 'Part $partId confirm ไปแล้ว');
       _partController.clear();
       return;
     }
 
-    // ยืนยัน
-    final item = widget.session.items.firstWhere((i) => i.partId == partId);
-
-    final confirm = await showConfirmDialog(
-      context,
-      title: 'Confirm นำสินค้าออก',
-      message:
-          'นำ ${item.partId} ออกจาก Pallet แล้ว?\n'
-          '${item.itemDesc}\n'
-          'จำนวน: ${item.qty} ชิ้น',
-      confirmLabel: 'Confirm',
-    );
-    if (!confirm) return;
-
     setState(() => _loading = true);
 
-    // offline → queue
-    if (!_isOnline) {
-      await OfflineService().addToQueue(
-        action: 'confirm-unload',
-        data: {
-          'sessionId': widget.session.sessionId,
-          'palletId': widget.pallet.palletId,
-          'partId': partId,
-          'operatorId': widget.userId,
-        },
-      );
-
-      setState(() {
-        _loading = false;
-        _partStatus[partId] = 'CONFIRMED';
-        _partController.clear();
-      });
-
-      if (!mounted) return;
-
-      showWarningSnackbar(context, 'บันทึกแบบ offline');
-
-      if (_allConfirmed) _goToStep2();
-      return;
-    }
-
-    // online → API
-    final result = await _api.confirmUnload(
-      sessionId: widget.session.sessionId,
-      palletId: widget.pallet.palletId,
+    final result = await ApiService().confirmUnload(
+      sessionId: _sessionId!,
+      palletId: _pallet!.palletId,
       partId: partId,
       operatorId: widget.userId,
     );
 
+    if (!mounted) return;
     setState(() => _loading = false);
 
-    if (!mounted) return;
-
     if (!result.success) {
-      showErrorDialog(context, message: result.error!);
+      showErrorDialog(context, message: result.error ?? 'เกิดข้อผิดพลาด');
       return;
     }
 
@@ -146,31 +187,112 @@ class _UnloadScreenState extends State<UnloadScreen> {
       _partController.clear();
     });
 
-    final allConfirmed = result.data!['allConfirmed'] as bool;
+    showSuccessSnackbar(context, '$partId ($_confirmedCount/$_totalCount)');
 
-    showSuccessSnackbar(
-      context,
-      '✅ $partId confirmed ($_confirmedCount/$_totalCount)',
-    );
-
-    if (allConfirmed) {
-      await Future.delayed(const Duration(milliseconds: 500));
-      _goToStep2();
-    }
+    // ครบทุกรายการ → เสนอให้สแกน Pallet ใหม่
+    if (_allConfirmed) _showNextPalletDialog();
   }
 
-  // ── ไป Step 2 ────────────────────────────────
-  void _goToStep2() {
-    showSuccessSnackbar(context, '✅ ครบทุกรายการ ไป Step 2 ได้เลย');
-
-    Navigator.pushReplacement(
+  // ── คืน Pallet ให้ AGV รับกลับ ASRS ──────
+  Future<void> _returnPallet() async {
+    final confirm = await showConfirmDialog(
       context,
-      MaterialPageRoute(
-        builder: (_) => LoadBasketScreen(
-          userId: widget.userId,
-          fullName: widget.fullName,
-          session: widget.session,
-          pallet: widget.pallet,
+      title: 'คืน Pallet',
+      message:
+          'คืน Pallet ${_pallet!.palletId}\n'
+          'ให้โฟล์คลิฟอัตโนมัติรับกลับ ASRS?\n\n'
+          '(หยิบออกแล้ว $_confirmedCount/$_totalCount รายการ)',
+      confirmLabel: 'คืน Pallet',
+    );
+    if (!confirm || !mounted) return;
+
+    setState(() => _returning = true);
+
+    final results = await Future.wait([
+      ApiService().returnPalletToAsis(
+        palletId: _pallet!.palletId,
+        sessionId: _sessionId,
+        operatorId: widget.userId,
+      ),
+      Future.delayed(const Duration(seconds: 5)),
+    ]);
+
+    if (!mounted) return;
+    setState(() => _returning = false);
+
+    final result = results[0] as ApiResult<Map<String, dynamic>>;
+    if (!result.success) {
+      showErrorDialog(context, message: result.error ?? 'เกิดข้อผิดพลาด');
+      return;
+    }
+
+    _resetForNextPallet();
+  }
+
+  // ── ครบทุกรายการ → คืน pallet อัตโนมัติ ──
+  Future<void> _showNextPalletDialog() async {
+    await _returnPallet();
+  }
+
+  void _resetForNextPallet() {
+    setState(() {
+      _pallet = null;
+      _sessionId = null;
+      _sessionOpen = false;
+      _partStatus.clear();
+      _palletController.clear();
+      _partController.clear();
+    });
+    _palletFocus.requestFocus();
+  }
+
+  @override
+  void dispose() {
+    _arrowController.dispose();
+    _palletController.dispose();
+    _palletFocus.dispose();
+    _partController.dispose();
+    _partFocus.dispose();
+    super.dispose();
+  }
+
+  Widget _buildReturnAnimation() {
+    return Scaffold(
+      appBar: WmsAppBar(title: 'Unload', userName: widget.fullName),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedBuilder(
+              animation: _arrowAnimation,
+              builder: (_, __) => Transform.translate(
+                offset: Offset(0, _arrowAnimation.value),
+                child: const Icon(
+                  Icons.arrow_upward,
+                  color: AppTheme.warning,
+                  size: 80,
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
+            const Icon(Icons.forklift, color: AppTheme.textGrey, size: 56),
+            const SizedBox(height: 24),
+            const Text(
+              'โฟล์คลิฟกำลังรับ Pallet...',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'กรุณารอสักครู่',
+              style: TextStyle(color: AppTheme.textGrey),
+            ),
+            const SizedBox(height: 32),
+            const _CountdownTimer(seconds: 5),
+          ],
         ),
       ),
     );
@@ -178,233 +300,234 @@ class _UnloadScreenState extends State<UnloadScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: WmsAppBar(title: 'Step 1 — Unload', userName: widget.fullName),
-      body: Column(
-        children: [
-          if (!_isOnline) const OfflineBanner(pendingCount: 0),
+    if (_returning) return _buildReturnAnimation();
 
-          // ── Progress Bar ────────────────────
-          _buildProgressBar(),
-
-          Expanded(
-            child: LoadingOverlay(
-              loading: _loading,
-              message: 'กำลัง confirm...',
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ── Step Indicator ──────────
-                    _buildStepIndicator(),
-                    const SizedBox(height: 16),
-
-                    // ── Session Info ────────────
-                    WmsCard(
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.inventory_2,
-                            color: AppTheme.primary,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  widget.pallet.palletId,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                Text(
-                                  'Session #${widget.session.sessionId}',
-                                  style: const TextStyle(
-                                    color: AppTheme.textGrey,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Text(
-                            '$_confirmedCount / $_totalCount',
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // ── Scan Part ───────────────
-                    WmsCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'สแกน Part เพื่อ Confirm',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          ScanTextField(
-                            label: 'Part ID',
-                            hint: 'เช่น PT-9821',
-                            controller: _partController,
-                            onSubmit: _confirmUnload,
-                          ),
-                          const SizedBox(height: 12),
-                          PrimaryButton(
-                            label: 'Confirm นำออก',
-                            icon: Icons.check_circle,
-                            onPressed: _confirmUnload,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // ── Items List ──────────────
-                    _buildItemsList(),
-                    const SizedBox(height: 16),
-
-                    // ── Manual Go Step 2 ────────
-                    if (_allConfirmed)
-                      PrimaryButton(
-                        label: 'ไป Step 2 →',
-                        icon: Icons.arrow_forward,
-                        onPressed: _goToStep2,
-                      ),
-                  ],
-                ),
+    return LoadingOverlay(
+      loading: _loading,
+      child: Scaffold(
+        appBar: WmsAppBar(
+          title: 'Unload',
+          userName: widget.fullName,
+          actions: [
+            if (_sessionOpen)
+              IconButton(
+                icon: const Icon(Icons.refresh, color: Colors.white),
+                tooltip: 'สแกน Pallet ใหม่',
+                onPressed: _resetForNextPallet,
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Progress Bar ─────────────────────────────
-  Widget _buildProgressBar() {
-    final progress = _totalCount == 0 ? 0.0 : _confirmedCount / _totalCount;
-
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          ],
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'นำออกแล้ว $_confirmedCount จาก $_totalCount รายการ',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+              // ── Progress (ถ้ามี session) ──
+              if (_sessionOpen) ...[
+                _buildProgressBar(),
+                const SizedBox(height: 16),
+              ],
+
+              // ── Scan Pallet ───────────────
+              if (!_sessionOpen) ...[
+                const Text(
+                  'สแกน Pallet',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
                 ),
-              ),
-              Text(
-                '${(progress * 100).toInt()}%',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.primary,
+                const SizedBox(height: 12),
+                ScanTextField(
+                  controller: _palletController,
+                  label: 'Pallet ID เช่น PAL-001',
+                  hint: 'PAL-001',
+                  onSubmit: _scanPallet,
                 ),
-              ),
+              ],
+
+              // ── Pallet Info ───────────────
+              if (_pallet != null) ...[
+                WmsCard(
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.inventory_2,
+                        color: AppTheme.primary,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _pallet!.palletId,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
+                            Text(
+                              'Session #$_sessionId · ${_pallet!.items.length} รายการ',
+                              style: const TextStyle(
+                                color: AppTheme.textGrey,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        '$_confirmedCount/$_totalCount',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // ── Scan Part ─────────────────
+              if (_sessionOpen) ...[
+                const Text(
+                  'สแกน Part',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ScanTextField(
+                  controller: _partController,
+                  label: 'Part ID เช่น PT-1122',
+                  hint: 'PT-1122',
+                  onSubmit: _confirmPart,
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // ── Items List ────────────────
+              if (_partStatus.isNotEmpty) _buildItemsList(),
+
+              // ── Return Pallet button ──────
+              if (_sessionOpen) ...[
+                const SizedBox(height: 20),
+                OutlinedButton.icon(
+                  onPressed: _returnPallet,
+                  icon: const Icon(Icons.reply, color: AppTheme.danger),
+                  label: const Text(
+                    'คืน Pallet',
+                    style: TextStyle(color: AppTheme.danger, fontWeight: FontWeight.w700),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppTheme.danger, width: 1.5),
+                    minimumSize: const Size(double.infinity, 52),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 8,
-              backgroundColor: Colors.grey.shade200,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                _allConfirmed ? AppTheme.success : AppTheme.primary,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  // ── Items List ───────────────────────────────
-  Widget _buildItemsList() {
-    final pending = widget.session.items
-        .where((i) => _partStatus[i.partId] == 'PENDING')
-        .toList();
-    final confirmed = widget.session.items
-        .where((i) => _partStatus[i.partId] == 'CONFIRMED')
-        .toList();
-
+  Widget _buildProgressBar() {
+    final progress = _totalCount == 0 ? 0.0 : _confirmedCount / _totalCount;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Pending
-        if (pending.isNotEmpty)
-          WmsCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'รอ Confirm',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textGrey,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ...pending.map((item) => _buildItemRow(item, false)),
-              ],
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Unload แล้ว $_confirmedCount จาก $_totalCount',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            Text(
+              '${(progress * 100).toInt()}%',
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: AppTheme.primary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: progress,
+            minHeight: 8,
+            backgroundColor: Colors.grey.shade200,
+            valueColor: AlwaysStoppedAnimation<Color>(
+              _allConfirmed ? AppTheme.success : AppTheme.primary,
             ),
           ),
-
-        if (pending.isNotEmpty && confirmed.isNotEmpty)
-          const SizedBox(height: 12),
-
-        // Confirmed
-        if (confirmed.isNotEmpty)
-          WmsCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Confirmed แล้ว',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.success,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ...confirmed.map((item) => _buildItemRow(item, true)),
-              ],
-            ),
-          ),
+        ),
       ],
     );
   }
 
-  Widget _buildItemRow(UnloadItem item, bool confirmed) {
+  Widget _buildItemsList() {
+    final items = _pallet!.items;
+    final pending = items
+        .where((i) => _partStatus[i.partId] == 'PENDING')
+        .toList();
+    final confirmed = items
+        .where((i) => _partStatus[i.partId] == 'CONFIRMED')
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (pending.isNotEmpty) ...[
+          const Text(
+            'รอ Confirm',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textGrey,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...pending.map((i) => _buildItemRow(i, false)),
+          const SizedBox(height: 16),
+        ],
+        if (confirmed.isNotEmpty) ...[
+          const Text(
+            'Confirmed',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.success,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...confirmed.map((i) => _buildItemRow(i, true)),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildItemRow(dynamic item, bool confirmed) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: confirmed
             ? AppTheme.success.withValues(alpha: 0.05)
-            : AppTheme.background,
+            : AppTheme.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: confirmed
@@ -438,107 +561,58 @@ class _UnloadScreenState extends State<UnloadScreen> {
                     fontSize: 12,
                   ),
                 ),
-                if (item.lotNumber != null)
-                  Text(
-                    'Lot: ${item.lotNumber}',
-                    style: const TextStyle(
-                      color: AppTheme.textGrey,
-                      fontSize: 12,
-                    ),
-                  ),
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${item.qty} ชิ้น',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              StatusBadge(item.condition),
-            ],
+          Text(
+            '${item.qty} ชิ้น',
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildStepIndicator() {
-    return Row(
-      children: [
-        _StepDot(number: 1, label: 'สแกน Pallet', done: true),
-        _StepLine(),
-        _StepDot(number: 2, label: 'Unload', active: true),
-        _StepLine(),
-        _StepDot(number: 3, label: 'Load Basket', active: false),
-      ],
-    );
-  }
 }
 
-// ── Step Widgets ──────────────────────────────
-class _StepDot extends StatelessWidget {
-  final int number;
-  final String label;
-  final bool active;
-  final bool done;
+class _CountdownTimer extends StatefulWidget {
+  final int seconds;
+  const _CountdownTimer({required this.seconds});
 
-  const _StepDot({
-    required this.number,
-    required this.label,
-    this.active = false,
-    this.done = false,
-  });
+  @override
+  State<_CountdownTimer> createState() => _CountdownTimerState();
+}
+
+class _CountdownTimerState extends State<_CountdownTimer> {
+  late int _remaining;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _remaining = widget.seconds;
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_remaining > 0) {
+        setState(() => _remaining--);
+      } else {
+        _timer?.cancel();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final color = done
-        ? AppTheme.success
-        : active
-        ? AppTheme.primary
-        : Colors.grey.shade300;
-
-    return Column(
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          child: Center(
-            child: done
-                ? const Icon(Icons.check, color: Colors.white, size: 16)
-                : Text(
-                    '$number',
-                    style: TextStyle(
-                      color: active ? Colors.white : Colors.grey,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: active || done ? AppTheme.primary : Colors.grey,
-            fontWeight: active || done ? FontWeight.w600 : FontWeight.normal,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StepLine extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        height: 2,
-        margin: const EdgeInsets.only(bottom: 20),
-        color: Colors.grey.shade300,
+    return Text(
+      '$_remaining วินาที',
+      style: const TextStyle(
+        fontSize: 32,
+        fontWeight: FontWeight.w700,
+        color: AppTheme.warning,
       ),
     );
   }

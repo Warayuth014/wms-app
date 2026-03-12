@@ -31,8 +31,9 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
   final _partController = TextEditingController();
   final _qtyController = TextEditingController();
   final _lotController = TextEditingController();
-  final _expController = TextEditingController();
   final _api = ApiService();
+
+  DateTime? _selectedExpDate;
 
   // Part ที่สแกนได้แล้ว รอผูก pallet
   final List<ReceiptLineResponse> _scannedLines = [];
@@ -45,6 +46,10 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
   void initState() {
     super.initState();
     _checkConnectivity();
+    // Restore lines ที่รอผูก pallet จาก session ที่ resume มา
+    if (widget.session.pendingLines.isNotEmpty) {
+      _scannedLines.addAll(widget.session.pendingLines);
+    }
   }
 
   Future<void> _checkConnectivity() async {
@@ -168,14 +173,72 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Expired Date
-                TextField(
-                  controller: _expController,
-                  keyboardType: TextInputType.datetime,
-                  decoration: const InputDecoration(
-                    labelText: 'Expired Date',
-                    prefixIcon: Icon(Icons.calendar_today),
-                    hintText: 'เช่น 2026-12-31',
+                // Expired Date — date picker (พ.ศ.)
+                GestureDetector(
+                  onTap: () async {
+                    final picked = await showModalBottomSheet<DateTime>(
+                      context: ctx,
+                      isScrollControlled: false,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => _ThaiDatePicker(
+                        initialDate: _selectedExpDate ?? DateTime.now(),
+                        firstDate: DateTime.now(),
+                      ),
+                    );
+                    if (picked != null) {
+                      setModal(() => _selectedExpDate = picked);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(
+                        color: _selectedExpDate != null
+                            ? AppTheme.primary
+                            : const Color(0xFFE0E0E0),
+                        width: _selectedExpDate != null ? 2 : 1,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_month,
+                          color: _selectedExpDate != null
+                              ? AppTheme.primary
+                              : AppTheme.textGrey,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _selectedExpDate != null
+                                ? '${_selectedExpDate!.day.toString().padLeft(2, '0')}/'
+                                    '${_selectedExpDate!.month.toString().padLeft(2, '0')}/'
+                                    '${_selectedExpDate!.year + 543}'
+                                : 'Expired Date (ไม่บังคับ)',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: _selectedExpDate != null
+                                  ? AppTheme.textPrimary
+                                  : AppTheme.textGrey,
+                            ),
+                          ),
+                        ),
+                        if (_selectedExpDate != null)
+                          GestureDetector(
+                            onTap: () => setModal(() => _selectedExpDate = null),
+                            child: const Icon(
+                              Icons.clear,
+                              color: AppTheme.textGrey,
+                              size: 20,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -249,7 +312,11 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
           'partId': poItem.partId,
           'qtyReceived': qty,
           'lotNumber': _lotController.text.trim(),
-          'expiredDate': _expController.text.trim(),
+          'expiredDate': _selectedExpDate != null
+              ? '${_selectedExpDate!.year}-'
+                  '${_selectedExpDate!.month.toString().padLeft(2, '0')}-'
+                  '${_selectedExpDate!.day.toString().padLeft(2, '0')}'
+              : '',
           'condition': _condition,
           'operatorId': widget.userId,
         },
@@ -275,7 +342,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
         _partController.clear();
         _qtyController.clear();
         _lotController.clear();
-        _expController.clear();
+        _selectedExpDate = null;
         _condition = 'NORMAL';
       });
 
@@ -295,9 +362,11 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       lotNumber: _lotController.text.trim().isEmpty
           ? null
           : _lotController.text.trim(),
-      expiredDate: _expController.text.trim().isEmpty
-          ? null
-          : _expController.text.trim(),
+      expiredDate: _selectedExpDate != null
+          ? '${_selectedExpDate!.year}-'
+              '${_selectedExpDate!.month.toString().padLeft(2, '0')}-'
+              '${_selectedExpDate!.day.toString().padLeft(2, '0')}'
+          : null,
       condition: _condition,
       operatorId: widget.userId,
     );
@@ -317,7 +386,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
     if (line.poItemStatus == 'OVER') {
       showWarningSnackbar(context, '⚠️ Over receiving: ${line.message}');
     } else {
-      showSuccessSnackbar(context, '✅ ${line.partId} บันทึกแล้ว');
+      showSuccessSnackbar(context, '${line.partId} บันทึกแล้ว');
     }
 
     setState(() {
@@ -325,7 +394,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       _partController.clear();
       _qtyController.clear();
       _lotController.clear();
-      _expController.clear();
+      _selectedExpDate = null;
       _condition = 'NORMAL';
     });
   }
@@ -523,7 +592,9 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
               decoration: BoxDecoration(
                 color: AppTheme.success.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.success.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: AppTheme.success.withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
                 children: [
@@ -763,6 +834,241 @@ class _StepLine extends StatelessWidget {
         height: 2,
         margin: const EdgeInsets.only(bottom: 20),
         color: Colors.grey.shade300,
+      ),
+    );
+  }
+}
+
+// ── Thai Buddhist Era Date Picker ─────────────
+class _ThaiDatePicker extends StatefulWidget {
+  final DateTime initialDate;
+  final DateTime firstDate;
+
+  const _ThaiDatePicker({
+    required this.initialDate,
+    required this.firstDate,
+  });
+
+  @override
+  State<_ThaiDatePicker> createState() => _ThaiDatePickerState();
+}
+
+class _ThaiDatePickerState extends State<_ThaiDatePicker> {
+  late int _day;
+  late int _month;
+  late int _year; // ปี ค.ศ. ใช้ภายใน
+
+  late FixedExtentScrollController _dayCtrl;
+  late FixedExtentScrollController _monthCtrl;
+  late FixedExtentScrollController _yearCtrl;
+
+  static const _monthNames = [
+    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน',
+    'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม',
+    'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+  ];
+
+  int get _startYear => widget.firstDate.year;
+  int get _endYear => 2099;
+  int get _daysInMonth => DateTime(_year, _month + 1, 0).day;
+
+  @override
+  void initState() {
+    super.initState();
+    _day = widget.initialDate.day;
+    _month = widget.initialDate.month;
+    _year = widget.initialDate.year;
+    _dayCtrl = FixedExtentScrollController(initialItem: _day - 1);
+    _monthCtrl = FixedExtentScrollController(initialItem: _month - 1);
+    _yearCtrl = FixedExtentScrollController(
+      initialItem: _year - _startYear,
+    );
+  }
+
+  @override
+  void dispose() {
+    _dayCtrl.dispose();
+    _monthCtrl.dispose();
+    _yearCtrl.dispose();
+    super.dispose();
+  }
+
+  void _confirm() {
+    final validDay = _day.clamp(1, _daysInMonth);
+    Navigator.pop(context, DateTime(_year, _month, validDay));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const itemH = 48.0;
+    return Container(
+      height: 340,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'ยกเลิก',
+                    style: TextStyle(color: AppTheme.textGrey),
+                  ),
+                ),
+                const Text(
+                  'เลือกวันหมดอายุ (พ.ศ.)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                TextButton(
+                  onPressed: _confirm,
+                  child: const Text(
+                    'ตกลง',
+                    style: TextStyle(
+                      color: AppTheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+
+          // columns
+          Expanded(
+            child: Stack(
+              children: [
+                // selection highlight band
+                Center(
+                  child: IgnorePointer(
+                    child: Container(
+                      height: itemH,
+                      decoration: BoxDecoration(
+                        border: Border.symmetric(
+                          horizontal: BorderSide(
+                            color: AppTheme.primary.withValues(alpha: 0.35),
+                            width: 1.5,
+                          ),
+                        ),
+                        color: AppTheme.primary.withValues(alpha: 0.05),
+                      ),
+                    ),
+                  ),
+                ),
+
+                Row(
+                  children: [
+                    // วัน
+                    Expanded(
+                      child: ListWheelScrollView.useDelegate(
+                        controller: _dayCtrl,
+                        itemExtent: itemH,
+                        physics: const FixedExtentScrollPhysics(),
+                        onSelectedItemChanged: (i) =>
+                            setState(() => _day = i + 1),
+                        childDelegate: ListWheelChildBuilderDelegate(
+                          childCount: 31,
+                          builder: (_, i) {
+                            final day = i + 1;
+                            final valid = day <= _daysInMonth;
+                            return Center(
+                              child: Text(
+                                '$day',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: day == _day
+                                      ? FontWeight.w700
+                                      : FontWeight.normal,
+                                  color: valid
+                                      ? (day == _day
+                                          ? AppTheme.primary
+                                          : AppTheme.textPrimary)
+                                      : Colors.grey.shade300,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+
+                    // เดือน
+                    Expanded(
+                      flex: 2,
+                      child: ListWheelScrollView.useDelegate(
+                        controller: _monthCtrl,
+                        itemExtent: itemH,
+                        physics: const FixedExtentScrollPhysics(),
+                        onSelectedItemChanged: (i) =>
+                            setState(() => _month = i + 1),
+                        childDelegate: ListWheelChildBuilderDelegate(
+                          childCount: 12,
+                          builder: (_, i) => Center(
+                            child: Text(
+                              _monthNames[i],
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: (i + 1) == _month
+                                    ? FontWeight.w700
+                                    : FontWeight.normal,
+                                color: (i + 1) == _month
+                                    ? AppTheme.primary
+                                    : AppTheme.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // ปี (พ.ศ.)
+                    Expanded(
+                      flex: 2,
+                      child: ListWheelScrollView.useDelegate(
+                        controller: _yearCtrl,
+                        itemExtent: itemH,
+                        physics: const FixedExtentScrollPhysics(),
+                        onSelectedItemChanged: (i) =>
+                            setState(() => _year = _startYear + i),
+                        childDelegate: ListWheelChildBuilderDelegate(
+                          childCount: _endYear - _startYear + 1,
+                          builder: (_, i) {
+                            final ceYear = _startYear + i;
+                            final beYear = ceYear + 543;
+                            return Center(
+                              child: Text(
+                                '$beYear',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: ceYear == _year
+                                      ? FontWeight.w700
+                                      : FontWeight.normal,
+                                  color: ceYear == _year
+                                      ? AppTheme.primary
+                                      : AppTheme.textPrimary,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

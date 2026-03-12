@@ -76,7 +76,7 @@ class _CancelScreenState extends State<CancelScreen> {
 
     showSuccessSnackbar(
       context,
-      '✅ อนุมัติยกเลิก ${log.refType} #${log.refId} แล้ว',
+      'อนุมัติยกเลิก ${log.refType} #${log.refId} แล้ว',
     );
 
     _loadPending();
@@ -198,7 +198,9 @@ class _CancelScreenState extends State<CancelScreen> {
             decoration: BoxDecoration(
               color: AppTheme.warning.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.warning.withValues(alpha: 0.3)),
+              border: Border.all(
+                color: AppTheme.warning.withValues(alpha: 0.3),
+              ),
             ),
             child: Row(
               children: [

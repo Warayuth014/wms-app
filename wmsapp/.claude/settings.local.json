@@ -2,7 +2,23 @@
   "permissions": {
     "allow": [
       "Bash(dart analyze)",
-      "WebFetch(domain:pub.dev)"
+      "WebFetch(domain:pub.dev)",
+      "Bash(flutter analyze)",
+      "Bash(dotnet ef migrations add AddPutawaySchema)",
+      "Bash(dotnet ef database update)",
+      "Bash(dotnet ef migrations script --from 0 --to init_update1)",
+      "Bash(sqlcmd -S localhost -d WmsDb -E -Q \"INSERT INTO [__EFMigrationsHistory] \\([MigrationId],[ProductVersion]\\) VALUES \\(''20260305092216_init'',''9.0.0''\\), \\(''20260306062537_init_update'',''9.0.0''\\), \\(''20260306063042_init_update1'',''9.0.0''\\)\")",
+      "Bash(sqlcmd -S \"LAPTOP-7ELHM2GA\\\\SQLEXPRESS\" -d WmsDB -U sa -P \"0993904232pOpU#/#\" -Q \"INSERT INTO [__EFMigrationsHistory] \\([MigrationId],[ProductVersion]\\) VALUES \\(''20260305092216_init'',''9.0.0''\\), \\(''20260306062537_init_update'',''9.0.0''\\), \\(''20260306063042_init_update1'',''9.0.0''\\)\")",
+      "Bash(sqlcmd -S \"LAPTOP-7ELHM2GA\\\\SQLEXPRESS\" -d WmsDB -U sa -P \"0993904232pOpU#/#\" -Q \"SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=''flow2'' AND TABLE_NAME=''Pallets'' AND COLUMN_NAME=''PalletId''\")",
+      "Bash(sqlcmd -S \"LAPTOP-7ELHM2GA\\\\SQLEXPRESS\" -d WmsDB -U sa -P \"0993904232pOpU#/#\" -Q \"SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=''master'' AND TABLE_NAME=''Users'' AND COLUMN_NAME=''UserId''\")",
+      "Bash(sqlcmd -S \"LAPTOP-7ELHM2GA\\\\SQLEXPRESS\" -d WmsDB -U sa -P \"0993904232pOpU#/#\" -Q \"SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME=''PutawaySessions''; SELECT MigrationId FROM [__EFMigrationsHistory] ORDER BY MigrationId;\")",
+      "Bash(dotnet build)",
+      "Bash(flutter pub get)",
+      "Bash(flutter analyze lib/screens/putaway/putaway_screen.dart)",
+      "Bash(flutter analyze lib/screens/putaway/putaway_screen.dart lib/services/api_service.dart)",
+      "Bash(dotnet ef:*)",
+      "Bash(sqlcmd -S \"LAPTOP-7ELHM2GA\\\\SQLEXPRESS\" -U sa -P \"0993904232pOpU#/#\" -d WmsDB -Q \"SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=''flow2'' AND TABLE_NAME=''Pallets''\" -h -1 -W)",
+      "Bash(sqlcmd -S \"LAPTOP-7ELHM2GA\\\\SQLEXPRESS\" -U sa -P \"0993904232pOpU#/#\" -d WmsDB -Q \"SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE COLUMN_NAME IN \\(''PalletId'',''UserId'',''PartId''\\) ORDER BY TABLE_SCHEMA, TABLE_NAME\" -h -1 -W)"
     ]
   }
 }

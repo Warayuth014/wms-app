@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:wmsapp/screens/home_screen.dart';
 import 'package:wmsapp/services/connectivity_service.dart';
 import 'package:wmsapp/services/offline_service.dart';
@@ -22,6 +23,16 @@ class WmsApp extends StatelessWidget {
       title: 'WMS',
       theme: AppTheme.light,
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('th', 'TH'),
+        Locale('en', 'US'),
+      ],
+      locale: const Locale('th', 'TH'),
       home: const HomeScreen(),
     );
   }

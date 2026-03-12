@@ -129,7 +129,7 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
       return;
     }
 
-    showSuccessSnackbar(context, '✅ Pallet $palletId ($_palletType) ผูกสำเร็จ');
+    showSuccessSnackbar(context, 'Pallet $palletId ($_palletType) ผูกสำเร็จ');
 
     // แจ้ง scan_part_screen ว่า lines ไหนผูกแล้ว
     widget.onAssigned(_selectedLineIds.toList());
@@ -298,7 +298,7 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
                                 child: _TypeButton(
                                   label: 'PW',
                                   desc: 'ต้องติดสติ๊กเกอร์ก่อน',
-                                  color: Colors.orange,
+                                  color: AppTheme.warning,
                                   selected: _palletType == 'PW',
                                   onTap: () =>
                                       setState(() => _palletType = 'PW'),

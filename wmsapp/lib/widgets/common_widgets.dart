@@ -196,21 +196,21 @@ class StatusBadge extends StatelessWidget {
 
   Color get _color => switch (status.toUpperCase()) {
     'FG' => AppTheme.success,
-    'PW' => Colors.orange,
+    'PW' => AppTheme.warning,
     'DAMAGED' => AppTheme.danger,
     'RECEIVED' => AppTheme.primary,
-    'PARTIAL' => Colors.orange,
-    'PENDING' => Colors.grey,
+    'PARTIAL' => AppTheme.warning,
+    'PENDING' => AppTheme.textGrey,
     'CONFIRMED' => AppTheme.success,
     'LOADED' => AppTheme.success,
     'CANCELLED' => AppTheme.danger,
     'NORMAL' => AppTheme.success,
     'OPEN' => AppTheme.primary,
-    'CLOSED' => Colors.grey,
-    'STEP1' => Colors.orange,
+    'CLOSED' => AppTheme.textGrey,
+    'STEP1' => AppTheme.warning,
     'STEP2' => AppTheme.secondary,
     'COMPLETED' => AppTheme.success,
-    _ => Colors.grey,
+    _ => AppTheme.textGrey,
   };
 
   @override

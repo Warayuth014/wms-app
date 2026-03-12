@@ -112,7 +112,7 @@ class _ScanPalletScreenState extends State<ScanPalletScreen> {
 
     showSuccessSnackbar(
       context,
-      '✅ เปลี่ยนสถานะเป็น FG แล้ว กรุณาสแกน Pallet ใหม่',
+      'เปลี่ยนสถานะเป็น FG แล้ว กรุณาสแกน Pallet ใหม่',
     );
 
     // scan ใหม่
@@ -151,12 +151,8 @@ class _ScanPalletScreenState extends State<ScanPalletScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => UnloadScreen(
-          userId: widget.userId,
-          fullName: widget.fullName,
-          session: result.data!,
-          pallet: _pallet!,
-        ),
+        builder: (_) =>
+            UnloadScreen(userId: widget.userId, fullName: widget.fullName),
       ),
     ).then((_) {
       // reset หลังกลับมา
@@ -239,7 +235,7 @@ class _ScanPalletScreenState extends State<ScanPalletScreen> {
                       // ── Action Button ──────────
                       if (_pallet!.needsLabeling)
                         PrimaryButton(
-                          label: 'ติดสติ๊กเกอร์แล้ว ✅',
+                          label: 'ติดสติ๊กเกอร์แล้ว',
                           icon: Icons.label,
                           onPressed: _confirmLabeling,
                         )

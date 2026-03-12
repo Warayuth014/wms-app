@@ -149,6 +149,27 @@ class ApiService {
     return ApiResult.success(ReceivingSession.fromJson(r.data!));
   }
 
+  /// ดึง session ที่ยังเปิดอยู่ของ PO (ถ้ามี)
+  /// คืน null ถ้าไม่มี session ที่ค้างอยู่ (404 หรือ error ใดๆ = ไม่มี)
+  Future<ReceivingSession?> getActiveReceivingSession(String poId) async {
+    try {
+      final base = await ApiService._resolveBase();
+      final res = await http
+          .get(
+            Uri.parse('$base/receiving/active-session/$poId'),
+            headers: _headers,
+          )
+          .timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        return ReceivingSession.fromJson(body);
+      }
+      return null; // 404 หรือ error อื่น = ไม่มี session ค้างอยู่
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<ApiResult<ReceiptLineResponse>> scanReceiptPart({
     required int sessionId,
     required String poId,
@@ -276,6 +297,36 @@ class ApiService {
   }
 
   // =============================================
+  // PUTAWAY
+  // =============================================
+
+  Future<ApiResult<PutawayPalletInfo>> scanPalletForPutaway(
+    String palletId, {
+    String? stationId,
+  }) async {
+    final query = stationId != null ? '?stationId=$stationId' : '';
+    final r = await _get('/putaway/scan-pallet/$palletId$query');
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(PutawayPalletInfo.fromJson(r.data!));
+  }
+
+  Future<ApiResult<PutawayResult>> confirmPutaway({
+    required String stationId,
+    required String palletId,
+    required String destination,
+    required String operatorId,
+  }) async {
+    final r = await _post('/putaway/confirm', {
+      'stationId': stationId,
+      'palletId': palletId,
+      'destination': destination,
+      'operatorId': operatorId,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(PutawayResult.fromJson(r.data!));
+  }
+
+  // =============================================
   // Cancel
   // =============================================
 
@@ -324,5 +375,198 @@ class ApiService {
     if (!r.success) return ApiResult.error(r.error);
     final list = r.data!['items'] as List;
     return ApiResult.success(list.map((i) => CancelLog.fromJson(i)).toList());
+  }
+
+  // ── Return ────────────────────────────────
+
+  Future<ApiResult<OrderResponse>> getReturnOrder(String orderId) async {
+    final r = await _get('/return/order/$orderId');
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(OrderResponse.fromJson(r.data!));
+  }
+
+  Future<ApiResult<OpenReturnResponse>> openReturnSession({
+    required String orderId,
+    required String operatorId,
+  }) async {
+    final r = await _post('/return/open-session', {
+      'orderId': orderId,
+      'operatorId': operatorId,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(OpenReturnResponse.fromJson(r.data!));
+  }
+
+  Future<ApiResult<ReceiveReturnItemResponse>> receiveReturnItem({
+    required int returnId,
+    required String orderId,
+    required String partId,
+    required int qtyReturned,
+    String? note,
+    required String operatorId,
+  }) async {
+    final r = await _post('/return/receive-item', {
+      'returnId': returnId,
+      'orderId': orderId,
+      'partId': partId,
+      'qtyReturned': qtyReturned,
+      'note': note,
+      'operatorId': operatorId,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(ReceiveReturnItemResponse.fromJson(r.data!));
+  }
+
+  Future<ApiResult<CloseReturnResponse>> closeReturnSession(
+    int returnId,
+  ) async {
+    final r = await _post('/return/close-session/$returnId', {});
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(CloseReturnResponse.fromJson(r.data!));
+  }
+
+  // GET confirmed items สำหรับ Load Basket
+  Future<ApiResult<List<ConfirmedUnloadItem>>> getConfirmedUnloadItems() async {
+    final r = await _get('/unload/confirmed-items');
+    if (!r.success) return ApiResult.error(r.error);
+    final list = (r.data!['items'] as List)
+        .map((i) => ConfirmedUnloadItem.fromJson(i))
+        .toList();
+    return ApiResult.success(list);
+  }
+
+  Future<ApiResult<List<LoadedBasketItem>>> getLoadedBasketItems() async {
+    final r = await _get('/unload/loaded-items');
+    if (!r.success) return ApiResult.error(r.error);
+    final list = (r.data!['items'] as List)
+        .map((i) => LoadedBasketItem.fromJson(i))
+        .toList();
+    return ApiResult.success(list);
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> returnPalletToAsis({
+    required String palletId,
+    int? sessionId,
+    required String operatorId,
+  }) async {
+    final r = await _post('/unload/return-pallet-to-asis', {
+      'palletId': palletId,
+      'sessionId': sessionId,
+      'operatorId': operatorId,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(r.data!);
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> returnBasket({
+    required String basketId,
+    required String operatorId,
+  }) async {
+    final r = await _post('/unload/return-basket', {
+      'basketId': basketId,
+      'operatorId': operatorId,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(r.data!);
+  }
+
+  // =============================================
+  // PICKING
+  // =============================================
+
+  Future<ApiResult<PickingSession>> openPickingSession({
+    required String packPalletId,
+    required String operatorId,
+  }) async {
+    final r = await _post('/picking/open-session', {
+      'packPalletId': packPalletId,
+      'operatorId': operatorId,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(PickingSession.fromJson(r.data!));
+  }
+
+  Future<PickingSession?> getActivePickingSession(String packPalletId) async {
+    try {
+      final base = await ApiService._resolveBase();
+      final res = await http
+          .get(
+            Uri.parse('$base/picking/active-session/$packPalletId'),
+            headers: _headers,
+          )
+          .timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        return PickingSession.fromJson(body);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<ApiResult<PickPalletResponse>> scanPickPallet(
+    String palletId,
+  ) async {
+    final r = await _get('/picking/scan-pick-pallet/$palletId');
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(PickPalletResponse.fromJson(r.data!));
+  }
+
+  Future<ApiResult<PickItemResult>> pickItem({
+    required int sessionId,
+    required String pickPalletId,
+    required String partId,
+    required int qtyPicked,
+    required String operatorId,
+  }) async {
+    final r = await _post('/picking/pick-item', {
+      'sessionId': sessionId,
+      'pickPalletId': pickPalletId,
+      'partId': partId,
+      'qtyPicked': qtyPicked,
+      'operatorId': operatorId,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(PickItemResult.fromJson(r.data!));
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> returnPickPallet({
+    required String palletId,
+    required String operatorId,
+  }) async {
+    final r = await _post('/picking/return-pick-pallet', {
+      'palletId': palletId,
+      'operatorId': operatorId,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(r.data!);
+  }
+
+  Future<ApiResult<CompletePickingResult>> completePickingSession(
+    int sessionId,
+  ) async {
+    final r = await _post('/picking/complete-session/$sessionId', {});
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(CompletePickingResult.fromJson(r.data!));
+  }
+
+  // Load to basket (independent)
+  Future<ApiResult<Map<String, dynamic>>> loadToBasketIndependent({
+    required int unloadLineId,
+    required String basketId,
+    required String partId,
+    required String palletId,
+    required String operatorId,
+  }) async {
+    final r = await _post('/unload/load-basket', {
+      'unloadLineId': unloadLineId,
+      'basketId': basketId,
+      'partId': partId,
+      'palletId': palletId,
+      'operatorId': operatorId,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(r.data!);
   }
 }
