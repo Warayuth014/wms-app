@@ -6,18 +6,25 @@ import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import '../../models/wms_models.dart';
 
+// ── Screen states ──────────────────────────────────────────────────────────
+enum _PickState {
+  scanSource, // รอสแกน source pallet (สำหรับรอบถัดไป)
+  pickView,   // แสดง station + รายการที่ต้องหยิบ
+  scanDest,   // รอสแกน dest (pallet เปล่า)
+}
+
 class PickItemsScreen extends StatefulWidget {
   final String userId;
   final String fullName;
-  final int sessionId;
-  final String packPalletId;
+  final String pickOrderId;
+  final AssignPickStationResponse initialAssignment;
 
   const PickItemsScreen({
     super.key,
     required this.userId,
     required this.fullName,
-    required this.sessionId,
-    required this.packPalletId,
+    required this.pickOrderId,
+    required this.initialAssignment,
   });
 
   @override
@@ -25,399 +32,642 @@ class PickItemsScreen extends StatefulWidget {
 }
 
 class _PickItemsScreenState extends State<PickItemsScreen> {
-  final _pickPalletController = TextEditingController();
+  final _sourceScanCtrl = TextEditingController();
+  final _sourceScanFocus = FocusNode();
+  final _destScanCtrl = TextEditingController();
+  final _destScanFocus = FocusNode();
   final _api = ApiService();
 
+  _PickState _state = _PickState.pickView; // เริ่มจาก pickView เลย (ได้ assignment มาแล้ว)
   bool _loading = false;
-  PickPalletResponse? _pickPallet;
-  String? _currentPickPalletId;
 
-  // track qty ที่จะ pick สำหรับแต่ละ part
-  final Map<String, TextEditingController> _qtyControllers = {};
+  late String _pickOrderId;
+  late AssignPickStationResponse _assignment;
 
-  // ── Scan Pick Pallet ───────────────────────
-  Future<void> _scanPickPallet() async {
-    final palletId = _pickPalletController.text.trim().toUpperCase();
+  // qty controllers สำหรับแต่ละ part
+  final Map<String, TextEditingController> _qtyCtrl = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _pickOrderId = widget.pickOrderId;
+    _assignment = widget.initialAssignment;
+    _buildQtyControllers();
+  }
+
+  void _buildQtyControllers() {
+    _disposeQtyCtrl();
+    for (final item in _assignment.palletItems) {
+      _qtyCtrl[item.partId] = TextEditingController(
+        text: '${item.qtyToPickSuggested}',
+      );
+    }
+  }
+
+  void _disposeQtyCtrl() {
+    for (final c in _qtyCtrl.values) {
+      c.dispose();
+    }
+    _qtyCtrl.clear();
+  }
+
+  // ── Scan source pallet (สำหรับรอบถัดไป) ────
+  Future<void> _scanSourcePallet() async {
+    final palletId = _sourceScanCtrl.text.trim().toUpperCase();
     if (palletId.isEmpty) return;
 
-    // ไม่ให้ scan pack pallet ตัวเอง
-    if (palletId == widget.packPalletId) {
-      showErrorDialog(context, message: 'ไม่สามารถ pick จาก Pack Pallet ตัวเองได้');
-      _pickPalletController.clear();
-      return;
-    }
-
     setState(() => _loading = true);
-
-    final result = await _api.scanPickPallet(palletId);
-
+    final result = await _api.assignPickStation(
+      palletId: palletId,
+      operatorId: widget.userId,
+      pickOrderId: _pickOrderId,
+    );
     if (!mounted) return;
     setState(() => _loading = false);
 
     if (!result.success) {
-      showErrorDialog(context, message: result.error ?? 'ไม่พบ Pallet นี้');
-      _pickPalletController.clear();
+      showErrorDialog(
+        context,
+        message: result.error ?? 'สแกน Pallet ไม่สำเร็จ',
+      );
+      _sourceScanCtrl.clear();
+      _sourceScanFocus.requestFocus();
       return;
     }
 
-    // ตั้ง qty controllers
-    _qtyControllers.clear();
-    for (final item in result.data!.items) {
-      _qtyControllers[item.partId] =
-          TextEditingController(text: '${item.qty}');
-    }
+    _assignment = result.data!;
+    _buildQtyControllers();
 
     setState(() {
-      _pickPallet = result.data;
-      _currentPickPalletId = palletId;
+      _state = _PickState.pickView;
     });
   }
 
-  // ── Pick single item ───────────────────────
-  Future<void> _pickItem(PickPalletItem item) async {
-    final qtyText = _qtyControllers[item.partId]?.text.trim() ?? '';
-    final qty = int.tryParse(qtyText);
-    if (qty == null || qty <= 0) {
-      showWarningSnackbar(context, 'กรุณาระบุจำนวนที่ถูกต้อง');
-      return;
-    }
-    if (qty > item.qty) {
-      showWarningSnackbar(context, 'จำนวนเกินกว่าที่มีบน Pallet (${item.qty})');
-      return;
-    }
-
-    setState(() => _loading = true);
-
-    final result = await _api.pickItem(
-      sessionId: widget.sessionId,
-      pickPalletId: _currentPickPalletId!,
-      partId: item.partId,
-      qtyPicked: qty,
-      operatorId: widget.userId,
-    );
-
-    if (!mounted) return;
-    setState(() => _loading = false);
-
-    if (!result.success) {
-      showErrorDialog(context, message: result.error ?? 'Pick ไม่สำเร็จ');
-      return;
-    }
-
-    showSuccessSnackbar(context, 'Pick ${item.partId} x$qty สำเร็จ');
-
-    // รีเฟรชข้อมูล pick pallet
-    if (result.data!.remainingOnPickPallet == 0) {
-      // Pallet ว่างแล้ว → ถามส่งกลับ
-      _showReturnDialog(isEmpty: true);
-    } else {
-      // รีเฟรช pallet data
-      await _refreshPickPallet();
-    }
+  // ── User confirms pick → go to scan dest ──
+  void _goToScanDest() {
+    setState(() {
+      _state = _PickState.scanDest;
+      _destScanCtrl.clear();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _destScanFocus.requestFocus();
+    });
   }
 
-  // ── Pick All items ─────────────────────────
-  Future<void> _pickAllItems() async {
-    if (_pickPallet == null) return;
+  // ── Scan dest pallet → confirm pick ───────
+  Future<void> _scanDestAndConfirm() async {
+    final destId = _destScanCtrl.text.trim().toUpperCase();
+    if (destId.isEmpty) return;
 
-    final confirm = await showConfirmDialog(
-      context,
-      title: 'Pick ทั้งหมด',
-      message: 'ต้องการ pick สินค้าทุกรายการจาก Pallet นี้?',
-      confirmLabel: 'Pick ทั้งหมด',
-    );
-    if (!confirm || !mounted) return;
-
-    setState(() => _loading = true);
-
-    for (final item in _pickPallet!.items) {
-      final qtyText = _qtyControllers[item.partId]?.text.trim() ?? '';
-      final qty = int.tryParse(qtyText) ?? item.qty;
-      if (qty <= 0) continue;
-
-      final result = await _api.pickItem(
-        sessionId: widget.sessionId,
-        pickPalletId: _currentPickPalletId!,
-        partId: item.partId,
-        qtyPicked: qty,
-        operatorId: widget.userId,
+    if (destId == _assignment.palletId) {
+      showErrorDialog(
+        context,
+        message: 'Dest Pallet ต้องไม่ใช่ Source Pallet เดียวกัน',
       );
+      return;
+    }
 
-      if (!mounted) return;
-
-      if (!result.success) {
-        setState(() => _loading = false);
-        showErrorDialog(context,
-            message: 'Pick ${item.partId} ล้มเหลว: ${result.error}');
-        return;
+    // รวบรวม items ที่จะ pick
+    final items = <Map<String, dynamic>>[];
+    for (final item in _assignment.palletItems) {
+      final qty = int.tryParse(_qtyCtrl[item.partId]?.text.trim() ?? '') ?? 0;
+      if (qty > 0) {
+        items.add({'partId': item.partId, 'qty': qty});
       }
     }
 
-    setState(() => _loading = false);
-    if (!mounted) return;
-
-    showSuccessSnackbar(context, 'Pick ทุกรายการสำเร็จ');
-    _showReturnDialog(isEmpty: true);
-  }
-
-  // ── Refresh pick pallet data ───────────────
-  Future<void> _refreshPickPallet() async {
-    if (_currentPickPalletId == null) return;
-
-    final result = await _api.scanPickPallet(_currentPickPalletId!);
-    if (!mounted) return;
-
-    if (!result.success) {
-      // ไม่มีของเหลือแล้ว
-      _showReturnDialog(isEmpty: true);
+    if (items.isEmpty) {
+      showWarningSnackbar(
+        context,
+        'กรุณาระบุจำนวนที่จะ pick อย่างน้อย 1 รายการ',
+      );
       return;
     }
-
-    _qtyControllers.clear();
-    for (final item in result.data!.items) {
-      _qtyControllers[item.partId] =
-          TextEditingController(text: '${item.qty}');
-    }
-
-    setState(() => _pickPallet = result.data);
-  }
-
-  // ── Return Pick Pallet Dialog ──────────────
-  Future<void> _showReturnDialog({required bool isEmpty}) async {
-    final confirm = await showConfirmDialog(
-      context,
-      title: isEmpty ? 'Pallet ว่างแล้ว' : 'ส่ง Pick Pallet กลับ',
-      message: isEmpty
-          ? 'Pick Pallet $_currentPickPalletId ว่างแล้ว\nส่งกลับ ASRS?'
-          : 'ส่ง Pick Pallet $_currentPickPalletId กลับ ASRS?\n(ยังมีสินค้าเหลืออยู่)',
-      confirmLabel: 'ส่งกลับ',
-    );
-
-    if (!confirm || !mounted) return;
 
     setState(() => _loading = true);
-
-    final result = await _api.returnPickPallet(
-      palletId: _currentPickPalletId!,
+    final result = await _api.confirmPickV2(
+      pickOrderId: _pickOrderId,
+      sourcePalletId: _assignment.palletId,
+      destPalletId: destId,
+      items: items,
       operatorId: widget.userId,
     );
-
     if (!mounted) return;
     setState(() => _loading = false);
 
     if (!result.success) {
-      showErrorDialog(context, message: result.error ?? 'ส่งกลับไม่สำเร็จ');
+      showErrorDialog(
+        context,
+        message: result.error ?? 'Confirm pick ไม่สำเร็จ',
+      );
       return;
     }
 
-    showSuccessSnackbar(context, 'ส่ง Pallet กลับ ASRS สำเร็จ');
+    final res = result.data!;
+    final sourcePalletId = _assignment.palletId;
 
-    // ถามว่าจะ pick pallet อีกตัวหรือกลับ
+    // ให้ user เลือกส่ง source pallet กลับที่ไหน
     if (!mounted) return;
-    final pickMore = await showConfirmDialog(
-      context,
-      title: 'Pick ต่อ?',
-      message: 'ต้องการ scan Pick Pallet อีกตัวหรือไม่?',
-      confirmLabel: 'Pick ต่อ',
+    await _showReturnPalletDialog(
+      sourcePalletId: sourcePalletId,
+      isEmpty: res.sourcePalletEmpty,
     );
+    if (!mounted) return;
 
-    if (pickMore && mounted) {
-      setState(() {
-        _pickPallet = null;
-        _currentPickPalletId = null;
-        _qtyControllers.clear();
-        _pickPalletController.clear();
-      });
-    } else if (mounted) {
+    if (res.isPickOrderComplete) {
+      // Pick order ครบ — แสดง dialog แล้วกลับ
+      await _showCompleteDialog(res, destId);
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+
+    // ยังไม่ครบ — แสดง summary แล้วเริ่ม loop ใหม่
+    await _showCycleDoneDialog(res, destId);
+    if (!mounted) return;
+
+    _resetToScanSource();
+  }
+
+  // ── Return pallet dialog — เลือกส่งกลับ ASRS หรือ ZONE PACK ──
+  Future<void> _showReturnPalletDialog({
+    required String sourcePalletId,
+    required bool isEmpty,
+  }) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(
+              isEmpty ? Icons.inventory_2_outlined : Icons.inventory_2,
+              color: isEmpty ? AppTheme.textGrey : AppTheme.warning,
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'ส่ง $sourcePalletId กลับ',
+                style: const TextStyle(fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isEmpty
+                  ? 'Pallet ว่างแล้ว — เลือกปลายทาง'
+                  : 'Pallet ยังมีของเหลือ — เลือกปลายทาง',
+              style: const TextStyle(fontSize: 13, color: AppTheme.textGrey),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _returnPallet(sourcePalletId, 'ASRS');
+                },
+                icon: const Icon(Icons.warehouse, size: 18),
+                label: const Text('ส่งกลับ ASRS'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _returnPallet(sourcePalletId, 'ZONE_PACK');
+                },
+                icon: const Icon(Icons.local_shipping, size: 18),
+                label: const Text('ส่งไป ZONE PACK'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.secondary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _returnPallet(String palletId, String destination) async {
+    setState(() => _loading = true);
+    final result = await _api.returnPallet(
+      palletId: palletId,
+      destination: destination,
+    );
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (!result.success) {
+      showErrorDialog(
+        context,
+        message: result.error ?? 'ส่ง Pallet กลับไม่สำเร็จ',
+      );
+    }
+  }
+
+  void _resetToScanSource() {
+    _disposeQtyCtrl();
+    setState(() {
+      _state = _PickState.scanSource;
+      _sourceScanCtrl.clear();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sourceScanFocus.requestFocus();
+    });
+  }
+
+  // ── Complete dialog ──────────────────────────────
+  Future<void> _showCompleteDialog(
+    ConfirmPickResponse res,
+    String destId,
+  ) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: AppTheme.success, size: 28),
+            SizedBox(width: 8),
+            Text('Pick Order ครบแล้ว!'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InfoRow(label: 'Pick Order', value: _pickOrderId),
+            InfoRow(label: 'Dest Pallet', value: destId),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.success,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('กลับหน้าหลัก'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Cycle done dialog (ยังไม่ครบ) ────────────────
+  Future<void> _showCycleDoneDialog(
+    ConfirmPickResponse res,
+    String destId,
+  ) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.inventory_2, color: AppTheme.primary, size: 24),
+            SizedBox(width: 8),
+            Text('Pick รอบนี้เสร็จ'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InfoRow(label: 'Dest Pallet', value: destId),
+            const Divider(height: 16),
+            const Text(
+              'ยังต้อง Pick เพิ่ม:',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            ...res.remainingItems
+                .where((r) => r.remainingQty > 0)
+                .map(
+                  (r) => Padding(
+                    padding: const EdgeInsets.only(bottom: 3),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.arrow_right,
+                          size: 14,
+                          color: AppTheme.textGrey,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            '${r.partId}: เหลือ ${r.remainingQty} ชิ้น',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+          ],
+        ),
+        actions: [
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(ctx),
+            icon: const Icon(Icons.qr_code_scanner, size: 18),
+            label: const Text('Scan Pallet ต่อ'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Back handling ────────────────────────────────
+  void _handleBack() {
+    if (_state == _PickState.scanDest) {
+      // กลับไปแก้ไขจำนวน
+      setState(() => _state = _PickState.pickView);
+    } else if (_state == _PickState.scanSource) {
+      // กลับไปหน้า picking (exit)
+      Navigator.pop(context);
+    } else {
       Navigator.pop(context);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: WmsAppBar(title: 'Pick Items', userName: widget.fullName),
-      body: LoadingOverlay(
-        loading: _loading,
-        message: 'กำลังดำเนินการ...',
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ── Pack Pallet Info Bar ────────
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                      color: AppTheme.primary.withValues(alpha: 0.2)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.inventory_2,
-                        color: AppTheme.primary, size: 18),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Pack Pallet: ${widget.packPalletId}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.primary,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'Session #${widget.sessionId}',
-                      style: const TextStyle(
-                          fontSize: 12, color: AppTheme.textGrey),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // ── No Pick Pallet: Scan ───────
-              if (_pickPallet == null) ...[
-                WmsCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.qr_code_scanner,
-                              color: AppTheme.secondary),
-                          SizedBox(width: 8),
-                          Text(
-                            'Scan Pick Pallet',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.secondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'สแกน Pallet ที่จะหยิบสินค้าออก (ต้นทาง)',
-                        style:
-                            TextStyle(fontSize: 13, color: AppTheme.textGrey),
-                      ),
-                      const SizedBox(height: 12),
-                      ScanTextField(
-                        label: 'Pick Pallet ID',
-                        hint: 'Scan Pick Pallet ID',
-                        controller: _pickPalletController,
-                        onSubmit: _scanPickPallet,
-                      ),
-                      const SizedBox(height: 12),
-                      PrimaryButton(
-                        label: 'Scan',
-                        icon: Icons.search,
-                        onPressed: _scanPickPallet,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Back button
-                DangerButton(
-                  label: 'กลับ',
-                  icon: Icons.arrow_back,
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-
-              // ── Pick Pallet Loaded ─────────
-              if (_pickPallet != null) ...[
-                // Pallet Info
-                WmsCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.local_shipping,
-                              color: AppTheme.secondary, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Pick Pallet: $_currentPickPalletId',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.secondary,
-                            ),
-                          ),
-                          const Spacer(),
-                          StatusBadge(_pickPallet!.type),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${_pickPallet!.items.length} รายการบน Pallet',
-                        style: const TextStyle(
-                            fontSize: 13, color: AppTheme.textGrey),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Pick All Button
-                PrimaryButton(
-                  label: 'Pick ทั้งหมด',
-                  icon: Icons.select_all,
-                  onPressed: _pickAllItems,
-                ),
-                const SizedBox(height: 12),
-
-                // ── Items List ────────────────
-                const Row(
-                  children: [
-                    Icon(Icons.list_alt, color: AppTheme.textPrimary, size: 18),
-                    SizedBox(width: 6),
-                    Text(
-                      'รายการสินค้า',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                ..._pickPallet!.items.map((item) => _buildItemCard(item)),
-
-                const SizedBox(height: 16),
-
-                // Return Pallet button
-                Row(
-                  children: [
-                    Expanded(
-                      child: DangerButton(
-                        label: 'ส่ง Pallet กลับ',
-                        icon: Icons.keyboard_return,
-                        onPressed: () =>
-                            _showReturnDialog(isEmpty: false),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ),
+    return PopScope(
+      canPop: _state == _PickState.pickView &&
+          _assignment == widget.initialAssignment,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
+        appBar: WmsAppBar(
+          title: 'Pick: $_pickOrderId',
+          userName: widget.fullName,
+        ),
+        body: LoadingOverlay(
+          loading: _loading,
+          message: 'กำลังดำเนินการ...',
+          child: switch (_state) {
+            _PickState.scanSource => _buildScanSource(),
+            _PickState.pickView => _buildPickView(),
+            _PickState.scanDest => _buildScanDest(),
+          },
         ),
       ),
     );
   }
 
-  Widget _buildItemCard(PickPalletItem item) {
-    final qtyCtrl = _qtyControllers[item.partId];
+  // ══════════════════════════════════════════════════
+  // State 1: Scan Source Pallet (สำหรับรอบถัดไป)
+  // ══════════════════════════════════════════════════
+  Widget _buildScanSource() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Order info
+          _buildOrderInfoBanner(),
+          const SizedBox(height: 16),
+
+          // Scan card
+          WmsCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.qr_code_scanner, color: AppTheme.primary),
+                    SizedBox(width: 8),
+                    Text(
+                      'Scan Source Pallet',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'สแกน Pallet ถัดไปที่ต้องการ Pick',
+                  style: TextStyle(fontSize: 13, color: AppTheme.textGrey),
+                ),
+                const SizedBox(height: 12),
+                ScanTextField(
+                  label: 'Source Pallet ID',
+                  hint: 'Scan Pallet ID',
+                  controller: _sourceScanCtrl,
+                  focusNode: _sourceScanFocus,
+                  onSubmit: _scanSourcePallet,
+                ),
+                const SizedBox(height: 12),
+                PrimaryButton(
+                  label: 'Scan',
+                  icon: Icons.search,
+                  onPressed: _scanSourcePallet,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════
+  // State 2: Pick View (station info + items)
+  // ══════════════════════════════════════════════════
+  Widget _buildPickView() {
+    final a = _assignment;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Station info banner
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppTheme.success.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: AppTheme.success.withValues(alpha: 0.4),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.location_on,
+                  color: AppTheme.success,
+                  size: 22,
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      a.stationName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: AppTheme.success,
+                      ),
+                    ),
+                    Text(
+                      'Station: ${a.stationId}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textGrey,
+                      ),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    a.palletId,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Order remaining needs
+          WmsCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.assignment, color: AppTheme.secondary, size: 18),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Pick Order: $_pickOrderId',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.secondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ...a.pickOrderItems.map(
+                  (oi) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.arrow_right,
+                          size: 14,
+                          color: AppTheme.textGrey,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            '${oi.partId}: ${oi.itemDesc}',
+                            style: const TextStyle(fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          'ต้องการ ${oi.remainingQty}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.warning,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Pallet items (qty editors)
+          const Row(
+            children: [
+              Icon(Icons.inventory_2, color: AppTheme.textPrimary, size: 18),
+              SizedBox(width: 6),
+              Text(
+                'รายการบน Pallet (ระบุจำนวนที่จะหยิบ)',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          ...a.palletItems.map((item) => _buildPalletItemCard(item)),
+          const SizedBox(height: 16),
+
+          // Pick done button
+          PrimaryButton(
+            label: 'หยิบครบแล้ว → สแกน Pallet เปล่า',
+            icon: Icons.arrow_forward,
+            onPressed: _goToScanDest,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPalletItemCard(PickItemOnPallet item) {
+    final ctrl = _qtyCtrl[item.partId];
+    // หา remaining จาก pickOrderItems
+    final orderItem = _assignment.pickOrderItems
+        .where((oi) => oi.partId == item.partId)
+        .firstOrNull;
+    final needed = orderItem?.remainingQty ?? 0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -437,7 +687,6 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Part ID + Condition
           Row(
             children: [
               Expanded(
@@ -457,84 +706,59 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
             item.itemDesc,
             style: const TextStyle(fontSize: 13, color: AppTheme.textGrey),
           ),
-          const SizedBox(height: 2),
           Text(
             '${item.owner} / ${item.brand}',
             style: const TextStyle(fontSize: 12, color: AppTheme.textGrey),
           ),
-
-          // Lot & Expiry
-          if (item.lotNumber != null || item.expiredDate != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Row(
-                children: [
-                  if (item.lotNumber != null) ...[
-                    const Icon(Icons.tag, size: 12, color: AppTheme.textGrey),
-                    const SizedBox(width: 2),
-                    Text(item.lotNumber!,
-                        style: const TextStyle(
-                            fontSize: 12, color: AppTheme.textGrey)),
-                    const SizedBox(width: 8),
-                  ],
-                  if (item.expiredDate != null) ...[
-                    const Icon(Icons.calendar_today,
-                        size: 12, color: AppTheme.textGrey),
-                    const SizedBox(width: 2),
-                    Text(item.expiredDate!,
-                        style: const TextStyle(
-                            fontSize: 12, color: AppTheme.textGrey)),
-                  ],
-                ],
-              ),
-            ),
-
-          const Divider(height: 16),
-
-          // Qty + Pick button
+          const Divider(height: 14),
           Row(
             children: [
-              Text(
-                'มี: ${item.qty}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textPrimary,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'บน Pallet: ${item.qtyOnPallet}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.textGrey,
+                    ),
+                  ),
+                  if (needed > 0)
+                    Text(
+                      'ต้องการ: $needed',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.warning,
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(width: 12),
+              const Spacer(),
+              const Text(
+                'จำนวนหยิบ: ',
+                style: TextStyle(fontSize: 13, color: AppTheme.textGrey),
+              ),
               SizedBox(
-                width: 80,
-                height: 40,
+                width: 72,
+                height: 38,
                 child: TextField(
-                  controller: qtyCtrl,
+                  controller: ctrl,
                   keyboardType: TextInputType.number,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w700),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
                   decoration: InputDecoration(
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 8),
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                     isDense: true,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              ElevatedButton.icon(
-                onPressed: () => _pickItem(item),
-                icon: const Icon(Icons.arrow_forward, size: 18),
-                label: const Text('Pick'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.success,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(0, 40),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
                   ),
                 ),
               ),
@@ -545,12 +769,164 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
     );
   }
 
+  // ══════════════════════════════════════════════════
+  // State 3: Scan Dest Pallet
+  // ══════════════════════════════════════════════════
+  Widget _buildScanDest() {
+    final picked = <String, int>{};
+    for (final item in _assignment.palletItems) {
+      final qty = int.tryParse(_qtyCtrl[item.partId]?.text.trim() ?? '') ?? 0;
+      if (qty > 0) picked[item.partId] = qty;
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Summary of what was picked
+          WmsCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.check_circle, color: AppTheme.success, size: 18),
+                    SizedBox(width: 6),
+                    Text(
+                      'รายการที่หยิบ',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.success,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ...picked.entries.map((e) {
+                  final item = _assignment.palletItems.firstWhere(
+                    (i) => i.partId == e.key,
+                  );
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.check,
+                          size: 14,
+                          color: AppTheme.success,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '${e.key} — ${item.itemDesc}',
+                            style: const TextStyle(fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          'x${e.value}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.success,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Scan dest pallet
+          WmsCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.qr_code_scanner, color: AppTheme.secondary),
+                    SizedBox(width: 8),
+                    Text(
+                      'Scan Pallet เปล่า (ปลายทาง)',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.secondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'สแกน Pallet เปล่าที่จะใส่สินค้าที่หยิบมา',
+                  style: TextStyle(fontSize: 13, color: AppTheme.textGrey),
+                ),
+                const SizedBox(height: 12),
+                ScanTextField(
+                  label: 'Dest Pallet ID',
+                  hint: 'Scan Pallet เปล่า',
+                  controller: _destScanCtrl,
+                  focusNode: _destScanFocus,
+                  onSubmit: _scanDestAndConfirm,
+                ),
+                const SizedBox(height: 12),
+                PrimaryButton(
+                  label: 'ยืนยัน',
+                  icon: Icons.check,
+                  onPressed: _scanDestAndConfirm,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          DangerButton(
+            label: 'กลับแก้ไขจำนวน',
+            icon: Icons.edit,
+            onPressed: () => setState(() => _state = _PickState.pickView),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Order info banner ────────────────────────────
+  Widget _buildOrderInfoBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.assignment, color: AppTheme.primary, size: 18),
+          const SizedBox(width: 6),
+          Text(
+            'Pick Order: $_pickOrderId',
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              color: AppTheme.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
-    _pickPalletController.dispose();
-    for (final c in _qtyControllers.values) {
-      c.dispose();
-    }
+    _sourceScanCtrl.dispose();
+    _sourceScanFocus.dispose();
+    _destScanCtrl.dispose();
+    _destScanFocus.dispose();
+    _disposeQtyCtrl();
     super.dispose();
   }
 }

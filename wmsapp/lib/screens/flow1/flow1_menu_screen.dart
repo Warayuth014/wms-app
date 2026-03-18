@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../services/api_service.dart';
 import 'scan_po_screen.dart';
+import 'pending_pallet_screen.dart';
 import 'package:wmsapp/screens/flow1/return_screen.dart';
 
-class Flow1MenuScreen extends StatelessWidget {
+class Flow1MenuScreen extends StatefulWidget {
   final String userId;
   final String fullName;
 
@@ -15,9 +17,33 @@ class Flow1MenuScreen extends StatelessWidget {
   });
 
   @override
+  State<Flow1MenuScreen> createState() => _Flow1MenuScreenState();
+}
+
+class _Flow1MenuScreenState extends State<Flow1MenuScreen> {
+  final _api = ApiService();
+  int _pendingPalletCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPendingCount();
+  }
+
+  Future<void> _loadPendingCount() async {
+    final r = await _api.getPendingPalletLines();
+    if (mounted && r.success) {
+      setState(() => _pendingPalletCount = r.data!.length);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: WmsAppBar(title: 'Receive — รับสินค้าเข้า', userName: fullName),
+      appBar: WmsAppBar(
+        title: 'Receive — รับสินค้าเข้า',
+        userName: widget.fullName,
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -39,13 +65,45 @@ class Flow1MenuScreen extends StatelessWidget {
               title: 'รับสินค้าจาก PO',
               subtitle: 'สแกน PO Number เพื่อรับสินค้าจาก Supplier',
               color: AppTheme.primary,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      ScanPoScreen(userId: userId, fullName: fullName),
-                ),
-              ),
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ScanPoScreen(
+                      userId: widget.userId,
+                      fullName: widget.fullName,
+                    ),
+                  ),
+                );
+                _loadPendingCount(); // รีเฟรชหลังกลับมา
+              },
+            ),
+
+            const SizedBox(height: 12),
+
+            // ── ค้างการผูก Pallet ─────────────
+            _MenuCard(
+              icon: Icons.pallet,
+              title: 'ค้างการผูก Pallet',
+              subtitle: _pendingPalletCount == 0
+                  ? 'ไม่มีรายการค้าง'
+                  : 'มี $_pendingPalletCount รายการรอผูก Pallet',
+              color: _pendingPalletCount == 0
+                  ? AppTheme.textGrey
+                  : AppTheme.danger,
+              badge: _pendingPalletCount > 0 ? '$_pendingPalletCount' : null,
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PendingPalletScreen(
+                      userId: widget.userId,
+                      fullName: widget.fullName,
+                    ),
+                  ),
+                );
+                _loadPendingCount(); // รีเฟรชหลังกลับมา
+              },
             ),
 
             const SizedBox(height: 12),
@@ -54,13 +112,15 @@ class Flow1MenuScreen extends StatelessWidget {
             _MenuCard(
               icon: Icons.replay,
               title: 'รับสินค้าคืน',
-              subtitle: 'สแกน Order Number เพื่อรับสินค้าคืนจากลูกค้า',
+              subtitle: 'สแกน Order Number รับสินค้าคืนจากลูกค้า',
               color: AppTheme.warning,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) =>
-                      ReturnScreen(userId: userId, fullName: fullName),
+                  builder: (_) => ReturnScreen(
+                    userId: widget.userId,
+                    fullName: widget.fullName,
+                  ),
                 ),
               ),
             ),
@@ -80,6 +140,7 @@ class _MenuCard extends StatelessWidget {
   final String subtitle;
   final Color color;
   final VoidCallback onTap;
+  final String? badge;
 
   const _MenuCard({
     required this.icon,
@@ -87,6 +148,7 @@ class _MenuCard extends StatelessWidget {
     required this.subtitle,
     required this.color,
     required this.onTap,
+    this.badge,
   });
 
   @override
@@ -130,6 +192,26 @@ class _MenuCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (badge != null)
+              Container(
+                margin: const EdgeInsets.only(right: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  badge!,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
             const Icon(Icons.chevron_right, color: Colors.white70, size: 28),
           ],
         ),

@@ -74,6 +74,7 @@ class ScanTextField extends StatelessWidget {
   final VoidCallback onSubmit;
   final bool enabled;
   final TextInputType? keyboardType;
+  final FocusNode? focusNode;
 
   const ScanTextField({
     super.key,
@@ -83,12 +84,14 @@ class ScanTextField extends StatelessWidget {
     required this.onSubmit,
     this.enabled = true,
     this.keyboardType,
+    this.focusNode,
   });
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      focusNode: focusNode,
       enabled: enabled,
       keyboardType: keyboardType,
       textInputAction: TextInputAction.search,
@@ -172,6 +175,41 @@ class DangerButton extends StatelessWidget {
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
         backgroundColor: AppTheme.danger,
+        foregroundColor: Colors.white,
+        minimumSize: const Size(double.infinity, 52),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (icon != null) ...[Icon(icon, size: 20), const SizedBox(width: 8)],
+          Text(label),
+        ],
+      ),
+    );
+  }
+}
+
+// =============================================
+// WarningButton
+// =============================================
+class WarningButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+
+  const WarningButton({
+    super.key,
+    required this.label,
+    this.onPressed,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppTheme.warning,
         foregroundColor: Colors.white,
         minimumSize: const Size(double.infinity, 52),
       ),
@@ -413,10 +451,12 @@ Future<void> showErrorDialog(
         children: [
           const Icon(Icons.error_outline, color: AppTheme.danger),
           const SizedBox(width: 8),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+          Expanded(
+            child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
         ],
       ),
-      content: Text(message),
+      content: Text(message, style: const TextStyle(height: 1.5)),
       actions: [
         ElevatedButton(
           onPressed: () => Navigator.pop(ctx),

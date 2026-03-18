@@ -7,7 +7,6 @@ import '../../services/api_service.dart';
 import '../../services/offline_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../models/wms_models.dart';
-import 'assign_pallet_screen.dart';
 
 class ScanPartScreen extends StatefulWidget {
   final String userId;
@@ -29,32 +28,54 @@ class ScanPartScreen extends StatefulWidget {
 
 class _ScanPartScreenState extends State<ScanPartScreen> {
   final _partController = TextEditingController();
+  final _partFocus = FocusNode();
   final _qtyController = TextEditingController();
   final _lotController = TextEditingController();
+  final _palletController = TextEditingController();
+  final _palletFocus = FocusNode();
   final _api = ApiService();
 
   DateTime? _selectedExpDate;
-
-  // Part ที่สแกนได้แล้ว รอผูก pallet
-  final List<ReceiptLineResponse> _scannedLines = [];
-
-  String _condition = 'NORMAL';
+  String _condition = 'FG'; // FG | PW (แทน NORMAL/DAMAGED)
   bool _loading = false;
   bool _isOnline = true;
+
+  // ── PO ล่าสุด (อัปเดตได้) ─────────────────
+  late POResponse _currentPo;
+
+  // ── Pallet ที่จำไว้ (ใช้ซ้ำ) ──────────────
+  String? _lastPalletId;
+  String? _lastPalletType;
+
+  // ── Line ที่รอผูก pallet ──────────────────
+  ReceiptLineResponse? _pendingLine;
+
+  // ── Lines ที่ผูก pallet แล้ว ──────────────
+  final List<_AssignedLine> _assignedLines = [];
+
+  // ── Lines ที่รอผูก pallet จาก resume ──────
+  final List<ReceiptLineResponse> _resumedPendingLines = [];
 
   @override
   void initState() {
     super.initState();
+    _currentPo = widget.po;
     _checkConnectivity();
-    // Restore lines ที่รอผูก pallet จาก session ที่ resume มา
     if (widget.session.pendingLines.isNotEmpty) {
-      _scannedLines.addAll(widget.session.pendingLines);
+      _resumedPendingLines.addAll(widget.session.pendingLines);
+    }
+  }
+
+  Future<void> _reloadPo() async {
+    final result = await _api.getPO(_currentPo.poId);
+    if (mounted && result.success) {
+      setState(() => _currentPo = result.data!);
     }
   }
 
   Future<void> _checkConnectivity() async {
     final online = await ConnectivityService().checkNow();
-    setState(() => _isOnline = online);
+    if (mounted) setState(() => _isOnline = online);
   }
 
   // ── สแกน Part ────────────────────────────────
@@ -65,37 +86,19 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       return;
     }
 
-    // ตรวจว่าสแกนซ้ำไหม
-    final alreadyScanned = _scannedLines.any((l) => l.partId == partId);
-    if (alreadyScanned) {
-      showErrorDialog(
-        context,
-        message: 'Part $partId สแกนไปแล้วใน session นี้',
-      );
-      return;
-    }
-
     // ตรวจว่า Part อยู่ใน PO ไหม
-    final inPO = widget.po.items.any((i) => i.partId == partId);
+    final inPO = _currentPo.items.any((i) => i.partId == partId);
     if (!inPO) {
-      showErrorDialog(
-        context,
-        message: 'Part $partId ไม่อยู่ใน PO ${widget.po.poId}',
-      );
+      showErrorDialog(context, message: 'Part $partId ไม่อยู่ใน PO ${_currentPo.poId}');
       return;
     }
 
-    // โชว์ form กรอกข้อมูล
-    final poItem = widget.po.items.firstWhere((i) => i.partId == partId);
-
-    setState(() {
-      _qtyController.text = poItem.qtyOrdered.toString();
-    });
-
+    final poItem = _currentPo.items.firstWhere((i) => i.partId == partId);
+    _qtyController.text = (poItem.qtyRemaining > 0 ? poItem.qtyRemaining : poItem.qtyOrdered).toString();
     _showPartForm(poItem);
   }
 
-  // ── Form กรอก qty, lot, expired ──────────────
+  // ── Form กรอก qty, lot, expired, condition ────
   void _showPartForm(POItem poItem) {
     showModalBottomSheet(
       context: context,
@@ -136,19 +139,21 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                 ),
                 Text(
                   poItem.itemDesc,
-                  style: const TextStyle(
-                    color: AppTheme.textGrey,
-                    fontSize: 13,
-                  ),
+                  style: const TextStyle(color: AppTheme.textGrey, fontSize: 13),
                 ),
                 const Divider(height: 20),
 
-                // ข้อมูล Part
                 InfoRow(
                   label: 'Owner',
                   value: '${poItem.owner} (${poItem.brand})',
                 ),
-                InfoRow(label: 'ต้องรับ', value: '${poItem.qtyOrdered} ชิ้น'),
+                InfoRow(label: 'สั่งซื้อ', value: '${poItem.qtyOrdered} ชิ้น'),
+                if (poItem.qtyRemaining > 0 && poItem.qtyRemaining < poItem.qtyOrdered)
+                  InfoRow(
+                    label: 'รับได้อีก',
+                    value: '${poItem.qtyRemaining} ชิ้น',
+                    valueColor: AppTheme.warning,
+                  ),
                 const SizedBox(height: 16),
 
                 // Qty
@@ -173,7 +178,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Expired Date — date picker (พ.ศ.)
+                // Expired Date
                 GestureDetector(
                   onTap: () async {
                     final picked = await showModalBottomSheet<DateTime>(
@@ -190,10 +195,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                     }
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       border: Border.all(
@@ -231,11 +233,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                         if (_selectedExpDate != null)
                           GestureDetector(
                             onTap: () => setModal(() => _selectedExpDate = null),
-                            child: const Icon(
-                              Icons.clear,
-                              color: AppTheme.textGrey,
-                              size: 20,
-                            ),
+                            child: const Icon(Icons.clear, color: AppTheme.textGrey, size: 20),
                           ),
                       ],
                     ),
@@ -243,9 +241,9 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Condition
+                // Condition — FG / PW
                 const Text(
-                  'สภาพสินค้า',
+                  'ประเภทสินค้า',
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                 ),
                 const SizedBox(height: 8),
@@ -253,21 +251,23 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                   children: [
                     Expanded(
                       child: _ConditionButton(
-                        label: 'NORMAL',
+                        label: 'FG',
+                        desc: 'สินค้าปกติ',
                         icon: Icons.check_circle,
                         color: AppTheme.success,
-                        selected: _condition == 'NORMAL',
-                        onTap: () => setModal(() => _condition = 'NORMAL'),
+                        selected: _condition == 'FG',
+                        onTap: () => setModal(() => _condition = 'FG'),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: _ConditionButton(
-                        label: 'DAMAGED',
-                        icon: Icons.warning,
-                        color: AppTheme.danger,
-                        selected: _condition == 'DAMAGED',
-                        onTap: () => setModal(() => _condition = 'DAMAGED'),
+                        label: 'PW',
+                        desc: 'ต้องติดสติ๊กเกอร์',
+                        icon: Icons.build_circle,
+                        color: AppTheme.warning,
+                        selected: _condition == 'PW',
+                        onTap: () => setModal(() => _condition = 'PW'),
                       ),
                     ),
                   ],
@@ -292,11 +292,17 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
     );
   }
 
-  // ── Confirm Part ──────────────────────────────
+  // ── Confirm Part → API → auto assign or show pallet scan ──
   Future<void> _confirmPart(POItem poItem) async {
     final qty = int.tryParse(_qtyController.text.trim());
     if (qty == null || qty <= 0) {
       showErrorDialog(context, message: 'จำนวนไม่ถูกต้อง');
+      return;
+    }
+
+    final maxQty = poItem.qtyRemaining > 0 ? poItem.qtyRemaining : poItem.qtyOrdered;
+    if (qty > maxQty) {
+      showErrorDialog(context, message: 'รับได้สูงสุด $maxQty ชิ้น (รับไปแล้ว ${poItem.qtyReceived} ชิ้น)');
       return;
     }
 
@@ -325,31 +331,21 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _scannedLines.add(
-          ReceiptLineResponse(
-            lineId: -1, // temp
-            partId: poItem.partId,
-            owner: poItem.owner,
-            brand: poItem.brand,
-            itemDesc: poItem.itemDesc,
-            qtyOrdered: poItem.qtyOrdered,
-            qtyReceived: qty,
-            condition: _condition,
-            poItemStatus: 'PENDING',
-            message: '⚠️ บันทึกแบบ offline',
-          ),
+        _pendingLine = ReceiptLineResponse(
+          lineId: -1,
+          partId: poItem.partId,
+          owner: poItem.owner,
+          brand: poItem.brand,
+          itemDesc: poItem.itemDesc,
+          qtyOrdered: poItem.qtyOrdered,
+          qtyReceived: qty,
+          condition: _condition,
+          poItemStatus: 'PENDING',
+          message: '⚠️ offline',
         );
-        _partController.clear();
-        _qtyController.clear();
-        _lotController.clear();
-        _selectedExpDate = null;
-        _condition = 'NORMAL';
       });
-
-      showWarningSnackbar(
-        context,
-        'บันทึกแบบ offline จะ sync เมื่อ WiFi กลับมา',
-      );
+      _clearFormFields();
+      showWarningSnackbar(context, 'บันทึกแบบ offline');
       return;
     }
 
@@ -359,9 +355,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       poId: widget.po.poId,
       partId: poItem.partId,
       qtyReceived: qty,
-      lotNumber: _lotController.text.trim().isEmpty
-          ? null
-          : _lotController.text.trim(),
+      lotNumber: _lotController.text.trim().isEmpty ? null : _lotController.text.trim(),
       expiredDate: _selectedExpDate != null
           ? '${_selectedExpDate!.year}-'
               '${_selectedExpDate!.month.toString().padLeft(2, '0')}-'
@@ -371,9 +365,8 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       operatorId: widget.userId,
     );
 
-    setState(() => _loading = false);
-
     if (!mounted) return;
+    setState(() => _loading = false);
 
     if (!result.success) {
       showErrorDialog(context, message: result.error!);
@@ -382,168 +375,283 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
 
     final line = result.data!;
 
-    // แจ้งเตือน over receiving
     if (line.poItemStatus == 'OVER') {
       showWarningSnackbar(context, '⚠️ Over receiving: ${line.message}');
     } else {
       showSuccessSnackbar(context, '${line.partId} บันทึกแล้ว');
     }
 
-    setState(() {
-      _scannedLines.add(line);
-      _partController.clear();
-      _qtyController.clear();
-      _lotController.clear();
-      _selectedExpDate = null;
-      _condition = 'NORMAL';
-    });
+    _clearFormFields();
+
+    // ── ลอง auto-assign กับ pallet ล่าสุด ──
+    if (_lastPalletId != null && _lastPalletType == _condition) {
+      await _assignToPallet(line, _lastPalletId!);
+    } else {
+      // ไม่มี pallet ที่ตรง type → ให้ scan pallet ใหม่
+      setState(() { _pendingLine = line; });
+      if (_lastPalletId != null && _lastPalletType != _condition) {
+        showWarningSnackbar(
+          context,
+          'Pallet $_lastPalletId เป็น $_lastPalletType ไม่ตรงกับสินค้า $_condition — กรุณาสแกน Pallet ใหม่',
+        );
+      }
+      _palletFocus.requestFocus();
+    }
   }
 
-  // ── ไป assign_pallet ─────────────────────────
-  void _goToAssignPallet() {
-    if (_scannedLines.isEmpty) {
-      showErrorDialog(
-        context,
-        message: 'กรุณาสแกน Part อย่างน้อย 1 รายการก่อน',
-      );
+  // ── Assign to Pallet ────────────────────────────
+  Future<void> _assignToPallet(ReceiptLineResponse line, String palletId) async {
+    setState(() => _loading = true);
+
+    final result = await _api.assignPallet(
+      sessionId: widget.session.sessionId,
+      palletId: palletId,
+      palletType: line.condition, // FG or PW
+      operatorId: widget.userId,
+      lineIds: [line.lineId],
+    );
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (!result.success) {
+      // ถ้า auto-assign ล้มเหลว → ให้ scan pallet ใหม่
+      setState(() {
+        _pendingLine = line;
+        _lastPalletId = null;
+        _lastPalletType = null;
+      });
+      showErrorDialog(context, message: result.error ?? 'ผูก Pallet ไม่สำเร็จ');
+      _palletFocus.requestFocus();
       return;
     }
 
-    Navigator.push(
+    // สำเร็จ → จำ pallet + เพิ่มเข้า assigned list
+    setState(() {
+      _lastPalletId = palletId;
+      _lastPalletType = line.condition;
+      _pendingLine = null;
+      _assignedLines.add(_AssignedLine(
+        partId: line.partId,
+        itemDesc: line.itemDesc,
+        qtyReceived: line.qtyReceived,
+        condition: line.condition,
+        palletId: palletId,
+      ));
+    });
+
+    showSuccessSnackbar(
       context,
-      MaterialPageRoute(
-        builder: (_) => AssignPalletScreen(
-          userId: widget.userId,
-          fullName: widget.fullName,
-          session: widget.session,
-          po: widget.po,
-          scannedLines: _scannedLines,
-          onAssigned: (assignedLineIds) {
-            setState(() {
-              _scannedLines.removeWhere(
-                (l) => assignedLineIds.contains(l.lineId),
-              );
-            });
-          },
+      '${line.partId} → Pallet $palletId สำเร็จ',
+    );
+    _partFocus.requestFocus();
+  }
+
+  // ── Scan Pallet (manual) ─────────────────────
+  Future<void> _scanPallet() async {
+    final palletId = _palletController.text.trim().toUpperCase();
+    if (palletId.isEmpty) {
+      showErrorDialog(context, message: 'กรุณาใส่ Pallet ID');
+      return;
+    }
+    if (_pendingLine == null) return;
+
+    await _assignToPallet(_pendingLine!, palletId);
+    _palletController.clear();
+  }
+
+  // ── Assign resumed pending lines ─────────────
+  Future<void> _assignResumedLine(ReceiptLineResponse line) async {
+    // ถ้ามี pallet ที่ตรง type → auto assign
+    if (_lastPalletId != null && _lastPalletType == line.condition) {
+      await _assignToPallet(line, _lastPalletId!);
+      setState(() => _resumedPendingLines.remove(line));
+    } else {
+      // ให้ scan pallet ใหม่
+      setState(() {
+        _pendingLine = line;
+        _resumedPendingLines.remove(line);
+      });
+      _palletFocus.requestFocus();
+    }
+  }
+
+  // ── Close Session ────────────────────────────
+  Future<void> _closeSession() async {
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'ปิด Session',
+      message: 'ผูกสินค้า ${_assignedLines.length} รายการแล้ว\nต้องการปิด session?',
+      confirmLabel: 'ปิด Session',
+    );
+    if (!confirm || !mounted) return;
+
+    setState(() => _loading = true);
+    final result = await _api.closeReceivingSession(widget.session.sessionId);
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (!result.success) {
+      showErrorDialog(context, message: result.error!);
+      return;
+    }
+
+    final poStatus = result.data!['poStatus'] as String;
+    final message = result.data!['message'] as String;
+
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Row(
+          children: [
+            Icon(
+              poStatus == 'RECEIVED' ? Icons.check_circle : Icons.warning_amber,
+              color: poStatus == 'RECEIVED' ? AppTheme.success : AppTheme.warning,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              poStatus == 'RECEIVED' ? 'รับสินค้าครบแล้ว' : 'รับสินค้าบางส่วน',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ],
         ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(message),
+            const SizedBox(height: 12),
+            InfoRow(label: 'PO', value: widget.po.poId),
+            InfoRow(label: 'Status', value: poStatus),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.popUntil(context, (route) => route.isFirst || route.settings.name == '/');
+            },
+            child: const Text('เสร็จสิ้น'),
+          ),
+        ],
       ),
     );
   }
 
+  void _clearFormFields() {
+    _partController.clear();
+    _qtyController.clear();
+    _lotController.clear();
+    _selectedExpDate = null;
+    _condition = 'FG';
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Part ที่ยังไม่ได้รับใน PO
-    final pendingItems = widget.po.items
+    final pendingItems = _currentPo.items
         .where((i) => i.status != 'RECEIVED')
         .toList();
 
-    return Scaffold(
-      appBar: WmsAppBar(title: 'สแกน Part', userName: widget.fullName),
+    final showPalletSection = _pendingLine != null;
+
+    return PopScope(
+      canPop: _pendingLine == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        // กดกลับขณะรอสแกน Pallet → กลับไปโหมดสแกน Part
+        // ทุก line ที่รอ pallet (ไม่ว่าจะ fresh scan หรือ resume) ต้องแสดงใน resumed list
+        setState(() {
+          _resumedPendingLines.insert(0, _pendingLine!);
+          _pendingLine = null;
+        });
+        _reloadPo();
+      },
+      child: Scaffold(
+      appBar: WmsAppBar(title: 'รับสินค้า', userName: widget.fullName),
       body: Column(
         children: [
           if (!_isOnline) const OfflineBanner(pendingCount: 0),
-
           Expanded(
             child: LoadingOverlay(
               loading: _loading,
-              message: 'กำลังบันทึก...',
+              message: 'กำลังดำเนินการ...',
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── Step Indicator ──────────
-                    _buildStepIndicator(),
-                    const SizedBox(height: 16),
-
                     // ── Session Info ────────────
-                    WmsCard(
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.receipt_long,
-                            color: AppTheme.primary,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  widget.po.poId,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                Text(
-                                  widget.po.supplierName,
-                                  style: const TextStyle(
-                                    color: AppTheme.textGrey,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Text(
-                            'Session #${widget.session.sessionId}',
-                            style: const TextStyle(
-                              color: AppTheme.textGrey,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    _buildSessionBar(),
                     const SizedBox(height: 16),
 
-                    // ── Scan Part ───────────────
-                    WmsCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'สแกน Part',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          ScanTextField(
-                            label: 'Part ID',
-                            hint: 'เช่น PT-9821',
-                            controller: _partController,
-                            onSubmit: _scanPart,
-                          ),
-                          const SizedBox(height: 12),
-                          PrimaryButton(
-                            label: 'สแกน',
-                            icon: Icons.qr_code_scanner,
-                            onPressed: _scanPart,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+                    // ── Pallet ที่ใช้อยู่ ────────
+                    if (_lastPalletId != null) _buildCurrentPalletBar(),
+                    if (_lastPalletId != null) const SizedBox(height: 12),
 
-                    // ── รายการที่สแกนแล้ว ───────
-                    if (_scannedLines.isNotEmpty) ...[
-                      _buildScannedList(),
+                    // ── Scan Pallet Section (เมื่อต้องสแกน pallet ใหม่) ──
+                    if (showPalletSection) ...[
+                      _buildPalletSection(),
                       const SizedBox(height: 16),
-                      PrimaryButton(
-                        label:
-                            'สแกน Pallet'
-                            ' (${_scannedLines.length} รายการ)',
-                        icon: Icons.inventory_2,
-                        onPressed: _goToAssignPallet,
-                      ),
-                      const SizedBox(height: 12),
                     ],
 
-                    // ── รายการที่ยังไม่สแกน ──────
-                    if (pendingItems.isNotEmpty)
+                    // ── Scan Part Section (ซ่อนเมื่อรอ pallet) ──
+                    if (!showPalletSection) ...[
+                      WmsCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'สแกน Part',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                            ),
+                            const SizedBox(height: 12),
+                            ScanTextField(
+                              label: 'Part ID',
+                              hint: 'เช่น PT-9821',
+                              controller: _partController,
+                              focusNode: _partFocus,
+                              onSubmit: _scanPart,
+                            ),
+                            const SizedBox(height: 12),
+                            PrimaryButton(
+                              label: 'สแกน',
+                              icon: Icons.qr_code_scanner,
+                              onPressed: _scanPart,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // ── Resumed pending lines (จาก session เก่า) ──
+                    if (_resumedPendingLines.isNotEmpty) ...[
+                      _buildResumedPendingList(),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // ── รายการที่ผูก Pallet แล้ว ──
+                    if (_assignedLines.isNotEmpty) ...[
+                      _buildAssignedList(),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // ── Pending PO Items ──────────
+                    if (pendingItems.isNotEmpty && !showPalletSection)
                       _buildPendingList(pendingItems),
+
+                    // ── Close Session ─────────────
+                    if (_assignedLines.isNotEmpty && !showPalletSection) ...[
+                      const SizedBox(height: 16),
+                      DangerButton(
+                        label: 'ปิด Session',
+                        icon: Icons.stop_circle,
+                        onPressed: _closeSession,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -551,11 +659,159 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 
-  // ── Scanned Lines ────────────────────────────
-  Widget _buildScannedList() {
+  // ── Session Info Bar ────────────────────────
+  Widget _buildSessionBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.receipt_long, color: AppTheme.primary, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.po.poId,
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.primary),
+                ),
+                Text(
+                  widget.po.supplierName,
+                  style: const TextStyle(fontSize: 12, color: AppTheme.textGrey),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            'Session #${widget.session.sessionId}',
+            style: const TextStyle(fontSize: 12, color: AppTheme.textGrey),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Current Pallet Bar ──────────────────────
+  Widget _buildCurrentPalletBar() {
+    final color = _lastPalletType == 'FG' ? AppTheme.success : AppTheme.warning;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.inventory_2, color: color, size: 18),
+          const SizedBox(width: 8),
+          Text(
+            'Pallet: $_lastPalletId',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: color),
+          ),
+          const SizedBox(width: 8),
+          StatusBadge(_lastPalletType!),
+          const Spacer(),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _lastPalletId = null;
+                _lastPalletType = null;
+              });
+            },
+            child: const Icon(Icons.close, size: 18, color: AppTheme.textGrey),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Pallet Scan Section ─────────────────────
+  Widget _buildPalletSection() {
+    return WmsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.inventory_2, color: AppTheme.secondary),
+              SizedBox(width: 8),
+              Text(
+                'สแกน Pallet',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.secondary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // แสดง item ที่รอผูก
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppTheme.warning.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.warning.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.pending, color: AppTheme.warning, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _pendingLine!.partId,
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                      ),
+                      Text(
+                        '${_pendingLine!.qtyReceived} ชิ้น',
+                        style: const TextStyle(fontSize: 12, color: AppTheme.textGrey),
+                      ),
+                    ],
+                  ),
+                ),
+                StatusBadge(_pendingLine!.condition),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          Text(
+            'สินค้าเป็น ${_pendingLine!.condition} — สแกน Pallet ประเภท ${_pendingLine!.condition}',
+            style: const TextStyle(fontSize: 13, color: AppTheme.textGrey),
+          ),
+          const SizedBox(height: 12),
+
+          ScanTextField(
+            label: 'Pallet ID',
+            hint: 'เช่น PAL-001',
+            controller: _palletController,
+            focusNode: _palletFocus,
+            onSubmit: _scanPallet,
+          ),
+          const SizedBox(height: 12),
+          PrimaryButton(
+            label: 'ผูก Pallet',
+            icon: Icons.link,
+            onPressed: _scanPallet,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Resumed Pending Lines ───────────────────
+  Widget _buildResumedPendingList() {
     return WmsCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -563,88 +819,125 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
           Row(
             children: [
               const Text(
-                'รอผูก Pallet',
+                'รอผูก Pallet (จาก session เดิม)',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
               ),
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppTheme.primary,
+                  color: AppTheme.warning,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  '${_scannedLines.length}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  '${_resumedPendingLines.length}',
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          ..._scannedLines.map(
-            (line) => Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.success.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: AppTheme.success.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.check_circle,
-                    color: AppTheme.success,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          line.partId,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
-                        ),
-                        Text(
-                          line.itemDesc,
-                          style: const TextStyle(
-                            color: AppTheme.textGrey,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+          ..._resumedPendingLines.map((line) => Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.warning.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.warning.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '${line.qtyReceived} ชิ้น',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      StatusBadge(line.condition),
+                      Text(line.partId, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                      Text(line.itemDesc, style: const TextStyle(color: AppTheme.textGrey, fontSize: 12)),
                     ],
                   ),
-                ],
-              ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('${line.qtyReceived} ชิ้น', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    StatusBadge(line.condition),
+                  ],
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _pendingLine == null ? () => _assignResumedLine(line) : null,
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(0, 36),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('ผูก', style: TextStyle(fontSize: 13)),
+                ),
+              ],
             ),
-          ),
+          )),
         ],
       ),
     );
   }
 
-  // ── Pending Items ────────────────────────────
+  // ── Assigned Lines List ─────────────────────
+  Widget _buildAssignedList() {
+    return WmsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.check_circle, color: AppTheme.success, size: 18),
+              const SizedBox(width: 6),
+              Text(
+                'ผูก Pallet แล้ว (${_assignedLines.length})',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ..._assignedLines.map((line) => Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.success.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.success.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle, color: AppTheme.success, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(line.partId, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                      Text(line.itemDesc, style: const TextStyle(color: AppTheme.textGrey, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('${line.qtyReceived} ชิ้น', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    Text(
+                      '${line.palletId} (${line.condition})',
+                      style: const TextStyle(fontSize: 11, color: AppTheme.textGrey),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+
+  // ── Pending PO Items ────────────────────────
   Widget _buildPendingList(List<POItem> items) {
     return WmsCard(
       child: Column(
@@ -652,79 +945,71 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
         children: [
           const Text(
             'ยังไม่ได้สแกน',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textGrey,
-            ),
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textGrey),
           ),
           const SizedBox(height: 12),
-          ...items.map(
-            (item) => Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.background,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.radio_button_unchecked,
-                    color: Colors.grey,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.partId,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        Text(
-                          item.itemDesc,
-                          style: const TextStyle(
-                            color: AppTheme.textGrey,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    '${item.qtyOrdered} ชิ้น',
-                    style: const TextStyle(
-                      color: AppTheme.textGrey,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
+          ...items.map((item) => Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.background,
+              borderRadius: BorderRadius.circular(8),
             ),
-          ),
+            child: Row(
+              children: [
+                const Icon(Icons.radio_button_unchecked, color: Colors.grey, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item.partId, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      Text(item.itemDesc, style: const TextStyle(color: AppTheme.textGrey, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Text('${item.qtyRemaining > 0 ? item.qtyRemaining : item.qtyOrdered} ชิ้น', style: const TextStyle(color: AppTheme.textGrey, fontSize: 13)),
+              ],
+            ),
+          )),
         ],
       ),
     );
   }
 
-  Widget _buildStepIndicator() {
-    return Row(
-      children: [
-        _StepDot(number: 1, label: 'สแกน PO', done: true),
-        _StepLine(),
-        _StepDot(number: 2, label: 'สแกน Part', active: true),
-        _StepLine(),
-        _StepDot(number: 3, label: 'สแกน Pallet', active: false),
-      ],
-    );
+  @override
+  void dispose() {
+    _partController.dispose();
+    _partFocus.dispose();
+    _qtyController.dispose();
+    _lotController.dispose();
+    _palletController.dispose();
+    _palletFocus.dispose();
+    super.dispose();
   }
 }
 
-// ── Condition Button ──────────────────────────
+// ── Assigned Line Model ─────────────────────────
+class _AssignedLine {
+  final String partId;
+  final String itemDesc;
+  final int qtyReceived;
+  final String condition;
+  final String palletId;
+
+  _AssignedLine({
+    required this.partId,
+    required this.itemDesc,
+    required this.qtyReceived,
+    required this.condition,
+    required this.palletId,
+  });
+}
+
+// ── Condition Button ────────────────────────────
 class _ConditionButton extends StatelessWidget {
   final String label;
+  final String desc;
   final IconData icon;
   final Color color;
   final bool selected;
@@ -732,6 +1017,7 @@ class _ConditionButton extends StatelessWidget {
 
   const _ConditionButton({
     required this.label,
+    required this.desc,
     required this.icon,
     required this.color,
     required this.selected,
@@ -743,7 +1029,7 @@ class _ConditionButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: selected ? color.withValues(alpha: 0.1) : AppTheme.background,
           border: Border.all(
@@ -752,88 +1038,28 @@ class _ConditionButton extends StatelessWidget {
           ),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Column(
           children: [
-            Icon(icon, color: selected ? color : Colors.grey, size: 18),
-            const SizedBox(width: 6),
+            Icon(icon, color: selected ? color : Colors.grey, size: 22),
+            const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
                 color: selected ? color : Colors.grey,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
-                fontSize: 13,
               ),
+            ),
+            Text(
+              desc,
+              style: TextStyle(
+                fontSize: 11,
+                color: selected ? color : Colors.grey,
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ── Step Widgets ──────────────────────────────
-class _StepDot extends StatelessWidget {
-  final int number;
-  final String label;
-  final bool active;
-  final bool done;
-
-  const _StepDot({
-    required this.number,
-    required this.label,
-    this.active = false,
-    this.done = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = done
-        ? AppTheme.success
-        : active
-        ? AppTheme.primary
-        : Colors.grey.shade300;
-
-    return Column(
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          child: Center(
-            child: done
-                ? const Icon(Icons.check, color: Colors.white, size: 16)
-                : Text(
-                    '$number',
-                    style: TextStyle(
-                      color: active || done ? Colors.white : Colors.grey,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: active || done ? AppTheme.primary : Colors.grey,
-            fontWeight: active || done ? FontWeight.w600 : FontWeight.normal,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StepLine extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        height: 2,
-        margin: const EdgeInsets.only(bottom: 20),
-        color: Colors.grey.shade300,
       ),
     );
   }
@@ -856,7 +1082,7 @@ class _ThaiDatePicker extends StatefulWidget {
 class _ThaiDatePickerState extends State<_ThaiDatePicker> {
   late int _day;
   late int _month;
-  late int _year; // ปี ค.ศ. ใช้ภายใน
+  late int _year;
 
   late FixedExtentScrollController _dayCtrl;
   late FixedExtentScrollController _monthCtrl;
@@ -880,9 +1106,7 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
     _year = widget.initialDate.year;
     _dayCtrl = FixedExtentScrollController(initialItem: _day - 1);
     _monthCtrl = FixedExtentScrollController(initialItem: _month - 1);
-    _yearCtrl = FixedExtentScrollController(
-      initialItem: _year - _startYear,
-    );
+    _yearCtrl = FixedExtentScrollController(initialItem: _year - _startYear);
   }
 
   @override
@@ -909,7 +1133,6 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
       ),
       child: Column(
         children: [
-          // header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
             child: Row(
@@ -917,65 +1140,41 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    'ยกเลิก',
-                    style: TextStyle(color: AppTheme.textGrey),
-                  ),
+                  child: const Text('ยกเลิก', style: TextStyle(color: AppTheme.textGrey)),
                 ),
-                const Text(
-                  'เลือกวันหมดอายุ (พ.ศ.)',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
-                ),
+                const Text('เลือกวันหมดอายุ (พ.ศ.)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                 TextButton(
                   onPressed: _confirm,
-                  child: const Text(
-                    'ตกลง',
-                    style: TextStyle(
-                      color: AppTheme.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                  child: const Text('ตกลง', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w700)),
                 ),
               ],
             ),
           ),
           const Divider(height: 1),
-
-          // columns
           Expanded(
             child: Stack(
               children: [
-                // selection highlight band
                 Center(
                   child: IgnorePointer(
                     child: Container(
                       height: itemH,
                       decoration: BoxDecoration(
                         border: Border.symmetric(
-                          horizontal: BorderSide(
-                            color: AppTheme.primary.withValues(alpha: 0.35),
-                            width: 1.5,
-                          ),
+                          horizontal: BorderSide(color: AppTheme.primary.withValues(alpha: 0.35), width: 1.5),
                         ),
                         color: AppTheme.primary.withValues(alpha: 0.05),
                       ),
                     ),
                   ),
                 ),
-
                 Row(
                   children: [
-                    // วัน
                     Expanded(
                       child: ListWheelScrollView.useDelegate(
                         controller: _dayCtrl,
                         itemExtent: itemH,
                         physics: const FixedExtentScrollPhysics(),
-                        onSelectedItemChanged: (i) =>
-                            setState(() => _day = i + 1),
+                        onSelectedItemChanged: (i) => setState(() => _day = i + 1),
                         childDelegate: ListWheelChildBuilderDelegate(
                           childCount: 31,
                           builder: (_, i) {
@@ -986,14 +1185,8 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
                                 '$day',
                                 style: TextStyle(
                                   fontSize: 20,
-                                  fontWeight: day == _day
-                                      ? FontWeight.w700
-                                      : FontWeight.normal,
-                                  color: valid
-                                      ? (day == _day
-                                          ? AppTheme.primary
-                                          : AppTheme.textPrimary)
-                                      : Colors.grey.shade300,
+                                  fontWeight: day == _day ? FontWeight.w700 : FontWeight.normal,
+                                  color: valid ? (day == _day ? AppTheme.primary : AppTheme.textPrimary) : Colors.grey.shade300,
                                 ),
                               ),
                             );
@@ -1001,16 +1194,13 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
                         ),
                       ),
                     ),
-
-                    // เดือน
                     Expanded(
                       flex: 2,
                       child: ListWheelScrollView.useDelegate(
                         controller: _monthCtrl,
                         itemExtent: itemH,
                         physics: const FixedExtentScrollPhysics(),
-                        onSelectedItemChanged: (i) =>
-                            setState(() => _month = i + 1),
+                        onSelectedItemChanged: (i) => setState(() => _month = i + 1),
                         childDelegate: ListWheelChildBuilderDelegate(
                           childCount: 12,
                           builder: (_, i) => Center(
@@ -1018,28 +1208,21 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
                               _monthNames[i],
                               style: TextStyle(
                                 fontSize: 18,
-                                fontWeight: (i + 1) == _month
-                                    ? FontWeight.w700
-                                    : FontWeight.normal,
-                                color: (i + 1) == _month
-                                    ? AppTheme.primary
-                                    : AppTheme.textPrimary,
+                                fontWeight: (i + 1) == _month ? FontWeight.w700 : FontWeight.normal,
+                                color: (i + 1) == _month ? AppTheme.primary : AppTheme.textPrimary,
                               ),
                             ),
                           ),
                         ),
                       ),
                     ),
-
-                    // ปี (พ.ศ.)
                     Expanded(
                       flex: 2,
                       child: ListWheelScrollView.useDelegate(
                         controller: _yearCtrl,
                         itemExtent: itemH,
                         physics: const FixedExtentScrollPhysics(),
-                        onSelectedItemChanged: (i) =>
-                            setState(() => _year = _startYear + i),
+                        onSelectedItemChanged: (i) => setState(() => _year = _startYear + i),
                         childDelegate: ListWheelChildBuilderDelegate(
                           childCount: _endYear - _startYear + 1,
                           builder: (_, i) {
@@ -1050,12 +1233,8 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
                                 '$beYear',
                                 style: TextStyle(
                                   fontSize: 20,
-                                  fontWeight: ceYear == _year
-                                      ? FontWeight.w700
-                                      : FontWeight.normal,
-                                  color: ceYear == _year
-                                      ? AppTheme.primary
-                                      : AppTheme.textPrimary,
+                                  fontWeight: ceYear == _year ? FontWeight.w700 : FontWeight.normal,
+                                  color: ceYear == _year ? AppTheme.primary : AppTheme.textPrimary,
                                 ),
                               ),
                             );

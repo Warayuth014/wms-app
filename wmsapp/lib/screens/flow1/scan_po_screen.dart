@@ -93,10 +93,24 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
     if (mounted) setState(() => _activeSession = active);
   }
 
+  // ── Reload PO หลังกลับมาจาก scan_part_screen ──
+  Future<void> _reloadPO() async {
+    if (_po == null) return;
+    final poId = _po!.poId;
+    final result = await _api.getPO(poId);
+    if (!mounted) return;
+    if (result.success) {
+      setState(() => _po = result.data!);
+      await OfflineService().savePO(result.data!);
+    }
+    final active = await _api.getActiveReceivingSession(poId);
+    if (mounted) setState(() => _activeSession = active);
+  }
+
   // ── Resume หรือ เปิด Session ใหม่ ──────────────
   Future<void> _resumeSession() async {
     if (_po == null || _activeSession == null) return;
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ScanPartScreen(
@@ -107,6 +121,7 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
         ),
       ),
     );
+    await _reloadPO();
   }
 
   Future<void> _openSession() async {
@@ -139,7 +154,7 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
     }
 
     // ไป scan_part_screen
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ScanPartScreen(
@@ -150,6 +165,7 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
         ),
       ),
     );
+    await _reloadPO();
   }
 
   @override
@@ -400,9 +416,7 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
       children: [
         _StepDot(number: 1, label: 'สแกน PO', active: true),
         _StepLine(),
-        _StepDot(number: 2, label: 'สแกน Part', active: false),
-        _StepLine(),
-        _StepDot(number: 3, label: 'สแกน Pallet', active: false),
+        _StepDot(number: 2, label: 'รับสินค้า', active: false),
       ],
     );
   }

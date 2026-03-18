@@ -18,7 +18,30 @@
       "Bash(flutter analyze lib/screens/putaway/putaway_screen.dart lib/services/api_service.dart)",
       "Bash(dotnet ef:*)",
       "Bash(sqlcmd -S \"LAPTOP-7ELHM2GA\\\\SQLEXPRESS\" -U sa -P \"0993904232pOpU#/#\" -d WmsDB -Q \"SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=''flow2'' AND TABLE_NAME=''Pallets''\" -h -1 -W)",
-      "Bash(sqlcmd -S \"LAPTOP-7ELHM2GA\\\\SQLEXPRESS\" -U sa -P \"0993904232pOpU#/#\" -d WmsDB -Q \"SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE COLUMN_NAME IN \\(''PalletId'',''UserId'',''PartId''\\) ORDER BY TABLE_SCHEMA, TABLE_NAME\" -h -1 -W)"
+      "Bash(sqlcmd -S \"LAPTOP-7ELHM2GA\\\\SQLEXPRESS\" -U sa -P \"0993904232pOpU#/#\" -d WmsDB -Q \"SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE COLUMN_NAME IN \\(''PalletId'',''UserId'',''PartId''\\) ORDER BY TABLE_SCHEMA, TABLE_NAME\" -h -1 -W)",
+      "Bash(flutter analyze:*)",
+      "Bash(xxd \"c:/Users/Admin/Documents/GitHub/wms-app/wmsapp/lib/screens/picking/picking_session_screen.dart\")",
+      "Bash(node -e \":*)",
+      "Bash(dotnet build:*)",
+      "Bash(grep -v \"^$\")",
+      "Bash(taskkill /PID 50960 /F)",
+      "Bash(cmd /c \"taskkill /PID 50960 /F\")",
+      "Bash(cmd /c \"taskkill /IM WmsApi.exe /F 2>&1\")",
+      "Bash(cmd /c \"taskkill /IM WmsApi.exe /F\")",
+      "Bash(powershell -Command \"Stop-Process -Name WmsApi -Force -ErrorAction SilentlyContinue; Write-Host ''stopped''\")",
+      "Bash(taskkill /IM WmsApi.exe /F)",
+      "Bash(powershell -Command \"Stop-Process -Name WmsApi -Force -ErrorAction SilentlyContinue; echo ''stopped''\")",
+      "Bash(curl -s -X POST http://localhost:5000/api/simulate/seed/pick-data)",
+      "Bash(python -m json.tool)",
+      "Bash(curl -s http://localhost:5000/api/picking/orders)",
+      "Bash(start dotnet:*)",
+      "Bash(curl -s -X POST http://localhost:5000/api/picking/assign-station -H \"Content-Type: application/json\" -d \"{\"\"pickOrderId\"\":\"\"PKO-001\"\",\"\"palletId\"\":\"\"PL-PICK-A\"\",\"\"operatorId\"\":\"\"SYS\"\"}\")",
+      "Bash(find /c/Users/Admin/Documents/GitHub/wms-app -name *.cs -o -name *.csproj)",
+      "Bash(find /c/Users/Admin/Documents/GitHub/wms-app -type f \\\\\\(-name *.cs -o -name *.csproj -o -name *.java -o -name *.py -o -name *.js -o -name *.ts -o -name *.go \\\\\\))",
+      "Read(//c/Users/Admin/Documents/GitHub/**)",
+      "Bash(find /c/Users/Admin/Documents/GitHub/WMS_Synnex -name *.cs)",
+      "Bash(dotnet --version)",
+      "Bash(dotnet new:*)"
     ]
   }
 }

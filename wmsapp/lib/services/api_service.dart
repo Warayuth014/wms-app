@@ -123,8 +123,13 @@ class ApiService {
     if (res.statusCode >= 200 && res.statusCode < 300) {
       return ApiResult.success(body);
     }
-    final msg = body['error'] ?? body['detail'] ?? 'เกิดข้อผิดพลาด';
-    return ApiResult.error(msg.toString());
+    // รองรับ camelCase จาก ApiError DTO: { error: "...", detail: "..." }
+    final error = body['error']?.toString();
+    final detail = body['detail']?.toString();
+    final msg = (error != null && detail != null)
+        ? '$error\n$detail'
+        : error ?? detail ?? 'เกิดข้อผิดพลาด (${res.statusCode})';
+    return ApiResult.error(msg);
   }
 
   // =============================================
@@ -210,6 +215,15 @@ class ApiService {
     });
     if (!r.success) return ApiResult.error(r.error);
     return ApiResult.success(r.data!);
+  }
+
+  Future<ApiResult<List<PendingPalletLine>>> getPendingPalletLines() async {
+    final r = await _get('/receiving/pending-pallet-lines');
+    if (!r.success) return ApiResult.error(r.error);
+    final list = (r.data!['lines'] as List)
+        .map((i) => PendingPalletLine.fromJson(i))
+        .toList();
+    return ApiResult.success(list);
   }
 
   Future<ApiResult<Map<String, dynamic>>> closeReceivingSession(
@@ -315,11 +329,27 @@ class ApiService {
     required String palletId,
     required String destination,
     required String operatorId,
+    bool convertToFG = true,
   }) async {
     final r = await _post('/putaway/confirm', {
       'stationId': stationId,
       'palletId': palletId,
       'destination': destination,
+      'operatorId': operatorId,
+      'convertToFG': convertToFG,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(PutawayResult.fromJson(r.data!));
+  }
+
+  Future<ApiResult<PutawayResult>> recallToPrework({
+    required String palletId,
+    required String stationId,
+    required String operatorId,
+  }) async {
+    final r = await _post('/putaway/recall-to-prework', {
+      'palletId': palletId,
+      'stationId': stationId,
       'operatorId': operatorId,
     });
     if (!r.success) return ApiResult.error(r.error);
@@ -505,24 +535,24 @@ class ApiService {
     }
   }
 
-  Future<ApiResult<PickPalletResponse>> scanPickPallet(
-    String palletId,
-  ) async {
-    final r = await _get('/picking/scan-pick-pallet/$palletId');
+  Future<ApiResult<ScanSourceResponse>> scanSource(String sourceId) async {
+    final r = await _get('/picking/scan-source/$sourceId');
     if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(PickPalletResponse.fromJson(r.data!));
+    return ApiResult.success(ScanSourceResponse.fromJson(r.data!));
   }
 
   Future<ApiResult<PickItemResult>> pickItem({
     required int sessionId,
-    required String pickPalletId,
+    required String sourceId,
+    required String sourceType,
     required String partId,
     required int qtyPicked,
     required String operatorId,
   }) async {
     final r = await _post('/picking/pick-item', {
       'sessionId': sessionId,
-      'pickPalletId': pickPalletId,
+      'sourceId': sourceId,
+      'sourceType': sourceType,
       'partId': partId,
       'qtyPicked': qtyPicked,
       'operatorId': operatorId,
@@ -531,14 +561,153 @@ class ApiService {
     return ApiResult.success(PickItemResult.fromJson(r.data!));
   }
 
-  Future<ApiResult<Map<String, dynamic>>> returnPickPallet({
+  Future<ApiResult<Map<String, dynamic>>> returnSource({
+    required String sourceId,
+    required String sourceType,
+    required String operatorId,
+    required String destination,
+  }) async {
+    final r = await _post('/picking/return-source', {
+      'sourceId': sourceId,
+      'sourceType': sourceType,
+      'operatorId': operatorId,
+      'destination': destination,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(r.data!);
+  }
+
+  // =============================================
+  // PICKING v2 — Pick Order flow
+  // =============================================
+
+  Future<ApiResult<List<PickOrder>>> getPickOrders() async {
+    final r = await _get('/picking/orders');
+    if (!r.success) return ApiResult.error(r.error);
+    // server returns JSON array → _handle wraps as {"items": [...]}
+    final list = r.data!['items'] as List;
+    return ApiResult.success(list.map((j) => PickOrder.fromJson(j)).toList());
+  }
+
+  Future<ApiResult<PickOrder>> getPickOrder(String pickOrderId) async {
+    final r = await _get('/picking/order/$pickOrderId');
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(PickOrder.fromJson(r.data!));
+  }
+
+  Future<ApiResult<AssignPickStationResponse>> assignPickStation({
     required String palletId,
     required String operatorId,
+    String? pickOrderId,
   }) async {
-    final r = await _post('/picking/return-pick-pallet', {
+    final body = <String, dynamic>{
       'palletId': palletId,
       'operatorId': operatorId,
+    };
+    if (pickOrderId != null) body['pickOrderId'] = pickOrderId;
+    final r = await _post('/picking/assign-station', body);
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(AssignPickStationResponse.fromJson(r.data!));
+  }
+
+  Future<ApiResult<ConfirmPickResponse>> confirmPickV2({
+    required String pickOrderId,
+    required String sourcePalletId,
+    required String destPalletId,
+    required List<Map<String, dynamic>> items,
+    required String operatorId,
+  }) async {
+    final r = await _post('/picking/confirm-pick', {
+      'pickOrderId': pickOrderId,
+      'sourcePalletId': sourcePalletId,
+      'destPalletId': destPalletId,
+      'items': items,
+      'operatorId': operatorId,
     });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(ConfirmPickResponse.fromJson(r.data!));
+  }
+
+  Future<ApiResult<void>> returnPallet({
+    required String palletId,
+    required String destination,
+  }) async {
+    final r = await _post('/picking/return-pallet', {
+      'palletId': palletId,
+      'destination': destination,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(null);
+  }
+
+  // =============================================
+  // SIMULATION — จำลองระบบอัตโนมัติ (AGV/ASRS/Labeling)
+  // =============================================
+
+  Future<ApiResult<Map<String, dynamic>>> simulateAsrsRetrieve({
+    required String palletId,
+    required String destination,
+  }) async {
+    final r = await _post('/simulate/asrs/retrieve-pallet', {
+      'palletId': palletId,
+      'destination': destination,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(r.data!);
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> simulateAsrsReceive(
+    String palletId,
+  ) async {
+    final r = await _post('/simulate/asrs/receive-pallet/$palletId', {});
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(r.data!);
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> simulateAgvDeliver({
+    required String palletId,
+    required String destination,
+  }) async {
+    final r = await _post('/simulate/agv/deliver-pallet', {
+      'palletId': palletId,
+      'destination': destination,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(r.data!);
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> simulateAgvPickup(
+    String palletId,
+  ) async {
+    final r = await _post('/simulate/agv/pickup-pallet/$palletId', {});
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(r.data!);
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> simulateLabelingComplete(
+    String palletId,
+  ) async {
+    final r = await _post('/simulate/labeling/complete/$palletId', {});
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(r.data!);
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> simulatePalletReturnComplete({
+    required String palletId,
+    String? destination,
+  }) async {
+    final r = await _post('/simulate/pallet/return-complete', {
+      'palletId': palletId,
+      'destination': destination ?? 'ASRS',
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(r.data!);
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> simulateBasketReturnComplete(
+    String basketId,
+  ) async {
+    final r = await _post('/simulate/basket/return-complete/$basketId', {});
     if (!r.success) return ApiResult.error(r.error);
     return ApiResult.success(r.data!);
   }

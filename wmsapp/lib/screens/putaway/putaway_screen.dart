@@ -586,21 +586,36 @@ class _StationSheetState extends State<_StationSheet> {
     });
   }
 
-  Future<void> _confirmPutaway() async {
+  Future<void> _confirmPutaway({bool convertToFG = true}) async {
     if (_pallet == null) return;
 
     final destLabel = _selectedDestination == 'ASRS' ? 'ASRS' : 'Prework';
-    final isConvert = widget.station.fixedDestination != null;
+    final isConvert = widget.station.fixedDestination != null && convertToFG;
+    final isSendAsrsAsPW = widget.station.fixedDestination != null && !convertToFG;
+
+    String title;
+    String message;
+    if (isConvert) {
+      title = 'ยืนยัน Convert & Putaway';
+      message = 'เปลี่ยน ${_pallet!.palletId} (PW → FG)\n'
+          'แล้วส่งเข้า ASRS\n\n'
+          'โฟล์คลิฟไร้คนขับจะมารับทันที';
+    } else if (isSendAsrsAsPW) {
+      title = 'ยืนยันส่งไป ASRS (ยังเป็น PW)';
+      message = 'ส่ง ${_pallet!.palletId} ไปเก็บที่ ASRS\n'
+          'โดยยังคงสถานะเป็น PW (ไม่ convert)\n\n'
+          'โฟล์คลิฟไร้คนขับจะมารับทันที';
+    } else {
+      title = 'ยืนยัน Putaway';
+      message = 'เก็บ Pallet ${_pallet!.palletId}\n'
+          'ที่ ${widget.station.id} → $destLabel\n\n'
+          'โฟล์คลิฟไร้คนขับจะมารับทันที';
+    }
+
     final confirm = await showConfirmDialog(
       context,
-      title: isConvert ? 'ยืนยัน Convert & Putaway' : 'ยืนยัน Putaway',
-      message: isConvert
-          ? 'เปลี่ยน ${_pallet!.palletId} (PW → FG)\n'
-                'แล้วส่งเข้า ASRS\n\n'
-                'โฟล์คลิฟไร้คนขับจะมารับทันที'
-          : 'เก็บ Pallet ${_pallet!.palletId}\n'
-                'ที่ ${widget.station.id} → $destLabel\n\n'
-                'โฟล์คลิฟไร้คนขับจะมารับทันที',
+      title: title,
+      message: message,
       confirmLabel: 'ยืนยัน',
     );
     if (!confirm) return;
@@ -612,6 +627,7 @@ class _StationSheetState extends State<_StationSheet> {
       palletId: _pallet!.palletId,
       destination: _selectedDestination,
       operatorId: widget.userId,
+      convertToFG: convertToFG,
     );
 
     setState(() => _loadingConfirm = false);
@@ -756,18 +772,14 @@ class _StationSheetState extends State<_StationSheet> {
 
                 if (widget.station.fixedDestination != null) ...[
                   const SizedBox(height: 10),
-                  DangerButton(
-                    label: 'ยกเลิก — ยังจัดการไม่เสร็จ',
-                    icon: Icons.cancel_outlined,
-                    onPressed: () {
-                      setState(() {
-                        _pallet = null;
-                        _palletController.clear();
-                      });
-                    },
+                  WarningButton(
+                    label: 'ส่งไป ASRS (ยังเป็น PW)',
+                    icon: Icons.warehouse,
+                    onPressed: () => _confirmPutaway(convertToFG: false),
                   ),
                 ],
               ],
+
 
               const SizedBox(height: 8),
             ],

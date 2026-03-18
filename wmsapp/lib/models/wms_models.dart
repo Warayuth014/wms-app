@@ -87,6 +87,7 @@ class POItem {
   final String itemDesc;
   final int qtyOrdered;
   final int qtyReceived;
+  final int qtyRemaining;
   final String status;
 
   POItem({
@@ -97,6 +98,7 @@ class POItem {
     required this.itemDesc,
     required this.qtyOrdered,
     required this.qtyReceived,
+    required this.qtyRemaining,
     required this.status,
   });
 
@@ -108,6 +110,7 @@ class POItem {
     itemDesc: json['itemDesc'],
     qtyOrdered: json['qtyOrdered'],
     qtyReceived: json['qtyReceived'],
+    qtyRemaining: json['qtyRemaining'] ?? 0,
     status: json['status'],
   );
 }
@@ -619,7 +622,8 @@ class PickingSession {
 
 class PickingLineItem {
   final int lineId;
-  final String pickPalletId;
+  final String sourceId;
+  final String sourceType;   // PALLET | BASKET
   final String partId;
   final String owner;
   final String brand;
@@ -631,7 +635,8 @@ class PickingLineItem {
 
   PickingLineItem({
     required this.lineId,
-    required this.pickPalletId,
+    required this.sourceId,
+    required this.sourceType,
     required this.partId,
     required this.owner,
     required this.brand,
@@ -645,7 +650,8 @@ class PickingLineItem {
   factory PickingLineItem.fromJson(Map<String, dynamic> json) =>
       PickingLineItem(
         lineId: json['lineId'],
-        pickPalletId: json['pickPalletId'],
+        sourceId: json['sourceId'],
+        sourceType: json['sourceType'] ?? 'PALLET',
         partId: json['partId'],
         owner: json['owner'],
         brand: json['brand'],
@@ -657,34 +663,37 @@ class PickingLineItem {
       );
 }
 
-class PickPalletResponse {
-  final String palletId;
+class ScanSourceResponse {
+  final String sourceId;
+  final String sourceType;   // PALLET | BASKET
   final String type;
   final String status;
-  final List<PickPalletItem> items;
+  final List<SourceItem> items;
   final String message;
 
-  PickPalletResponse({
-    required this.palletId,
+  ScanSourceResponse({
+    required this.sourceId,
+    required this.sourceType,
     required this.type,
     required this.status,
     required this.items,
     required this.message,
   });
 
-  factory PickPalletResponse.fromJson(Map<String, dynamic> json) =>
-      PickPalletResponse(
-        palletId: json['palletId'],
+  factory ScanSourceResponse.fromJson(Map<String, dynamic> json) =>
+      ScanSourceResponse(
+        sourceId: json['sourceId'],
+        sourceType: json['sourceType'],
         type: json['type'],
         status: json['status'],
         items: (json['items'] as List)
-            .map((i) => PickPalletItem.fromJson(i))
+            .map((i) => SourceItem.fromJson(i))
             .toList(),
         message: json['message'],
       );
 }
 
-class PickPalletItem {
+class SourceItem {
   final String partId;
   final String owner;
   final String brand;
@@ -694,7 +703,7 @@ class PickPalletItem {
   final int qty;
   final String condition;
 
-  PickPalletItem({
+  SourceItem({
     required this.partId,
     required this.owner,
     required this.brand,
@@ -705,7 +714,7 @@ class PickPalletItem {
     required this.condition,
   });
 
-  factory PickPalletItem.fromJson(Map<String, dynamic> json) => PickPalletItem(
+  factory SourceItem.fromJson(Map<String, dynamic> json) => SourceItem(
     partId: json['partId'],
     owner: json['owner'],
     brand: json['brand'],
@@ -722,7 +731,7 @@ class PickItemResult {
   final int lineId;
   final String partId;
   final int qtyPicked;
-  final int remainingOnPickPallet;
+  final int remainingOnSource;
   final String message;
 
   PickItemResult({
@@ -730,7 +739,7 @@ class PickItemResult {
     required this.lineId,
     required this.partId,
     required this.qtyPicked,
-    required this.remainingOnPickPallet,
+    required this.remainingOnSource,
     required this.message,
   });
 
@@ -739,7 +748,7 @@ class PickItemResult {
     lineId: json['lineId'],
     partId: json['partId'],
     qtyPicked: json['qtyPicked'],
-    remainingOnPickPallet: json['remainingOnPickPallet'],
+    remainingOnSource: json['remainingOnSource'],
     message: json['message'],
   );
 }
@@ -764,6 +773,236 @@ class CompletePickingResult {
         packPalletId: json['packPalletId'],
         message: json['message'],
       );
+}
+
+// =============================================
+// Pending Pallet Line (ค้างการผูก Pallet)
+// =============================================
+class PendingPalletLine {
+  final int lineId;
+  final int sessionId;
+  final String poId;
+  final String partId;
+  final String owner;
+  final String brand;
+  final String itemDesc;
+  final int qtyReceived;
+  final String condition;
+  final String? lotNumber;
+  final DateTime receivedAt;
+
+  PendingPalletLine({
+    required this.lineId,
+    required this.sessionId,
+    required this.poId,
+    required this.partId,
+    required this.owner,
+    required this.brand,
+    required this.itemDesc,
+    required this.qtyReceived,
+    required this.condition,
+    this.lotNumber,
+    required this.receivedAt,
+  });
+
+  factory PendingPalletLine.fromJson(Map<String, dynamic> j) => PendingPalletLine(
+    lineId: j['lineId'],
+    sessionId: j['sessionId'],
+    poId: j['poId'],
+    partId: j['partId'],
+    owner: j['owner'],
+    brand: j['brand'],
+    itemDesc: j['itemDesc'],
+    qtyReceived: j['qtyReceived'],
+    condition: j['condition'],
+    lotNumber: j['lotNumber'],
+    receivedAt: DateTime.tryParse(j['receivedAt'] ?? '') ?? DateTime.now(),
+  );
+}
+
+// =============================================
+// Picking v2 — Pick Order flow
+// =============================================
+
+class PickOrder {
+  final String pickOrderId;
+  final String status;
+  final DateTime createdAt;
+  final List<PickOrderItemV2> items;
+
+  PickOrder({
+    required this.pickOrderId,
+    required this.status,
+    required this.createdAt,
+    required this.items,
+  });
+
+  int get totalRequired => items.fold(0, (s, i) => s + i.requiredQty);
+  int get totalPicked   => items.fold(0, (s, i) => s + i.reservedQty);
+
+  factory PickOrder.fromJson(Map<String, dynamic> j) => PickOrder(
+    pickOrderId: j['pickOrderId'],
+    status: j['status'],
+    createdAt: DateTime.tryParse(j['createdAt'] ?? '') ?? DateTime.now(),
+    items: (j['items'] as List)
+        .map((i) => PickOrderItemV2.fromJson(i))
+        .toList(),
+  );
+}
+
+class PickOrderItemV2 {
+  final int id;
+  final String partId;
+  final String owner;
+  final String brand;
+  final String itemDesc;
+  final int requiredQty;
+  final int reservedQty;
+  final int remainingQty;
+  final String status;
+
+  PickOrderItemV2({
+    required this.id,
+    required this.partId,
+    required this.owner,
+    required this.brand,
+    required this.itemDesc,
+    required this.requiredQty,
+    required this.reservedQty,
+    required this.remainingQty,
+    required this.status,
+  });
+
+  factory PickOrderItemV2.fromJson(Map<String, dynamic> j) => PickOrderItemV2(
+    id: j['id'],
+    partId: j['partId'],
+    owner: j['owner'],
+    brand: j['brand'],
+    itemDesc: j['itemDesc'],
+    requiredQty: j['requiredQty'],
+    reservedQty: j['reservedQty'],
+    remainingQty: j['remainingQty'],
+    status: j['status'],
+  );
+}
+
+class AssignPickStationResponse {
+  final String stationId;
+  final String stationName;
+  final String palletId;
+  final String pickOrderId;
+  final List<PickItemOnPallet> palletItems;
+  final List<PickOrderItemV2> pickOrderItems;
+  final String message;
+
+  AssignPickStationResponse({
+    required this.stationId,
+    required this.stationName,
+    required this.palletId,
+    required this.pickOrderId,
+    required this.palletItems,
+    required this.pickOrderItems,
+    required this.message,
+  });
+
+  factory AssignPickStationResponse.fromJson(Map<String, dynamic> j) =>
+      AssignPickStationResponse(
+        stationId: j['stationId'],
+        stationName: j['stationName'],
+        palletId: j['palletId'],
+        pickOrderId: j['pickOrderId'],
+        palletItems: (j['palletItems'] as List)
+            .map((i) => PickItemOnPallet.fromJson(i))
+            .toList(),
+        pickOrderItems: (j['pickOrderItems'] as List)
+            .map((i) => PickOrderItemV2.fromJson(i))
+            .toList(),
+        message: j['message'],
+      );
+}
+
+class PickItemOnPallet {
+  final String partId;
+  final String owner;
+  final String brand;
+  final String itemDesc;
+  final int qtyOnPallet;
+  final int qtyToPickSuggested;
+  final String condition;
+
+  PickItemOnPallet({
+    required this.partId,
+    required this.owner,
+    required this.brand,
+    required this.itemDesc,
+    required this.qtyOnPallet,
+    required this.qtyToPickSuggested,
+    required this.condition,
+  });
+
+  factory PickItemOnPallet.fromJson(Map<String, dynamic> j) => PickItemOnPallet(
+    partId: j['partId'],
+    owner: j['owner'],
+    brand: j['brand'],
+    itemDesc: j['itemDesc'],
+    qtyOnPallet: j['qtyOnPallet'],
+    qtyToPickSuggested: j['qtyToPickSuggested'],
+    condition: j['condition'],
+  );
+}
+
+class ConfirmPickResponse {
+  final bool isPickOrderComplete;
+  final bool sourcePalletEmpty;
+  final bool sourcePickDone;
+  final String pickOrderStatus;
+  final List<PickRemainingItem> remainingItems;
+  final String message;
+
+  ConfirmPickResponse({
+    required this.isPickOrderComplete,
+    required this.sourcePalletEmpty,
+    required this.sourcePickDone,
+    required this.pickOrderStatus,
+    required this.remainingItems,
+    required this.message,
+  });
+
+  factory ConfirmPickResponse.fromJson(Map<String, dynamic> j) =>
+      ConfirmPickResponse(
+        isPickOrderComplete: j['isPickOrderComplete'],
+        sourcePalletEmpty: j['sourcePalletEmpty'],
+        sourcePickDone: j['sourcePickDone'] ?? false,
+        pickOrderStatus: j['pickOrderStatus'],
+        remainingItems: (j['remainingItems'] as List)
+            .map((i) => PickRemainingItem.fromJson(i))
+            .toList(),
+        message: j['message'],
+      );
+}
+
+class PickRemainingItem {
+  final String partId;
+  final String itemDesc;
+  final int requiredQty;
+  final int pickedQty;
+  final int remainingQty;
+
+  PickRemainingItem({
+    required this.partId,
+    required this.itemDesc,
+    required this.requiredQty,
+    required this.pickedQty,
+    required this.remainingQty,
+  });
+
+  factory PickRemainingItem.fromJson(Map<String, dynamic> j) => PickRemainingItem(
+    partId: j['partId'],
+    itemDesc: j['itemDesc'],
+    requiredQty: j['requiredQty'],
+    pickedQty: j['pickedQty'],
+    remainingQty: j['remainingQty'],
+  );
 }
 
 class ConfirmedUnloadItem {
