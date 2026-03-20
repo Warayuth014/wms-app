@@ -828,29 +828,29 @@ class PickOrder {
   final String pickOrderId;
   final String status;
   final DateTime createdAt;
-  final List<PickOrderItemV2> items;
+  final List<PickOrderDetail> details;
 
   PickOrder({
     required this.pickOrderId,
     required this.status,
     required this.createdAt,
-    required this.items,
+    required this.details,
   });
 
-  int get totalRequired => items.fold(0, (s, i) => s + i.requiredQty);
-  int get totalPicked   => items.fold(0, (s, i) => s + i.reservedQty);
+  int get totalRequired => details.fold(0, (s, d) => s + d.requiredQty);
+  int get totalPicked   => details.fold(0, (s, d) => s + d.reservedQty);
 
   factory PickOrder.fromJson(Map<String, dynamic> j) => PickOrder(
     pickOrderId: j['pickOrderId'],
     status: j['status'],
     createdAt: DateTime.tryParse(j['createdAt'] ?? '') ?? DateTime.now(),
-    items: (j['items'] as List)
-        .map((i) => PickOrderItemV2.fromJson(i))
+    details: (j['details'] as List)
+        .map((d) => PickOrderDetail.fromJson(d))
         .toList(),
   );
 }
 
-class PickOrderItemV2 {
+class PickOrderDetail {
   final int id;
   final String partId;
   final String owner;
@@ -860,8 +860,9 @@ class PickOrderItemV2 {
   final int reservedQty;
   final int remainingQty;
   final String status;
+  final List<PickOrderSub> subs;
 
-  PickOrderItemV2({
+  PickOrderDetail({
     required this.id,
     required this.partId,
     required this.owner,
@@ -871,9 +872,10 @@ class PickOrderItemV2 {
     required this.reservedQty,
     required this.remainingQty,
     required this.status,
+    this.subs = const [],
   });
 
-  factory PickOrderItemV2.fromJson(Map<String, dynamic> j) => PickOrderItemV2(
+  factory PickOrderDetail.fromJson(Map<String, dynamic> j) => PickOrderDetail(
     id: j['id'],
     partId: j['partId'],
     owner: j['owner'],
@@ -882,6 +884,39 @@ class PickOrderItemV2 {
     requiredQty: j['requiredQty'],
     reservedQty: j['reservedQty'],
     remainingQty: j['remainingQty'],
+    status: j['status'],
+    subs: (j['subs'] as List? ?? [])
+        .map((s) => PickOrderSub.fromJson(s))
+        .toList(),
+  );
+}
+
+class PickOrderSub {
+  final int id;
+  final int pickOrderDetailId;
+  final int receiptLineId;
+  final String? palletId;
+  final int allocatedQty;
+  final int pickedQty;
+  final String status;
+
+  PickOrderSub({
+    required this.id,
+    required this.pickOrderDetailId,
+    required this.receiptLineId,
+    this.palletId,
+    required this.allocatedQty,
+    required this.pickedQty,
+    required this.status,
+  });
+
+  factory PickOrderSub.fromJson(Map<String, dynamic> j) => PickOrderSub(
+    id: j['id'],
+    pickOrderDetailId: j['pickOrderDetailId'],
+    receiptLineId: j['receiptLineId'],
+    palletId: j['palletId'],
+    allocatedQty: j['allocatedQty'],
+    pickedQty: j['pickedQty'],
     status: j['status'],
   );
 }
@@ -892,7 +927,7 @@ class AssignPickStationResponse {
   final String palletId;
   final String pickOrderId;
   final List<PickItemOnPallet> palletItems;
-  final List<PickOrderItemV2> pickOrderItems;
+  final List<PickOrderDetail> pickOrderItems;
   final String message;
 
   AssignPickStationResponse({
@@ -915,7 +950,7 @@ class AssignPickStationResponse {
             .map((i) => PickItemOnPallet.fromJson(i))
             .toList(),
         pickOrderItems: (j['pickOrderItems'] as List)
-            .map((i) => PickOrderItemV2.fromJson(i))
+            .map((i) => PickOrderDetail.fromJson(i))
             .toList(),
         message: j['message'],
       );

@@ -13,10 +13,13 @@ class ApiResult<T> {
   final bool success;
   final T? data;
   final String? error;
+  final int? statusCode;
 
-  ApiResult.success(this.data) : success = true, error = null;
+  ApiResult.success(this.data) : success = true, error = null, statusCode = 200;
 
-  ApiResult.error(this.error) : success = false, data = null;
+  ApiResult.error(this.error, {this.statusCode}) : success = false, data = null;
+
+  bool get isNotFound => statusCode == 404;
 }
 
 // =============================================
@@ -129,7 +132,7 @@ class ApiService {
     final msg = (error != null && detail != null)
         ? '$error\n$detail'
         : error ?? detail ?? 'เกิดข้อผิดพลาด (${res.statusCode})';
-    return ApiResult.error(msg);
+    return ApiResult.error(msg, statusCode: res.statusCode);
   }
 
   // =============================================
@@ -606,7 +609,7 @@ class ApiService {
     };
     if (pickOrderId != null) body['pickOrderId'] = pickOrderId;
     final r = await _post('/picking/assign-station', body);
-    if (!r.success) return ApiResult.error(r.error);
+    if (!r.success) return ApiResult.error(r.error, statusCode: r.statusCode);
     return ApiResult.success(AssignPickStationResponse.fromJson(r.data!));
   }
 

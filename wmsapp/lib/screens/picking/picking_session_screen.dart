@@ -34,6 +34,118 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
     });
   }
 
+  Future<void> _returnPallet(String palletId, String destination) async {
+    setState(() => _loading = true);
+    final result = await _api.returnPallet(
+      palletId: palletId,
+      destination: destination,
+    );
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (!result.success) {
+      showErrorDialog(
+        context,
+        message: result.error ?? 'ส่ง Pallet กลับไม่สำเร็จ',
+      );
+      return;
+    }
+
+    showSuccessSnackbar(context, 'ส่ง $palletId ไป $destination แล้ว');
+  }
+
+  Future<void> _showReturnOrErrorDialog(
+    String palletId,
+    String? errorMsg,
+  ) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.info_outline, color: AppTheme.warning, size: 24),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(palletId, style: const TextStyle(fontSize: 16)),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              errorMsg ?? 'ไม่มีสินค้าที่ต้อง Pick บน Pallet นี้',
+              style: const TextStyle(fontSize: 13, color: AppTheme.textGrey),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'ต้องการส่ง Pallet กลับหรือไม่?',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _returnPallet(palletId, 'ASRS');
+                },
+                icon: const Icon(Icons.warehouse, size: 18),
+                label: const Text('ส่งกลับ ASRS'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _returnPallet(palletId, 'ZONE_PACK');
+                },
+                icon: const Icon(Icons.local_shipping, size: 18),
+                label: const Text('ส่งไป ZONE PACK'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.secondary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.textGrey,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text('ปิด'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _scanPallet() async {
     final palletId = _scanCtrl.text.trim().toUpperCase();
     if (palletId.isEmpty) return;
@@ -47,10 +159,13 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
     setState(() => _loading = false);
 
     if (!result.success) {
-      showErrorDialog(
-        context,
-        message: result.error ?? 'สแกน Pallet ไม่สำเร็จ',
-      );
+      if (result.isNotFound) {
+        // 404 — ไม่พบ Pallet ใน DB เลย → แค่โชว์ error ปกติ
+        showErrorDialog(context, message: result.error ?? 'ไม่พบ Pallet');
+      } else {
+        // 400 — Pallet มีอยู่แต่ไม่มีของ pick → ให้เลือกส่งกลับได้
+        await _showReturnOrErrorDialog(palletId, result.error);
+      }
       _scanCtrl.clear();
       _scanFocus.requestFocus();
       return;

@@ -8,9 +8,11 @@ import '../../models/wms_models.dart';
 
 // ── Screen states ──────────────────────────────────────────────────────────
 enum _PickState {
-  scanSource, // รอสแกน source pallet (สำหรับรอบถัดไป)
-  pickView,   // แสดง station + รายการที่ต้องหยิบ
-  scanDest,   // รอสแกน dest (pallet เปล่า)
+  scanSource, // รอสแกน source pallet
+  pickView, // แสดง station + รายการที่ต้องหยิบ
+  scanDest, // รอสแกน dest (pallet เปล่า) — ครั้งแรกเท่านั้น
+  afterPick, // หลัง confirm pick — แสดง 2 ปุ่ม
+  returnSource, // pallet ไม่มีของ pick → เลือก ASRS / ZONE PACK หรือออก
 }
 
 class PickItemsScreen extends StatefulWidget {
@@ -38,11 +40,20 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
   final _destScanFocus = FocusNode();
   final _api = ApiService();
 
-  _PickState _state = _PickState.pickView; // เริ่มจาก pickView เลย (ได้ assignment มาแล้ว)
+  _PickState _state = _PickState.pickView;
   bool _loading = false;
 
   late String _pickOrderId;
   late AssignPickStationResponse _assignment;
+
+  // dest pallet จำไว้ใช้ซ้ำในรอบถัดไป
+  String? _destPalletId;
+
+  // ผลลัพธ์จาก confirm pick ล่าสุด
+  ConfirmPickResponse? _lastResult;
+
+  // pallet ที่สแกนแล้วไม่มี pick items (สำหรับ returnSource state)
+  String? _returnPalletId;
 
   // qty controllers สำหรับแต่ละ part
   final Map<String, TextEditingController> _qtyCtrl = {};
@@ -71,7 +82,11 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
     _qtyCtrl.clear();
   }
 
-  // ── Scan source pallet (สำหรับรอบถัดไป) ────
+  // ══════════════════════════════════════════════════
+  // Actions
+  // ══════════════════════════════════════════════════
+
+  // ── Scan source pallet ─────────────────────────
   Future<void> _scanSourcePallet() async {
     final palletId = _sourceScanCtrl.text.trim().toUpperCase();
     if (palletId.isEmpty) return;
@@ -86,35 +101,42 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
     setState(() => _loading = false);
 
     if (!result.success) {
-      showErrorDialog(
-        context,
-        message: result.error ?? 'สแกน Pallet ไม่สำเร็จ',
-      );
-      _sourceScanCtrl.clear();
-      _sourceScanFocus.requestFocus();
+      // ไม่มีของ pick บน pallet นี้ → ถือว่าเป็น pallet ที่ไม่เกี่ยว / ว่าง
+      // ให้เลือกส่ง ASRS / ZONE PACK หรือออก
+      setState(() {
+        _returnPalletId = palletId;
+        _state = _PickState.returnSource;
+      });
       return;
     }
 
     _assignment = result.data!;
     _buildQtyControllers();
 
+    // ถ้ามี pick items → ไป pickView (ใช้ dest pallet เดิมถ้ามี)
     setState(() {
       _state = _PickState.pickView;
     });
   }
 
-  // ── User confirms pick → go to scan dest ──
-  void _goToScanDest() {
-    setState(() {
-      _state = _PickState.scanDest;
-      _destScanCtrl.clear();
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _destScanFocus.requestFocus();
-    });
+  // ── User confirms pick qty → ไปสแกน dest หรือ confirm เลย ──
+  void _goToScanDestOrConfirm() {
+    if (_destPalletId != null) {
+      // มี dest pallet แล้ว → confirm เลย
+      _confirmPick(_destPalletId!);
+    } else {
+      // ยังไม่มี dest pallet → ไปสแกน
+      setState(() {
+        _state = _PickState.scanDest;
+        _destScanCtrl.clear();
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _destScanFocus.requestFocus();
+      });
+    }
   }
 
-  // ── Scan dest pallet → confirm pick ───────
+  // ── Scan dest pallet → confirm pick ──────────
   Future<void> _scanDestAndConfirm() async {
     final destId = _destScanCtrl.text.trim().toUpperCase();
     if (destId.isEmpty) return;
@@ -127,6 +149,12 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
       return;
     }
 
+    _destPalletId = destId;
+    await _confirmPick(destId);
+  }
+
+  // ── Confirm pick (โอนของจาก source → dest) ────
+  Future<void> _confirmPick(String destId) async {
     // รวบรวม items ที่จะ pick
     final items = <Map<String, dynamic>>[];
     for (final item in _assignment.palletItems) {
@@ -163,113 +191,13 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
       return;
     }
 
-    final res = result.data!;
-    final sourcePalletId = _assignment.palletId;
-
-    // ให้ user เลือกส่ง source pallet กลับที่ไหน
-    if (!mounted) return;
-    await _showReturnPalletDialog(
-      sourcePalletId: sourcePalletId,
-      isEmpty: res.sourcePalletEmpty,
-    );
-    if (!mounted) return;
-
-    if (res.isPickOrderComplete) {
-      // Pick order ครบ — แสดง dialog แล้วกลับ
-      await _showCompleteDialog(res, destId);
-      if (mounted) Navigator.pop(context);
-      return;
-    }
-
-    // ยังไม่ครบ — แสดง summary แล้วเริ่ม loop ใหม่
-    await _showCycleDoneDialog(res, destId);
-    if (!mounted) return;
-
-    _resetToScanSource();
+    setState(() {
+      _lastResult = result.data!;
+      _state = _PickState.afterPick;
+    });
   }
 
-  // ── Return pallet dialog — เลือกส่งกลับ ASRS หรือ ZONE PACK ──
-  Future<void> _showReturnPalletDialog({
-    required String sourcePalletId,
-    required bool isEmpty,
-  }) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(
-              isEmpty ? Icons.inventory_2_outlined : Icons.inventory_2,
-              color: isEmpty ? AppTheme.textGrey : AppTheme.warning,
-              size: 24,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'ส่ง $sourcePalletId กลับ',
-                style: const TextStyle(fontSize: 16),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isEmpty
-                  ? 'Pallet ว่างแล้ว — เลือกปลายทาง'
-                  : 'Pallet ยังมีของเหลือ — เลือกปลายทาง',
-              style: const TextStyle(fontSize: 13, color: AppTheme.textGrey),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _returnPallet(sourcePalletId, 'ASRS');
-                },
-                icon: const Icon(Icons.warehouse, size: 18),
-                label: const Text('ส่งกลับ ASRS'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _returnPallet(sourcePalletId, 'ZONE_PACK');
-                },
-                icon: const Icon(Icons.local_shipping, size: 18),
-                label: const Text('ส่งไป ZONE PACK'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.secondary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
+  // ── Return pallet to ASRS / ZONE PACK ──────────
   Future<void> _returnPallet(String palletId, String destination) async {
     setState(() => _loading = true);
     final result = await _api.returnPallet(
@@ -284,10 +212,15 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
         context,
         message: result.error ?? 'ส่ง Pallet กลับไม่สำเร็จ',
       );
+      return;
     }
+
+    showSuccessSnackbar(context, 'ส่ง $palletId ไป $destination แล้ว');
+    _goToScanSource();
   }
 
-  void _resetToScanSource() {
+  // ── Go to scan source state ──────────────────
+  void _goToScanSource() {
     _disposeQtyCtrl();
     setState(() {
       _state = _PickState.scanSource;
@@ -298,130 +231,28 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
     });
   }
 
-  // ── Complete dialog ──────────────────────────────
-  Future<void> _showCompleteDialog(
-    ConfirmPickResponse res,
-    String destId,
-  ) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle, color: AppTheme.success, size: 28),
-            SizedBox(width: 8),
-            Text('Pick Order ครบแล้ว!'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            InfoRow(label: 'Pick Order', value: _pickOrderId),
-            InfoRow(label: 'Dest Pallet', value: destId),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.success,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('กลับหน้าหลัก'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Cycle done dialog (ยังไม่ครบ) ────────────────
-  Future<void> _showCycleDoneDialog(
-    ConfirmPickResponse res,
-    String destId,
-  ) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.inventory_2, color: AppTheme.primary, size: 24),
-            SizedBox(width: 8),
-            Text('Pick รอบนี้เสร็จ'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            InfoRow(label: 'Dest Pallet', value: destId),
-            const Divider(height: 16),
-            const Text(
-              'ยังต้อง Pick เพิ่ม:',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
-            ...res.remainingItems
-                .where((r) => r.remainingQty > 0)
-                .map(
-                  (r) => Padding(
-                    padding: const EdgeInsets.only(bottom: 3),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.arrow_right,
-                          size: 14,
-                          color: AppTheme.textGrey,
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            '${r.partId}: เหลือ ${r.remainingQty} ชิ้น',
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-          ],
-        ),
-        actions: [
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pop(ctx),
-            icon: const Icon(Icons.qr_code_scanner, size: 18),
-            label: const Text('Scan Pallet ต่อ'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Back handling ────────────────────────────────
+  // ── Back handling ──────────────────────────────
   void _handleBack() {
-    if (_state == _PickState.scanDest) {
-      // กลับไปแก้ไขจำนวน
-      setState(() => _state = _PickState.pickView);
-    } else if (_state == _PickState.scanSource) {
-      // กลับไปหน้า picking (exit)
-      Navigator.pop(context);
-    } else {
-      Navigator.pop(context);
+    switch (_state) {
+      case _PickState.scanDest:
+        setState(() => _state = _PickState.pickView);
+      case _PickState.afterPick:
+        // ไม่ให้กด back ตอนอยู่ afterPick → ต้องเลือกปุ่ม
+        break;
+      case _PickState.returnSource:
+        _goToScanSource();
+      case _PickState.scanSource:
+        Navigator.pop(context);
+      case _PickState.pickView:
+        Navigator.pop(context);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: _state == _PickState.pickView &&
+      canPop:
+          _state == _PickState.pickView &&
           _assignment == widget.initialAssignment,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _handleBack();
@@ -438,6 +269,8 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
             _PickState.scanSource => _buildScanSource(),
             _PickState.pickView => _buildPickView(),
             _PickState.scanDest => _buildScanDest(),
+            _PickState.afterPick => _buildAfterPick(),
+            _PickState.returnSource => _buildReturnSource(),
           },
         ),
       ),
@@ -445,7 +278,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
   }
 
   // ══════════════════════════════════════════════════
-  // State 1: Scan Source Pallet (สำหรับรอบถัดไป)
+  // State 1: Scan Source Pallet
   // ══════════════════════════════════════════════════
   Widget _buildScanSource() {
     return SingleChildScrollView(
@@ -453,11 +286,13 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Order info
           _buildOrderInfoBanner(),
+          if (_destPalletId != null) ...[
+            const SizedBox(height: 8),
+            _buildDestPalletBanner(),
+          ],
           const SizedBox(height: 16),
 
-          // Scan card
           WmsCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -478,7 +313,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'สแกน Pallet ถัดไปที่ต้องการ Pick',
+                  'สแกน Pallet ที่ต้องการหยิบของออก',
                   style: TextStyle(fontSize: 13, color: AppTheme.textGrey),
                 ),
                 const SizedBox(height: 12),
@@ -508,6 +343,8 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
   // ══════════════════════════════════════════════════
   Widget _buildPickView() {
     final a = _assignment;
+    final hasDest = _destPalletId != null;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -582,7 +419,11 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.assignment, color: AppTheme.secondary, size: 18),
+                    const Icon(
+                      Icons.assignment,
+                      color: AppTheme.secondary,
+                      size: 18,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       'Pick Order: $_pickOrderId',
@@ -650,11 +491,13 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
           ...a.palletItems.map((item) => _buildPalletItemCard(item)),
           const SizedBox(height: 16),
 
-          // Pick done button
+          // Button — ถ้ามี dest pallet แล้วก็ confirm เลย ไม่ต้องสแกนใหม่
           PrimaryButton(
-            label: 'หยิบครบแล้ว → สแกน Pallet เปล่า',
-            icon: Icons.arrow_forward,
-            onPressed: _goToScanDest,
+            label: hasDest
+                ? 'ยืนยันหยิบ → ใส่ $_destPalletId'
+                : 'หยิบครบแล้ว → สแกน Pallet ปลายทาง',
+            icon: hasDest ? Icons.check : Icons.arrow_forward,
+            onPressed: _goToScanDestOrConfirm,
           ),
         ],
       ),
@@ -663,7 +506,6 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
 
   Widget _buildPalletItemCard(PickItemOnPallet item) {
     final ctrl = _qtyCtrl[item.partId];
-    // หา remaining จาก pickOrderItems
     final orderItem = _assignment.pickOrderItems
         .where((oi) => oi.partId == item.partId)
         .firstOrNull;
@@ -770,7 +612,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
   }
 
   // ══════════════════════════════════════════════════
-  // State 3: Scan Dest Pallet
+  // State 3: Scan Dest Pallet (ครั้งแรก)
   // ══════════════════════════════════════════════════
   Widget _buildScanDest() {
     final picked = <String, int>{};
@@ -852,7 +694,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                     Icon(Icons.qr_code_scanner, color: AppTheme.secondary),
                     SizedBox(width: 8),
                     Text(
-                      'Scan Pallet เปล่า (ปลายทาง)',
+                      'Scan Pallet ปลายทาง',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -863,13 +705,13 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'สแกน Pallet เปล่าที่จะใส่สินค้าที่หยิบมา',
+                  'สแกน Pallet ปลายทางที่จะใส่สินค้าที่หยิบมา',
                   style: TextStyle(fontSize: 13, color: AppTheme.textGrey),
                 ),
                 const SizedBox(height: 12),
                 ScanTextField(
                   label: 'Dest Pallet ID',
-                  hint: 'Scan Pallet เปล่า',
+                  hint: 'Scan Pallet ปลายทาง',
                   controller: _destScanCtrl,
                   focusNode: _destScanFocus,
                   onSubmit: _scanDestAndConfirm,
@@ -894,7 +736,298 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
     );
   }
 
-  // ── Order info banner ────────────────────────────
+  // ══════════════════════════════════════════════════
+  // State 4: After Pick — 2 ปุ่ม
+  // ══════════════════════════════════════════════════
+  Widget _buildAfterPick() {
+    final res = _lastResult!;
+    final isComplete = res.isPickOrderComplete;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Success banner
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.success.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppTheme.success.withValues(alpha: 0.4),
+              ),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  isComplete ? Icons.celebration : Icons.check_circle,
+                  color: AppTheme.success,
+                  size: 48,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  isComplete ? 'Pick Order ครบแล้ว!' : 'Pick รอบนี้สำเร็จ',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.success,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Dest Pallet: $_destPalletId',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Remaining items (ถ้ายังไม่ครบ)
+          if (!isComplete) ...[
+            WmsCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.pending_actions,
+                        color: AppTheme.warning,
+                        size: 18,
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        'ยังต้อง Pick เพิ่ม',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.warning,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ...res.remainingItems
+                      .where((r) => r.remainingQty > 0)
+                      .map(
+                        (r) => Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.arrow_right,
+                                size: 14,
+                                color: AppTheme.textGrey,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  '${r.partId}: ${r.itemDesc}',
+                                  style: const TextStyle(fontSize: 13),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Text(
+                                'เหลือ ${r.remainingQty}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.warning,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // ── ปุ่ม 1: กลับสแกน Pallet ──
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _goToScanSource,
+              icon: const Icon(Icons.qr_code_scanner, size: 20),
+              label: const Text(
+                'กลับสแกน Pallet',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // ── ปุ่ม 2: ส่งไป PACK ──
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: isComplete
+                  ? () {
+                      // TODO: ไปหน้า PACK flow
+                      showSuccessSnackbar(
+                        context,
+                        'Pick Order $_pickOrderId ครบ — พร้อมส่งไป PACK',
+                      );
+                      Navigator.pop(context);
+                    }
+                  : null,
+              icon: const Icon(Icons.local_shipping, size: 20),
+              label: Text(
+                isComplete ? 'ส่งไป PACK' : 'ส่งไป PACK (รอ Pick ครบก่อน)',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.secondary,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: AppTheme.textGrey.withValues(
+                  alpha: 0.3,
+                ),
+                disabledForegroundColor: AppTheme.textGrey,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════
+  // State 5: Return Source — pallet ไม่มี pick items
+  // ══════════════════════════════════════════════════
+  Widget _buildReturnSource() {
+    final palletId = _returnPalletId ?? '';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildOrderInfoBanner(),
+          if (_destPalletId != null) ...[
+            const SizedBox(height: 8),
+            _buildDestPalletBanner(),
+          ],
+          const SizedBox(height: 16),
+
+          // Pallet info
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.warning.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppTheme.warning.withValues(alpha: 0.4),
+              ),
+            ),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.info_outline,
+                  color: AppTheme.warning,
+                  size: 40,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  palletId,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'ไม่มีสินค้าที่ต้อง Pick บน Pallet นี้',
+                  style: TextStyle(fontSize: 14, color: AppTheme.textGrey),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          const Text(
+            'เลือกปลายทาง',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+
+          // ส่งกลับ ASRS
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _returnPallet(palletId, 'ASRS'),
+              icon: const Icon(Icons.warehouse, size: 20),
+              label: const Text(
+                'ส่งกลับ ASRS',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // ส่งไป ZONE PACK
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _returnPallet(palletId, 'ZONE_PACK'),
+              icon: const Icon(Icons.local_shipping, size: 20),
+              label: const Text(
+                'ส่งไป ZONE PACK',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.secondary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
+      ),
+    );
+  }
+
+  // ── Banners ──────────────────────────────────────
   Widget _buildOrderInfoBanner() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -913,6 +1046,31 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
               fontWeight: FontWeight.w700,
               fontSize: 14,
               color: AppTheme.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDestPalletBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.secondary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.secondary.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.inventory_2, color: AppTheme.secondary, size: 18),
+          const SizedBox(width: 6),
+          Text(
+            'Dest Pallet: $_destPalletId',
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              color: AppTheme.secondary,
             ),
           ),
         ],
