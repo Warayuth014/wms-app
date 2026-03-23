@@ -1,6 +1,5 @@
 // lib/screens/flow2/load_basket_detail_screen.dart
 
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
@@ -10,61 +9,31 @@ import '../../models/wms_models.dart';
 class LoadBasketDetailScreen extends StatefulWidget {
   final String userId;
   final String fullName;
-  final ConfirmedUnloadItem item;
-  // ถ้ามีค่า = resume mode (item ถูก load ลง basket แล้ว รอคืนตะกร้า)
-  final LoadedBasketItem? preloaded;
+  final GroupedUnloadItem item;
 
   const LoadBasketDetailScreen({
     super.key,
     required this.userId,
     required this.fullName,
     required this.item,
-    this.preloaded,
   });
 
   @override
   State<LoadBasketDetailScreen> createState() => _LoadBasketDetailScreenState();
 }
 
-class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen>
-    with SingleTickerProviderStateMixin {
+class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen> {
   final _basketController = TextEditingController();
   final _basketFocus = FocusNode();
+  final _qtyController = TextEditingController();
 
   BasketScanResponse? _basket;
   bool _loading = false;
-  bool _loaded = false;
-  bool _returning = false;
-
-  // animation
-  late AnimationController _arrowController;
-  late Animation<double> _arrowAnimation;
 
   @override
   void initState() {
     super.initState();
-    _arrowController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..repeat(reverse: true);
-
-    _arrowAnimation = Tween<double>(begin: 0, end: -20).animate(
-      CurvedAnimation(parent: _arrowController, curve: Curves.easeInOut),
-    );
-
-    // Resume mode: item ถูก load แล้ว ข้ามไปหน้า คืนตะกร้า ทันที
-    if (widget.preloaded != null) {
-      final p = widget.preloaded!;
-      _basket = BasketScanResponse(
-        basketId: p.basketId,
-        label: p.basketLabel,
-        zone: null,
-        destination: p.basketDestination,
-        status: 'IN_USE',
-        message: '',
-      );
-      _loaded = true;
-    }
+    _qtyController.text = '${widget.item.totalQty}';
   }
 
   // ── สแกน Basket ───────────────────────────
@@ -88,14 +57,12 @@ class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen>
 
     final basket = result.data!;
 
-    // เช็ค Basket ต้องว่างเท่านั้น
     if (basket.status != 'AVAILABLE') {
       showErrorDialog(
         context,
         message:
             'Basket ${basket.basketId} ไม่ว่าง\n'
-            'สถานะ: ${basket.status}\n'
-            '1 Part ต่อ 1 Basket เท่านั้น',
+            'สถานะ: ${basket.status}',
       );
       _basketController.clear();
       _basketFocus.requestFocus();
@@ -105,9 +72,22 @@ class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen>
     setState(() => _basket = basket);
   }
 
-  // ── Load เข้า Basket ──────────────────────
+  // ── Load เข้า Basket แล้วกลับ ─────────────
   Future<void> _loadToBasket() async {
     if (_basket == null) return;
+
+    final qty = int.tryParse(_qtyController.text.trim()) ?? 0;
+    if (qty <= 0) {
+      showErrorDialog(context, message: 'กรุณาระบุจำนวนที่ต้องการ Load');
+      return;
+    }
+    if (qty > widget.item.totalQty) {
+      showErrorDialog(
+        context,
+        message: 'จำนวนเกินที่มี (${widget.item.totalQty} ชิ้น)',
+      );
+      return;
+    }
 
     final confirm = await showConfirmDialog(
       context,
@@ -115,18 +95,17 @@ class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen>
       message:
           'ใส่ ${widget.item.partId} เข้า ${_basket!.label}?\n'
           '${widget.item.itemDesc}\n'
-          'จำนวน: ${widget.item.qtyUnloaded} ชิ้น',
+          'จำนวน: $qty ชิ้น',
       confirmLabel: 'Load',
     );
     if (!confirm || !mounted) return;
 
     setState(() => _loading = true);
 
-    final result = await ApiService().loadToBasketIndependent(
-      unloadLineId: widget.item.lineId,
-      basketId: _basket!.basketId,
+    final result = await ApiService().loadToBasket(
       partId: widget.item.partId,
-      palletId: widget.item.palletId,
+      basketId: _basket!.basketId,
+      qty: qty,
       operatorId: widget.userId,
     );
 
@@ -138,36 +117,7 @@ class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen>
       return;
     }
 
-    setState(() => _loaded = true);
-    showSuccessSnackbar(context, 'Load สำเร็จ');
-  }
-
-  // ── คืนตะกร้า (Robot pickup animation) ───
-  Future<void> _returnBasket() async {
-    setState(() => _returning = true);
-
-    // Call API + animation พร้อมกัน
-    final result = await Future.wait([
-      ApiService().returnBasket(
-        basketId: _basket!.basketId,
-        operatorId: widget.userId,
-      ),
-      Future.delayed(const Duration(seconds: 5)),
-    ]);
-
-    if (!mounted) return;
-    setState(() => _returning = false);
-
-    final apiResult = result[0] as ApiResult<Map<String, dynamic>>;
-    if (!apiResult.success) {
-      showErrorDialog(
-        context,
-        message: apiResult.error ?? 'คืนตะกร้าไม่สำเร็จ',
-      );
-      return;
-    }
-
-    showSuccessSnackbar(context, 'คืนตะกร้าเรียบร้อย');
+    showSuccessSnackbar(context, 'Load สำเร็จ — ${widget.item.partId} x$qty → ${_basket!.label}');
     Navigator.pop(context);
   }
 
@@ -175,7 +125,7 @@ class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen>
   void dispose() {
     _basketController.dispose();
     _basketFocus.dispose();
-    _arrowController.dispose();
+    _qtyController.dispose();
     super.dispose();
   }
 
@@ -185,70 +135,85 @@ class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen>
       loading: _loading,
       child: Scaffold(
         appBar: WmsAppBar(title: 'Load Basket', userName: widget.fullName),
-        body: _returning
-            ? _buildReturnAnimation()
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ── Part Info ─────────────
-                    _buildPartInfo(),
-                    const SizedBox(height: 20),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Part Info ─────────────
+              _buildPartInfo(),
+              const SizedBox(height: 20),
 
-                    // ── Scan Basket ───────────
-                    if (!_loaded) ...[
-                      const Text(
-                        'สแกน Basket',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      ScanTextField(
-                        controller: _basketController,
-                        label: 'Basket ID เช่น BKT-A1',
-                        hint: 'BKT-A1',
-                        onSubmit: _scanBasket,
-                      ),
-                    ],
-
-                    // ── Basket Info ───────────
-                    if (_basket != null) ...[
-                      const SizedBox(height: 16),
-                      _buildBasketInfo(),
-                      const SizedBox(height: 20),
-
-                      // ── Load Button ───────────
-                      if (!_loaded)
-                        PrimaryButton(
-                          label: 'Load เข้า Basket',
-                          icon: Icons.add_box,
-                          onPressed: _loadToBasket,
-                        ),
-                    ],
-
-                    // ── Return Basket Button ──
-                    if (_loaded) ...[
-                      const SizedBox(height: 20),
-                      _buildLoadedSuccess(),
-                      const SizedBox(height: 20),
-                      DangerButton(
-                        label: 'คืนตะกร้า',
-                        icon: Icons.arrow_upward,
-                        onPressed: _returnBasket,
-                      ),
-                    ],
-                  ],
+              // ── Qty Input ─────────────
+              const Text(
+                'จำนวนที่จะ Load เข้าตะกร้า',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
                 ),
               ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _qtyController,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+                decoration: InputDecoration(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  suffixText: '/ ${widget.item.totalQty} ชิ้น',
+                  suffixStyle: const TextStyle(
+                    fontSize: 14,
+                    color: AppTheme.textGrey,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // ── Scan Basket ───────────
+              const Text(
+                'สแกน Basket',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ScanTextField(
+                controller: _basketController,
+                label: 'Basket ID เช่น BKT-A1',
+                hint: 'BKT-A1',
+                onSubmit: _scanBasket,
+              ),
+
+              // ── Basket Info + Load Button ──
+              if (_basket != null) ...[
+                const SizedBox(height: 16),
+                _buildBasketInfo(),
+                const SizedBox(height: 20),
+                PrimaryButton(
+                  label: 'Load เข้า Basket',
+                  icon: Icons.add_box,
+                  onPressed: _loadToBasket,
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  // ── Part Info Card ─────────────────────────
   Widget _buildPartInfo() {
     return WmsCard(
       child: Column(
@@ -265,20 +230,32 @@ class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen>
                   fontSize: 16,
                 ),
               ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${widget.item.totalQty} ชิ้น',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: AppTheme.primary,
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 8),
           InfoRow(label: 'สินค้า', value: widget.item.itemDesc),
-          InfoRow(label: 'Pallet', value: widget.item.palletId),
-          InfoRow(label: 'จำนวน', value: '${widget.item.qtyUnloaded} ชิ้น'),
-          if (widget.item.lotNumber != null)
-            InfoRow(label: 'Lot', value: widget.item.lotNumber!),
+          InfoRow(label: 'เจ้าของ', value: '${widget.item.owner} / ${widget.item.brand}'),
         ],
       ),
     );
   }
 
-  // ── Basket Info Card ───────────────────────
   Widget _buildBasketInfo() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -315,131 +292,6 @@ class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen>
           ),
           StatusBadge(_basket!.status),
         ],
-      ),
-    );
-  }
-
-  // ── Loaded Success Card ────────────────────
-  Widget _buildLoadedSuccess() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.success.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.success.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.check_circle, color: AppTheme.success, size: 28),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Load สำเร็จแล้ว',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.success,
-                  ),
-                ),
-                Text(
-                  '${widget.item.partId} → ${_basket!.label}',
-                  style: const TextStyle(
-                    color: AppTheme.textGrey,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Return Animation (5 วิ) ────────────────
-  Widget _buildReturnAnimation() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // ลูกศรสีแดงชี้ขึ้น
-          AnimatedBuilder(
-            animation: _arrowAnimation,
-            builder: (_, __) => Transform.translate(
-              offset: Offset(0, _arrowAnimation.value),
-              child: const Icon(
-                Icons.arrow_upward,
-                color: AppTheme.danger,
-                size: 80,
-              ),
-            ),
-          ),
-          const SizedBox(height: 32),
-          const Icon(Icons.shopping_basket, color: AppTheme.textGrey, size: 48),
-          const SizedBox(height: 24),
-          const Text(
-            'Robot กำลังรับตะกร้า...',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'กรุณารอสักครู่',
-            style: TextStyle(color: AppTheme.textGrey),
-          ),
-          const SizedBox(height: 32),
-          const _CountdownTimer(seconds: 5),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Countdown Timer Widget ─────────────────
-class _CountdownTimer extends StatefulWidget {
-  final int seconds;
-  const _CountdownTimer({required this.seconds});
-
-  @override
-  State<_CountdownTimer> createState() => _CountdownTimerState();
-}
-
-class _CountdownTimerState extends State<_CountdownTimer> {
-  late int _remaining;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _remaining = widget.seconds;
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (_remaining > 0) {
-        setState(() => _remaining--);
-      } else {
-        _timer?.cancel();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      '$_remaining วินาที',
-      style: const TextStyle(
-        fontSize: 32,
-        fontWeight: FontWeight.w700,
-        color: AppTheme.danger,
       ),
     );
   }

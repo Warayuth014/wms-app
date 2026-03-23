@@ -134,6 +134,67 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
     // แจ้ง scan_part_screen ว่า lines ไหนผูกแล้ว
     widget.onAssigned(_selectedLineIds.toList());
 
+    // ── เช็ค auto-close จาก API ──
+    final data = result.data!;
+    final autoClosed = data['autoClosed'] == true;
+
+    if (autoClosed) {
+      final poStatus = data['poStatus'] as String? ?? 'RECEIVED';
+      final closeMessage = data['closeMessage'] as String? ?? 'ปิด Session อัตโนมัติ';
+
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Row(
+            children: [
+              Icon(
+                poStatus == 'RECEIVED' ? Icons.check_circle : Icons.warning_amber,
+                color: poStatus == 'RECEIVED' ? AppTheme.success : AppTheme.warning,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  poStatus == 'RECEIVED' ? 'รับสินค้าครบแล้ว' : 'รับสินค้าบางส่วน',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(closeMessage),
+              const SizedBox(height: 8),
+              const Text(
+                'Session ถูกปิดอัตโนมัติ',
+                style: TextStyle(color: AppTheme.textGrey, fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              InfoRow(label: 'PO', value: widget.po.poId),
+              InfoRow(label: 'Status', value: poStatus),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.popUntil(
+                  context,
+                  (route) => route.isFirst || route.settings.name == '/',
+                );
+              },
+              child: const Text('เสร็จสิ้น'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     // ตรวจว่าครบทุก Part ใน PO หรือยัง
     final remaining = widget.scannedLines
         .where((l) => !_selectedLineIds.contains(l.lineId))

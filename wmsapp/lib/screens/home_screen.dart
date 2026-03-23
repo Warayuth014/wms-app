@@ -12,6 +12,7 @@ import 'package:wmsapp/screens/flow1/flow1_menu_screen.dart';
 import 'package:wmsapp/screens/supervisor/cancel_screen.dart';
 import 'package:wmsapp/screens/putaway/putaway_screen.dart';
 import 'package:wmsapp/screens/picking/picking_session_screen.dart';
+import 'package:wmsapp/screens/test/test_pick_order_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -299,6 +300,64 @@ class _HomeScreenState extends State<HomeScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (_) => CancelScreen(userId: _userId!),
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  // ── TEST Section ────────────
+                  if (_userId != null) ...[
+                    const SizedBox(height: 24),
+                    const Text(
+                      'TEST',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textGrey,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => TestPickOrderScreen(
+                            userId: _userId!,
+                            fullName: _fullName!,
+                          ),
+                        ),
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.science, color: AppTheme.textGrey),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'สร้าง Pick Order (TEST)',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.textPrimary,
+                                    ),
+                                  ),
+                                  Text(
+                                    'เลือกสินค้าจาก ReceiptLines แล้วสร้าง Pick Order',
+                                    style: TextStyle(fontSize: 13, color: AppTheme.textGrey),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.chevron_right, color: AppTheme.textGrey),
+                          ],
                         ),
                       ),
                     ),

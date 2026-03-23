@@ -8,6 +8,8 @@ import '../../services/api_service.dart';
 import '../../models/wms_models.dart';
 
 // ── Station definition ───────────────────────
+enum PWRole { none, receive, send }
+
 class _StationInfo {
   final String id;
   final String label;
@@ -17,6 +19,8 @@ class _StationInfo {
   final String? allowedType;
   // null = ให้ user เลือก destination, non-null = ตายตัวไม่มี selector
   final String? fixedDestination;
+  // PW role: receive = เรียก pallet จาก ASRS, send = convert & ส่งเข้า ASRS
+  final PWRole pwRole;
 
   const _StationInfo({
     required this.id,
@@ -25,6 +29,7 @@ class _StationInfo {
     required this.icon,
     this.allowedType,
     this.fixedDestination,
+    this.pwRole = PWRole.none,
   });
 }
 
@@ -49,30 +54,63 @@ const _kStations = [
   ),
 ];
 
+// สีรับ = เขียว teal, สีส่ง = ส้มแดง — แยกชัดเจน
+const _kColorReceive = Color(0xFF00796B); // teal เข้ม
+const _kColorSend    = Color(0xFFD84315); // ส้มแดง
+
 const _kPWStations = [
+  // คี่ = รับ pallet จาก ASRS (recall)
   _StationInfo(
     id: 'PW-STN-1',
-    label: 'PW Station 1',
-    color: Color(0xFFE65100),
-    icon: Icons.build_circle,
+    label: 'รับ Pallet',
+    color: _kColorReceive,
+    icon: Icons.download,
     allowedType: 'PW',
-    fixedDestination: 'ASRS',
+    pwRole: PWRole.receive,
   ),
+  // คู่ = ส่ง pallet เข้า ASRS (convert & putaway)
   _StationInfo(
     id: 'PW-STN-2',
-    label: 'PW Station 2',
-    color: Color(0xFFBF360C),
-    icon: Icons.build_circle,
+    label: 'ส่ง Pallet',
+    color: _kColorSend,
+    icon: Icons.upload,
     allowedType: 'PW',
     fixedDestination: 'ASRS',
+    pwRole: PWRole.send,
   ),
   _StationInfo(
     id: 'PW-STN-3',
-    label: 'PW Station 3',
-    color: Color(0xFF6D4C41),
-    icon: Icons.build_circle,
+    label: 'รับ Pallet',
+    color: _kColorReceive,
+    icon: Icons.download,
+    allowedType: 'PW',
+    pwRole: PWRole.receive,
+  ),
+  _StationInfo(
+    id: 'PW-STN-4',
+    label: 'ส่ง Pallet',
+    color: _kColorSend,
+    icon: Icons.upload,
     allowedType: 'PW',
     fixedDestination: 'ASRS',
+    pwRole: PWRole.send,
+  ),
+  _StationInfo(
+    id: 'PW-STN-5',
+    label: 'รับ Pallet',
+    color: _kColorReceive,
+    icon: Icons.download,
+    allowedType: 'PW',
+    pwRole: PWRole.receive,
+  ),
+  _StationInfo(
+    id: 'PW-STN-6',
+    label: 'ส่ง Pallet',
+    color: _kColorSend,
+    icon: Icons.upload,
+    allowedType: 'PW',
+    fixedDestination: 'ASRS',
+    pwRole: PWRole.send,
   ),
 ];
 
@@ -93,30 +131,34 @@ class PutawayScreen extends StatefulWidget {
   State<PutawayScreen> createState() => _PutawayScreenState();
 }
 
-class _PutawayScreenState extends State<PutawayScreen> {
+class _PutawayScreenState extends State<PutawayScreen>
+    with SingleTickerProviderStateMixin {
   final _stationController = TextEditingController();
+  late final TabController _tabCtrl;
 
   // stations ที่กำลัง dispatch อยู่ → แสดง arrow animation
   final Set<String> _dispatchingStations = {};
   final Map<String, Timer> _dispatchTimers = {};
 
   @override
+  void initState() {
+    super.initState();
+    _tabCtrl = TabController(length: 2, vsync: this);
+  }
+
+  @override
   void dispose() {
     _stationController.dispose();
+    _tabCtrl.dispose();
     for (final t in _dispatchTimers.values) {
       t.cancel();
     }
     super.dispose();
   }
 
-  // เรียกจาก _StationSheet หลัง confirm สำเร็จ
   void _onPutawayConfirmed(String stationId) {
     setState(() => _dispatchingStations.add(stationId));
-
-    // ยกเลิก timer เดิมถ้ามี
     _dispatchTimers[stationId]?.cancel();
-
-    // 5 วินาทีแล้วกลับปกติ
     _dispatchTimers[stationId] = Timer(const Duration(seconds: 5), () {
       if (mounted) setState(() => _dispatchingStations.remove(stationId));
       _dispatchTimers.remove(stationId);
@@ -138,10 +180,18 @@ class _PutawayScreenState extends State<PutawayScreen> {
         message:
             'ไม่พบ Station: $raw\n'
             'STN: STN-1, STN-2, STN-3\n'
-            'Prework: PW-STN-1, PW-STN-2, PW-STN-3',
+            'Prework: PW-STN-1 ~ PW-STN-6',
       );
       return;
     }
+
+    // สลับ tab ให้ตรงกับ station ที่สแกน
+    if (raw.startsWith('PW-')) {
+      _tabCtrl.animateTo(1);
+    } else {
+      _tabCtrl.animateTo(0);
+    }
+
     _openStationPopup(station);
   }
 
@@ -184,30 +234,22 @@ class _PutawayScreenState extends State<PutawayScreen> {
         title: 'Putaway — เก็บ pallet เข้า ASRS',
         userName: widget.fullName,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Scan station barcode ──────────────
-            WmsCard(
+      body: Column(
+        children: [
+          // ── Scan station barcode ──────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: WmsCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Row(
                     children: [
-                      Icon(
-                        Icons.qr_code_scanner,
-                        color: AppTheme.primary,
-                        size: 20,
-                      ),
+                      Icon(Icons.qr_code_scanner, color: AppTheme.primary, size: 20),
                       SizedBox(width: 8),
                       Text(
                         'สแกนบาร์โค้ด Station',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                       ),
                     ],
                   ),
@@ -219,76 +261,159 @@ class _PutawayScreenState extends State<PutawayScreen> {
                   const SizedBox(height: 12),
                   ScanTextField(
                     label: 'Station ID',
-                    hint: 'เช่น STN-1',
+                    hint: 'เช่น STN-1, PW-STN-1',
                     controller: _stationController,
                     onSubmit: _onStationBarcodeScan,
                   ),
                 ],
               ),
             ),
+          ),
 
-            const SizedBox(height: 20),
+          const SizedBox(height: 12),
 
-            // ── Station cards ─────────────────────
-            const Text(
-              'เลือก Station',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
-              ),
+          // ── Tab bar ─────────────────────────────
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(12),
             ),
-            const SizedBox(height: 12),
-
-            // แถวบน: STN-1, STN-2, STN-3
-            _buildStationRow(_kStations),
-            const SizedBox(height: 40),
-            const Text(
-              'เลือก Prework Station',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
+            child: TabBar(
+              controller: _tabCtrl,
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              indicator: BoxDecoration(
+                color: AppTheme.primary,
+                borderRadius: BorderRadius.circular(12),
               ),
+              labelColor: Colors.white,
+              unselectedLabelColor: AppTheme.textPrimary,
+              labelStyle: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                fontFamily: 'Sarabun',
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                fontFamily: 'Sarabun',
+              ),
+              tabs: const [
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.warehouse, size: 18),
+                      SizedBox(width: 6),
+                      Text('Station'),
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.build_circle, size: 18),
+                      SizedBox(width: 6),
+                      Text('Prework'),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            // แถวล่าง: PW-STN-1, PW-STN-2, PW-STN-3
-            _buildStationRow(_kPWStations),
+          ),
 
-            const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
-            // ── Info banner ───────────────────────
-            // Container(
-            //   padding: const EdgeInsets.all(14),
-            //   decoration: BoxDecoration(
-            //     color: AppTheme.primary.withValues(alpha: 0.07),
-            //     borderRadius: BorderRadius.circular(12),
-            //     border: Border.all(
-            //       color: AppTheme.primary.withValues(alpha: 0.2),
-            //     ),
-            //   ),
-            //   child: const Row(
-            //     crossAxisAlignment: CrossAxisAlignment.start,
-            //     children: [
-            //       Icon(Icons.info_outline, color: AppTheme.primary, size: 18),
-            //       SizedBox(width: 10),
-            //       Expanded(
-            //         child: Text(
-            //           'หลังยืนยัน โฟล์คลิฟไร้คนขับจะมารับ Pallet\n'
-            //           'STN-1/2/3 → FG & PW — เลือก ASRS หรือ Prework\n'
-            //           'PW-STN → PW เท่านั้น — convert เป็น FG แล้วส่ง ASRS',
-            //           style: TextStyle(
-            //             fontSize: 12,
-            //             color: AppTheme.primary,
-            //             height: 1.6,
-            //           ),
-            //         ),
-            //       ),
-            //     ],
-            //   ),
-            // ),
-          ],
-        ),
+          // ── Tab content ─────────────────────────
+          Expanded(
+            child: TabBarView(
+              controller: _tabCtrl,
+              children: [
+                // ── Tab 1: Station ──
+                SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'เลือก Station (FG & PW)',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'สแกน Pallet → เลือก ASRS หรือ Prework',
+                        style: TextStyle(fontSize: 12, color: AppTheme.textGrey),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildStationRow(_kStations),
+                    ],
+                  ),
+                ),
+
+                // ── Tab 2: Prework ──
+                SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── Legend ──
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _kColorReceive.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.download, size: 14, color: _kColorReceive),
+                                SizedBox(width: 4),
+                                Text('รับ — เรียก Pallet จาก ASRS',
+                                    style: TextStyle(fontSize: 11, color: _kColorReceive, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _kColorSend.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.upload, size: 14, color: _kColorSend),
+                                SizedBox(width: 4),
+                                Text('ส่ง — Convert & ส่ง ASRS',
+                                    style: TextStyle(fontSize: 11, color: _kColorSend, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // PW-STN-1 ~ 3
+                      _buildStationRow(_kPWStations.sublist(0, 3)),
+                      const SizedBox(height: 10),
+                      // PW-STN-4 ~ 6
+                      _buildStationRow(_kPWStations.sublist(3, 6)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -418,9 +543,11 @@ class _StationCardState extends State<_StationCard>
             fontWeight: FontWeight.w800,
           ),
         ),
-        const Text(
-          'AGV กำลังมา...',
-          style: TextStyle(color: Colors.white70, fontSize: 11),
+        Text(
+          widget.station.pwRole == PWRole.receive
+              ? 'AGV กำลังนำ Pallet มา...'
+              : 'AGV กำลังมารับ...',
+          style: const TextStyle(color: Colors.white70, fontSize: 11),
         ),
       ],
     );
@@ -538,6 +665,8 @@ class _StationSheetState extends State<_StationSheet> {
     super.dispose();
   }
 
+  bool get _isReceive => widget.station.pwRole == PWRole.receive;
+
   Future<void> _scanPallet() async {
     final palletId = _palletController.text.trim().toUpperCase();
     if (palletId.isEmpty) {
@@ -545,6 +674,13 @@ class _StationSheetState extends State<_StationSheet> {
       return;
     }
 
+    // ── Receive station → recall จาก ASRS ทันที ──
+    if (_isReceive) {
+      await _recallPallet(palletId);
+      return;
+    }
+
+    // ── Send station / Normal station → scan pallet ──
     setState(() {
       _loadingPallet = true;
       _pallet = null;
@@ -580,12 +716,44 @@ class _StationSheetState extends State<_StationSheet> {
 
     setState(() {
       _pallet = pallet;
-      // station มี fixedDestination → ใช้ค่านั้นเลย ไม่ต้องถาม user
       _selectedDestination =
           widget.station.fixedDestination ?? pallet.suggestedDestination;
     });
   }
 
+  // ── Receive: เรียก PW Pallet จาก ASRS มาที่ station นี้ ──
+  Future<void> _recallPallet(String palletId) async {
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'เรียก Pallet จาก ASRS',
+      message: 'เรียก $palletId จาก ASRS\n'
+          'มาที่ ${widget.station.id}\n\n'
+          'AGV จะนำ Pallet มาส่งทันที',
+      confirmLabel: 'เรียก Pallet',
+    );
+    if (!confirm || !mounted) return;
+
+    setState(() => _loadingConfirm = true);
+
+    final result = await _api.recallToPrework(
+      palletId: palletId,
+      stationId: widget.station.id,
+      operatorId: widget.userId,
+    );
+
+    setState(() => _loadingConfirm = false);
+    if (!mounted) return;
+
+    if (!result.success) {
+      showErrorDialog(context, message: result.error!);
+      return;
+    }
+
+    Navigator.pop(context);
+    widget.onConfirmed();
+  }
+
+  // ── Send / Normal: confirm putaway ──
   Future<void> _confirmPutaway({bool convertToFG = true}) async {
     if (_pallet == null) return;
 
@@ -639,7 +807,6 @@ class _StationSheetState extends State<_StationSheet> {
       return;
     }
 
-    // ปิด sheet → trigger arrow animation บน station card
     Navigator.pop(context);
     widget.onConfirmed();
   }
@@ -729,10 +896,17 @@ class _StationSheetState extends State<_StationSheet> {
               const SizedBox(height: 16),
 
               // ── Scan Pallet ─────────────────────
-              const Text(
-                'สแกน Pallet',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              Text(
+                _isReceive ? 'เรียก Pallet จาก ASRS' : 'สแกน Pallet',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
               ),
+              if (_isReceive) ...[
+                const SizedBox(height: 4),
+                const Text(
+                  'ใส่ Pallet ID (PW) ที่ต้องการเรียกจาก ASRS',
+                  style: TextStyle(fontSize: 12, color: AppTheme.textGrey),
+                ),
+              ],
               const SizedBox(height: 10),
               ScanTextField(
                 label: 'Pallet ID',
@@ -742,14 +916,14 @@ class _StationSheetState extends State<_StationSheet> {
               ),
               const SizedBox(height: 10),
               PrimaryButton(
-                label: 'ค้นหา Pallet',
-                icon: Icons.search,
-                loading: _loadingPallet,
+                label: _isReceive ? 'เรียก Pallet' : 'ค้นหา Pallet',
+                icon: _isReceive ? Icons.download : Icons.search,
+                loading: _isReceive ? _loadingConfirm : _loadingPallet,
                 onPressed: _scanPallet,
               ),
 
-              // ── Pallet Info ─────────────────────
-              if (_pallet != null) ...[
+              // ── Pallet Info (เฉพาะ Send / Normal) ──
+              if (!_isReceive && _pallet != null) ...[
                 const SizedBox(height: 16),
                 _buildPalletInfo(),
 

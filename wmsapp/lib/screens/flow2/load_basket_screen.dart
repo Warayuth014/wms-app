@@ -24,9 +24,8 @@ class LoadBasketScreen extends StatefulWidget {
 class _LoadBasketScreenState extends State<LoadBasketScreen> {
   final _filterController = TextEditingController();
 
-  List<ConfirmedUnloadItem> _allItems = [];
-  List<ConfirmedUnloadItem> _filtered = [];
-  List<LoadedBasketItem> _loadedItems = [];
+  List<GroupedUnloadItem> _allItems = [];
+  List<GroupedUnloadItem> _filtered = [];
   bool _loading = false;
 
   @override
@@ -38,26 +37,19 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
   Future<void> _loadItems() async {
     setState(() => _loading = true);
 
-    final results = await Future.wait([
-      ApiService().getConfirmedUnloadItems(),
-      ApiService().getLoadedBasketItems(),
-    ]);
+    final result = await ApiService().getConfirmedUnloadItems();
 
     if (!mounted) return;
     setState(() => _loading = false);
 
-    final confirmed = results[0] as ApiResult<List<ConfirmedUnloadItem>>;
-    final loaded = results[1] as ApiResult<List<LoadedBasketItem>>;
-
-    if (!confirmed.success) {
-      showErrorDialog(context, message: confirmed.error ?? 'โหลดข้อมูลไม่ได้');
+    if (!result.success) {
+      showErrorDialog(context, message: result.error ?? 'โหลดข้อมูลไม่ได้');
       return;
     }
 
     setState(() {
-      _allItems = confirmed.data ?? [];
-      _filtered = _allItems;
-      _loadedItems = loaded.data ?? [];
+      _allItems = result.data ?? [];
+      _filter(_filterController.text);
     });
   }
 
@@ -140,7 +132,7 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
                 if (_allItems.isNotEmpty) ...[
                   const Spacer(),
                   Text(
-                    'ทั้งหมด ${_allItems.length} รายการรอ load',
+                    'รวม ${_allItems.fold<int>(0, (s, i) => s + i.totalQty)} ชิ้นรอ load',
                     style: const TextStyle(
                       color: AppTheme.warning,
                       fontSize: 13,
@@ -158,97 +150,19 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : RefreshIndicator(
-                    onRefresh: _loadItems,
-                    child: ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        // ── รอคืนตะกร้า ──────────
-                        if (_loadedItems.isNotEmpty) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.warning.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.shopping_basket,
-                                  color: AppTheme.warning,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'รอคืนตะกร้า (${_loadedItems.length})',
-                                  style: const TextStyle(
-                                    color: AppTheme.warning,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          ..._loadedItems.map(_buildLoadedItemCard),
-                          const SizedBox(height: 16),
-                        ],
-
-                        // ── รอ Load ───────────────
-                        if (_filtered.isEmpty)
-                          _buildEmpty()
-                        else ...[
-                          if (_loadedItems.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primary.withValues(
-                                    alpha: 0.08,
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.category,
-                                      color: AppTheme.primary,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'รอ Load (${_filtered.length})',
-                                      style: const TextStyle(
-                                        color: AppTheme.primary,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ..._filtered.asMap().entries.map(
-                            (e) => Padding(
-                              padding: EdgeInsets.only(
-                                bottom:
-                                    e.key < _filtered.length - 1 ? 8.0 : 0.0,
-                              ),
-                              child: _buildItemCard(e.value),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
+                : _filtered.isEmpty
+                    ? _buildEmpty()
+                    : RefreshIndicator(
+                        onRefresh: _loadItems,
+                        child: ListView.separated(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _filtered.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 8),
+                          itemBuilder: (_, i) =>
+                              _buildItemCard(_filtered[i]),
+                        ),
+                      ),
           ),
         ],
       ),
@@ -284,7 +198,7 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
     );
   }
 
-  Widget _buildItemCard(ConfirmedUnloadItem item) {
+  Widget _buildItemCard(GroupedUnloadItem item) {
     return GestureDetector(
       onTap: () async {
         await Navigator.push(
@@ -297,7 +211,6 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
             ),
           ),
         );
-        // refresh หลังกลับมา
         _loadItems();
       },
       child: Container(
@@ -309,7 +222,6 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
         ),
         child: Row(
           children: [
-            // Part Icon
             Container(
               width: 48,
               height: 48,
@@ -324,8 +236,6 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
               ),
             ),
             const SizedBox(width: 12),
-
-            // Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -345,168 +255,33 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.inventory_2,
-                        size: 12,
-                        color: AppTheme.textGrey,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        item.palletId,
-                        style: const TextStyle(
-                          color: AppTheme.textGrey,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Icon(
-                        Icons.numbers,
-                        size: 12,
-                        color: AppTheme.textGrey,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${item.qtyUnloaded} ชิ้น',
-                        style: const TextStyle(
-                          color: AppTheme.textGrey,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // Arrow
-            const Icon(Icons.chevron_right, color: AppTheme.textGrey),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLoadedItemCard(LoadedBasketItem loaded) {
-    final fakeItem = ConfirmedUnloadItem(
-      lineId: loaded.lineId,
-      partId: loaded.partId,
-      palletId: loaded.palletId,
-      itemDesc: loaded.itemDesc,
-      owner: loaded.owner,
-      qtyUnloaded: loaded.qtyLoaded,
-      lotNumber: loaded.lotNumber,
-    );
-
-    return GestureDetector(
-      onTap: () async {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => LoadBasketDetailScreen(
-              userId: widget.userId,
-              fullName: widget.fullName,
-              item: fakeItem,
-              preloaded: loaded,
-            ),
-          ),
-        );
-        _loadItems();
-      },
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppTheme.warning.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.warning.withValues(alpha: 0.4)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppTheme.warning.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.shopping_basket,
-                color: AppTheme.warning,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
                   Text(
-                    loaded.partId,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                    ),
-                  ),
-                  Text(
-                    loaded.itemDesc,
+                    '${item.owner} / ${item.brand}',
                     style: const TextStyle(
                       color: AppTheme.textGrey,
-                      fontSize: 13,
+                      fontSize: 12,
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.shopping_basket,
-                        size: 12,
-                        color: AppTheme.warning,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        loaded.basketLabel,
-                        style: const TextStyle(
-                          color: AppTheme.warning,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (loaded.basketDestination != null) ...[
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.arrow_forward,
-                          size: 12,
-                          color: AppTheme.textGrey,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          loaded.basketDestination!,
-                          style: const TextStyle(
-                            color: AppTheme.textGrey,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ],
                   ),
                 ],
               ),
             ),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Icon(Icons.arrow_upward, color: AppTheme.warning, size: 20),
-                Text(
-                  'คืนตะกร้า',
-                  style: TextStyle(
-                    color: AppTheme.warning,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${item.totalQty} ชิ้น',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: AppTheme.primary,
                 ),
-              ],
+              ),
             ),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right, color: AppTheme.textGrey),
           ],
         ),
       ),

@@ -383,20 +383,23 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
 
     _clearFormFields();
 
-    // ── ลอง auto-assign กับ pallet ล่าสุด ──
-    if (_lastPalletId != null && _lastPalletType == _condition) {
-      await _assignToPallet(line, _lastPalletId!);
-    } else {
-      // ไม่มี pallet ที่ตรง type → ให้ scan pallet ใหม่
-      setState(() { _pendingLine = line; });
-      if (_lastPalletId != null && _lastPalletType != _condition) {
-        showWarningSnackbar(
-          context,
-          'Pallet $_lastPalletId เป็น $_lastPalletType ไม่ตรงกับสินค้า $_condition — กรุณาสแกน Pallet ใหม่',
-        );
+    // ── แสดง pallet section ให้เลือกทุกครั้ง (pre-fill pallet เดิมถ้า type ตรง) ──
+    setState(() {
+      _pendingLine = line;
+      if (_lastPalletId != null && _lastPalletType == line.condition) {
+        _palletController.text = _lastPalletId!;
+      } else {
+        _palletController.clear();
       }
-      _palletFocus.requestFocus();
+    });
+
+    if (_lastPalletId != null && _lastPalletType != line.condition) {
+      showWarningSnackbar(
+        context,
+        'Pallet $_lastPalletId เป็น $_lastPalletType ไม่ตรงกับสินค้า ${line.condition} — กรุณาสแกน Pallet ใหม่',
+      );
     }
+    _palletFocus.requestFocus();
   }
 
   // ── Assign to Pallet ────────────────────────────
@@ -427,23 +430,101 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
     }
 
     // สำเร็จ → จำ pallet + เพิ่มเข้า assigned list
+    final data = result.data!;
+    final autoClosed = data['autoClosed'] == true;
+
     setState(() {
       _lastPalletId = palletId;
       _lastPalletType = line.condition;
       _pendingLine = null;
-      _assignedLines.add(_AssignedLine(
-        partId: line.partId,
-        itemDesc: line.itemDesc,
-        qtyReceived: line.qtyReceived,
-        condition: line.condition,
-        palletId: palletId,
-      ));
+
+      // ถ้า partId + palletId เดียวกัน → รวม qty
+      final existIdx = _assignedLines.indexWhere(
+        (a) => a.partId == line.partId && a.palletId == palletId,
+      );
+      if (existIdx >= 0) {
+        final old = _assignedLines[existIdx];
+        _assignedLines[existIdx] = _AssignedLine(
+          partId: old.partId,
+          itemDesc: old.itemDesc,
+          qtyReceived: old.qtyReceived + line.qtyReceived,
+          condition: old.condition,
+          palletId: old.palletId,
+        );
+      } else {
+        _assignedLines.add(_AssignedLine(
+          partId: line.partId,
+          itemDesc: line.itemDesc,
+          qtyReceived: line.qtyReceived,
+          condition: line.condition,
+          palletId: palletId,
+        ));
+      }
     });
 
     showSuccessSnackbar(
       context,
       '${line.partId} → Pallet $palletId สำเร็จ',
     );
+
+    // ── Auto-closed → แสดง dialog แล้ว navigate กลับ ──
+    if (autoClosed) {
+      final poStatus = data['poStatus'] as String? ?? 'RECEIVED';
+      final closeMessage = data['closeMessage'] as String? ?? 'ปิด Session อัตโนมัติ';
+
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Row(
+            children: [
+              Icon(
+                poStatus == 'RECEIVED' ? Icons.check_circle : Icons.warning_amber,
+                color: poStatus == 'RECEIVED' ? AppTheme.success : AppTheme.warning,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  poStatus == 'RECEIVED' ? 'รับสินค้าครบแล้ว' : 'รับสินค้าบางส่วน',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(closeMessage),
+              const SizedBox(height: 8),
+              const Text(
+                'Session ถูกปิดอัตโนมัติ',
+                style: TextStyle(color: AppTheme.textGrey, fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              InfoRow(label: 'PO', value: widget.po.poId),
+              InfoRow(label: 'Status', value: poStatus),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.popUntil(context, (route) => route.isFirst || route.settings.name == '/');
+              },
+              child: const Text('เสร็จสิ้น'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // โหลด PO ใหม่เพื่ออัพเดท qtyRemaining
+    await _reloadPo();
+
     _partFocus.requestFocus();
   }
 
@@ -474,71 +555,6 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       });
       _palletFocus.requestFocus();
     }
-  }
-
-  // ── Close Session ────────────────────────────
-  Future<void> _closeSession() async {
-    final confirm = await showConfirmDialog(
-      context,
-      title: 'ปิด Session',
-      message: 'ผูกสินค้า ${_assignedLines.length} รายการแล้ว\nต้องการปิด session?',
-      confirmLabel: 'ปิด Session',
-    );
-    if (!confirm || !mounted) return;
-
-    setState(() => _loading = true);
-    final result = await _api.closeReceivingSession(widget.session.sessionId);
-    if (!mounted) return;
-    setState(() => _loading = false);
-
-    if (!result.success) {
-      showErrorDialog(context, message: result.error!);
-      return;
-    }
-
-    final poStatus = result.data!['poStatus'] as String;
-    final message = result.data!['message'] as String;
-
-    if (!mounted) return;
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Row(
-          children: [
-            Icon(
-              poStatus == 'RECEIVED' ? Icons.check_circle : Icons.warning_amber,
-              color: poStatus == 'RECEIVED' ? AppTheme.success : AppTheme.warning,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              poStatus == 'RECEIVED' ? 'รับสินค้าครบแล้ว' : 'รับสินค้าบางส่วน',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(message),
-            const SizedBox(height: 12),
-            InfoRow(label: 'PO', value: widget.po.poId),
-            InfoRow(label: 'Status', value: poStatus),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.popUntil(context, (route) => route.isFirst || route.settings.name == '/');
-            },
-            child: const Text('เสร็จสิ้น'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _clearFormFields() {
@@ -643,15 +659,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                     if (pendingItems.isNotEmpty && !showPalletSection)
                       _buildPendingList(pendingItems),
 
-                    // ── Close Session ─────────────
-                    if (_assignedLines.isNotEmpty && !showPalletSection) ...[
-                      const SizedBox(height: 16),
-                      DangerButton(
-                        label: 'ปิด Session',
-                        icon: Icons.stop_circle,
-                        onPressed: _closeSession,
-                      ),
-                    ],
+                    // auto-close เมื่อรับครบ — ไม่ต้องมีปุ่มปิด manual
                   ],
                 ),
               ),

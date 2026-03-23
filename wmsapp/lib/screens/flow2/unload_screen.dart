@@ -35,6 +35,10 @@ class _UnloadScreenState extends State<UnloadScreen>
   // partId → PENDING | CONFIRMED
   final Map<String, String> _partStatus = {};
 
+  // qty controllers & scanned part highlight
+  final Map<String, TextEditingController> _qtyCtrl = {};
+  String? _scannedPartId; // part ที่ scan แล้วรอกด confirm
+
   @override
   void initState() {
     super.initState();
@@ -51,6 +55,21 @@ class _UnloadScreenState extends State<UnloadScreen>
       _partStatus.values.where((s) => s == 'CONFIRMED').length;
   int get _totalCount => _partStatus.length;
   bool get _allConfirmed => _totalCount > 0 && _confirmedCount == _totalCount;
+
+  void _buildQtyControllers() {
+    _disposeQtyCtrl();
+    if (_pallet == null) return;
+    for (final item in _pallet!.items) {
+      _qtyCtrl[item.partId] = TextEditingController(text: '${item.qty}');
+    }
+  }
+
+  void _disposeQtyCtrl() {
+    for (final c in _qtyCtrl.values) {
+      c.dispose();
+    }
+    _qtyCtrl.clear();
+  }
 
   // ── สแกน Pallet ───────────────────────────
   Future<void> _scanPallet() async {
@@ -137,6 +156,18 @@ class _UnloadScreenState extends State<UnloadScreen>
       _sessionId = session.sessionId;
       _sessionOpen = true;
       _partStatus.clear();
+      _scannedPartId = null;
+
+      // อัพเดท items จาก session (มี remaining qty ที่ถูกต้อง)
+      _pallet = PalletScanResponse(
+        palletId: _pallet!.palletId,
+        type: _pallet!.type,
+        status: _pallet!.status,
+        needsLabeling: false,
+        items: session.items,
+        message: '',
+      );
+
       for (final item in session.items) {
         _partStatus[item.partId] =
             session.confirmedPartIds.contains(item.partId)
@@ -145,11 +176,12 @@ class _UnloadScreenState extends State<UnloadScreen>
       }
     });
 
+    _buildQtyControllers();
     _partFocus.requestFocus();
   }
 
-  // ── Confirm Unload Part ────────────────────
-  Future<void> _confirmPart() async {
+  // ── Scan Part → ไฮไลท์ รอกด Confirm ────────
+  void _scanPart() {
     final partId = _partController.text.trim().toUpperCase();
     if (partId.isEmpty) return;
 
@@ -165,6 +197,36 @@ class _UnloadScreenState extends State<UnloadScreen>
       return;
     }
 
+    setState(() {
+      _scannedPartId = partId;
+      _partController.clear();
+    });
+  }
+
+  // ── Confirm Unload Part (กดปุ่ม) ───────────
+  Future<void> _confirmScannedPart() async {
+    if (_scannedPartId == null) return;
+    final partId = _scannedPartId!;
+
+    // อ่าน qty จาก controller
+    final qtyText = _qtyCtrl[partId]?.text.trim() ?? '';
+    final qty = int.tryParse(qtyText) ?? 0;
+
+    if (qty <= 0) {
+      showErrorDialog(context, message: 'กรุณาระบุจำนวนที่ต้องการ Unload');
+      return;
+    }
+
+    // หา item เดิมเพื่อเช็ค max qty
+    final item = _pallet!.items.firstWhere((i) => i.partId == partId);
+    if (qty > item.qty) {
+      showErrorDialog(
+        context,
+        message: 'จำนวนเกินที่มีบน Pallet (${item.qty})',
+      );
+      return;
+    }
+
     setState(() => _loading = true);
 
     final result = await ApiService().confirmUnload(
@@ -172,6 +234,7 @@ class _UnloadScreenState extends State<UnloadScreen>
       palletId: _pallet!.palletId,
       partId: partId,
       operatorId: widget.userId,
+      qtyUnloaded: qty,
     );
 
     if (!mounted) return;
@@ -182,14 +245,57 @@ class _UnloadScreenState extends State<UnloadScreen>
       return;
     }
 
+    // คำนวณส่วนที่เหลือบน Pallet
+    final remainder = item.qty - qty;
+
     setState(() {
-      _partStatus[partId] = 'CONFIRMED';
-      _partController.clear();
+      _scannedPartId = null;
+
+      if (remainder > 0) {
+        // ยัง unload ไม่หมด → อัพเดท qty ที่เหลือ ให้สแกนซ้ำได้
+        final idx = _pallet!.items.indexWhere((i) => i.partId == partId);
+        if (idx >= 0) {
+          final oldItem = _pallet!.items[idx];
+          final updatedItems = List<UnloadItem>.from(_pallet!.items);
+          updatedItems[idx] = UnloadItem(
+            partId: oldItem.partId,
+            owner: oldItem.owner,
+            brand: oldItem.brand,
+            itemDesc: oldItem.itemDesc,
+            lotNumber: oldItem.lotNumber,
+            expiredDate: oldItem.expiredDate,
+            qty: remainder,
+            condition: oldItem.condition,
+          );
+          _pallet = PalletScanResponse(
+            palletId: _pallet!.palletId,
+            type: _pallet!.type,
+            status: _pallet!.status,
+            needsLabeling: _pallet!.needsLabeling,
+            items: updatedItems,
+            message: _pallet!.message,
+          );
+          // อัพเดท qty controller
+          _qtyCtrl[partId]?.text = '$remainder';
+        }
+        // ยังคง PENDING → สแกนซ้ำได้
+        _partStatus[partId] = 'PENDING';
+      } else {
+        // unload หมดแล้ว → CONFIRMED
+        _partStatus[partId] = 'CONFIRMED';
+      }
     });
 
-    showSuccessSnackbar(context, '$partId ($_confirmedCount/$_totalCount)');
+    showSuccessSnackbar(
+      context,
+      remainder > 0
+          ? '$partId — หยิบ $qty ชิ้น (เหลือ $remainder)'
+          : '$partId — $qty ชิ้น ($_confirmedCount/$_totalCount)',
+    );
 
-    // ครบทุกรายการ → เสนอให้สแกน Pallet ใหม่
+    _partFocus.requestFocus();
+
+    // ครบทุกรายการ → เสนอให้คืน Pallet
     if (_allConfirmed) _showNextPalletDialog();
   }
 
@@ -235,11 +341,13 @@ class _UnloadScreenState extends State<UnloadScreen>
   }
 
   void _resetForNextPallet() {
+    _disposeQtyCtrl();
     setState(() {
       _pallet = null;
       _sessionId = null;
       _sessionOpen = false;
       _partStatus.clear();
+      _scannedPartId = null;
       _palletController.clear();
       _partController.clear();
     });
@@ -253,6 +361,7 @@ class _UnloadScreenState extends State<UnloadScreen>
     _palletFocus.dispose();
     _partController.dispose();
     _partFocus.dispose();
+    _disposeQtyCtrl();
     super.dispose();
   }
 
@@ -408,13 +517,32 @@ class _UnloadScreenState extends State<UnloadScreen>
                   controller: _partController,
                   label: 'Part ID เช่น PT-1122',
                   hint: 'PT-1122',
-                  onSubmit: _confirmPart,
+                  onSubmit: _scanPart,
                 ),
                 const SizedBox(height: 16),
               ],
 
-              // ── Items List ────────────────
+              // ── Items List (with qty editors) ──
               if (_partStatus.isNotEmpty) _buildItemsList(),
+
+              // ── Confirm Unload button (เมื่อ scan part แล้ว) ──
+              if (_scannedPartId != null) ...[
+                const SizedBox(height: 12),
+                PrimaryButton(
+                  label: 'ยืนยัน Unload: $_scannedPartId',
+                  icon: Icons.check,
+                  onPressed: _confirmScannedPart,
+                ),
+                const SizedBox(height: 8),
+                DangerButton(
+                  label: 'ยกเลิก',
+                  icon: Icons.close,
+                  onPressed: () {
+                    setState(() => _scannedPartId = null);
+                    _partFocus.requestFocus();
+                  },
+                ),
+              ],
 
               // ── Return Pallet button ──────
               if (_sessionOpen) ...[
@@ -492,16 +620,22 @@ class _UnloadScreenState extends State<UnloadScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (pending.isNotEmpty) ...[
-          const Text(
-            'รอ Confirm',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textGrey,
-            ),
+          const Row(
+            children: [
+              Icon(Icons.inventory_2, color: AppTheme.textPrimary, size: 18),
+              SizedBox(width: 6),
+              Text(
+                'รอ Unload (ระบุจำนวนที่จะหยิบออก)',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
-          ...pending.map((i) => _buildItemRow(i, false)),
+          ...pending.map((i) => _buildItemCard(i, false)),
           const SizedBox(height: 16),
         ],
         if (confirmed.isNotEmpty) ...[
@@ -514,60 +648,173 @@ class _UnloadScreenState extends State<UnloadScreen>
             ),
           ),
           const SizedBox(height: 8),
-          ...confirmed.map((i) => _buildItemRow(i, true)),
+          ...confirmed.map((i) => _buildItemCard(i, true)),
         ],
       ],
     );
   }
 
-  Widget _buildItemRow(dynamic item, bool confirmed) {
+  Widget _buildItemCard(UnloadItem item, bool confirmed) {
+    final isScanned = _scannedPartId == item.partId;
+    final ctrl = _qtyCtrl[item.partId];
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: confirmed
             ? AppTheme.success.withValues(alpha: 0.05)
-            : AppTheme.surface,
-        borderRadius: BorderRadius.circular(8),
+            : isScanned
+                ? AppTheme.primary.withValues(alpha: 0.08)
+                : Colors.white,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: confirmed
               ? AppTheme.success.withValues(alpha: 0.3)
-              : Colors.grey.shade200,
+              : isScanned
+                  ? AppTheme.primary
+                  : AppTheme.border,
+          width: isScanned ? 2 : 1,
         ),
+        boxShadow: [
+          if (!confirmed)
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+        ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            confirmed ? Icons.check_circle : Icons.radio_button_unchecked,
-            color: confirmed ? AppTheme.success : Colors.grey,
-            size: 20,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.partId,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
+          Row(
+            children: [
+              Icon(
+                confirmed ? Icons.check_circle : Icons.radio_button_unchecked,
+                color: confirmed
+                    ? AppTheme.success
+                    : isScanned
+                        ? AppTheme.primary
+                        : Colors.grey,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.partId,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                    Text(
+                      item.itemDesc,
+                      style: const TextStyle(
+                        color: AppTheme.textGrey,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isScanned)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'SCANNED',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-                Text(
-                  item.itemDesc,
-                  style: const TextStyle(
-                    color: AppTheme.textGrey,
-                    fontSize: 12,
+            ],
+          ),
+          if (!confirmed) ...[
+            const Divider(height: 14),
+            Row(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'บน Pallet: ${item.qty} ชิ้น',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.textGrey,
+                      ),
+                    ),
+                    Text(
+                      '${item.owner} / ${item.brand}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textGrey,
+                      ),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                const Text(
+                  'จำนวน Unload: ',
+                  style: TextStyle(fontSize: 13, color: AppTheme.textGrey),
+                ),
+                SizedBox(
+                  width: 72,
+                  height: 38,
+                  child: TextField(
+                    controller: ctrl,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    enabled: isScanned,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      isDense: true,
+                    ),
                   ),
                 ),
               ],
             ),
-          ),
-          Text(
-            '${item.qty} ชิ้น',
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
+          ] else ...[
+            const Divider(height: 14),
+            Row(
+              children: [
+                Text(
+                  '${item.owner} / ${item.brand}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textGrey,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${_qtyCtrl[item.partId]?.text ?? item.qty} ชิ้น',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.success,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
