@@ -1040,33 +1040,27 @@ class PickRemainingItem {
   );
 }
 
-class ConfirmedUnloadItem {
-  final int lineId;
+class GroupedUnloadItem {
   final String partId;
-  final String palletId;
-  final String itemDesc;
   final String owner;
-  final int qtyUnloaded;
-  final String? lotNumber;
+  final String brand;
+  final String itemDesc;
+  final int totalQty;
 
-  ConfirmedUnloadItem({
-    required this.lineId,
+  GroupedUnloadItem({
     required this.partId,
-    required this.palletId,
-    required this.itemDesc,
     required this.owner,
-    required this.qtyUnloaded,
-    this.lotNumber,
+    required this.brand,
+    required this.itemDesc,
+    required this.totalQty,
   });
 
-  factory ConfirmedUnloadItem.fromJson(Map<String, dynamic> j) =>
-      ConfirmedUnloadItem(
-        lineId: j['lineId'],
+  factory GroupedUnloadItem.fromJson(Map<String, dynamic> j) =>
+      GroupedUnloadItem(
         partId: j['partId'],
-        palletId: j['palletId'],
-        itemDesc: j['itemDesc'],
         owner: j['owner'],
-        qtyUnloaded: j['qtyUnloaded'],
-        lotNumber: j['lotNumber'],
+        brand: j['brand'],
+        itemDesc: j['itemDesc'],
+        totalQty: j['totalQty'],
       );
 }
