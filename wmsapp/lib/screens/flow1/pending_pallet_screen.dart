@@ -81,9 +81,9 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppTheme.background,
+                    color: AppTheme.background(context),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppTheme.border),
+                    border: Border.all(color: AppTheme.border(context)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -99,9 +99,9 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
                       const SizedBox(height: 2),
                       Text(
                         line.itemDesc,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: AppTheme.textGrey,
+                          color: AppTheme.textGrey(context),
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -119,9 +119,9 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
                           const SizedBox(width: 8),
                           Text(
                             'PO: ${line.poId}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppTheme.textGrey,
+                              color: AppTheme.textGrey(context),
                             ),
                           ),
                         ],
@@ -154,9 +154,9 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'ถ้า Pallet มีสินค้าอยู่แล้วต้องเป็น Type เดียวกัน (${line.condition})',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppTheme.textGrey,
+                    color: AppTheme.textGrey(context),
                   ),
                 ),
               ],
@@ -165,9 +165,9 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
           actions: [
             TextButton(
               onPressed: assigning ? null : () => Navigator.pop(ctx),
-              child: const Text(
+              child: Text(
                 'ยกเลิก',
-                style: TextStyle(color: AppTheme.textGrey),
+                style: TextStyle(color: AppTheme.textGrey(context)),
               ),
             ),
             ElevatedButton(
@@ -273,18 +273,18 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
         children: [
           Icon(Icons.check_circle_outline, size: 72, color: AppTheme.success),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'ไม่มีรายการค้างการผูก Pallet',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: AppTheme.textGrey,
+              color: AppTheme.textGrey(context),
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'ทุกรายการผูก Pallet เรียบร้อยแล้ว',
-            style: TextStyle(fontSize: 14, color: AppTheme.textGrey),
+            style: TextStyle(fontSize: 14, color: AppTheme.textGrey(context)),
           ),
         ],
       ),
@@ -363,7 +363,7 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppTheme.border),
+        side: BorderSide(color: AppTheme.border(context)),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -398,18 +398,18 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
                   children: [
                     Text(
                       line.partId,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
-                        color: AppTheme.textPrimary,
+                        color: AppTheme.textPrimary(context),
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       line.itemDesc,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        color: AppTheme.textGrey,
+                        color: AppTheme.textGrey(context),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -421,19 +421,19 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
                         const SizedBox(width: 8),
                         Text(
                           'Qty: ${line.qtyReceived}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: AppTheme.textPrimary,
+                            color: AppTheme.textPrimary(context),
                           ),
                         ),
                         if (line.lotNumber != null) ...[
                           const SizedBox(width: 8),
                           Text(
                             'LOT: ${line.lotNumber}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppTheme.textGrey,
+                              color: AppTheme.textGrey(context),
                             ),
                           ),
                         ],

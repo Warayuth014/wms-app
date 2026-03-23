@@ -145,12 +145,12 @@ class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen> {
               const SizedBox(height: 20),
 
               // ── Qty Input ─────────────
-              const Text(
+              Text(
                 'จำนวนที่จะ Load เข้าตะกร้า',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimary,
+                  color: AppTheme.textPrimary(context),
                 ),
               ),
               const SizedBox(height: 12),
@@ -171,21 +171,21 @@ class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   suffixText: '/ ${widget.item.totalQty} ชิ้น',
-                  suffixStyle: const TextStyle(
+                  suffixStyle: TextStyle(
                     fontSize: 14,
-                    color: AppTheme.textGrey,
+                    color: AppTheme.textGrey(context),
                   ),
                 ),
               ),
               const SizedBox(height: 20),
 
               // ── Scan Basket ───────────
-              const Text(
+              Text(
                 'สแกน Basket',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimary,
+                  color: AppTheme.textPrimary(context),
                 ),
               ),
               const SizedBox(height: 12),
@@ -282,8 +282,8 @@ class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen> {
                 ),
                 Text(
                   _basket!.destination ?? 'ไม่ระบุปลายทาง',
-                  style: const TextStyle(
-                    color: AppTheme.textGrey,
+                  style: TextStyle(
+                    color: AppTheme.textGrey(context),
                     fontSize: 13,
                   ),
                 ),

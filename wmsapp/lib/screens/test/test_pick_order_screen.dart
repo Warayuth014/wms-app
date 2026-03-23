@@ -174,11 +174,11 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
             // ── List ──
             Expanded(
               child: _lines.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
                         'ไม่มีสินค้าที่ PALLETIZED\nหรือถูก allocate หมดแล้ว',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: AppTheme.textGrey),
+                        style: TextStyle(color: AppTheme.textGrey(context)),
                       ),
                     )
                   : ListView.builder(
@@ -264,9 +264,9 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
                     ),
                     Text(
                       itemDesc,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppTheme.textGrey,
+                        color: AppTheme.textGrey(context),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -305,9 +305,9 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     suffixText: '/$available',
-                    suffixStyle: const TextStyle(
+                    suffixStyle: TextStyle(
                       fontSize: 10,
-                      color: AppTheme.textGrey,
+                      color: AppTheme.textGrey(context),
                     ),
                   ),
                 ),
@@ -337,11 +337,11 @@ class _InfoChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: AppTheme.textGrey),
+          Icon(icon, size: 12, color: AppTheme.textGrey(context)),
           const SizedBox(width: 3),
           Text(
             label,
-            style: const TextStyle(fontSize: 11, color: AppTheme.textGrey),
+            style: TextStyle(fontSize: 11, color: AppTheme.textGrey(context)),
           ),
         ],
       ),

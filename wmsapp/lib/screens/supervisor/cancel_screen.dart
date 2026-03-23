@@ -157,18 +157,18 @@ class _CancelScreenState extends State<CancelScreen> {
             color: AppTheme.success.withValues(alpha: 0.4),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'ไม่มีคำขอที่รอดำเนินการ',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: AppTheme.textGrey,
+              color: AppTheme.textGrey(context),
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'ทุกรายการได้รับการดำเนินการแล้ว',
-            style: TextStyle(color: AppTheme.textGrey, fontSize: 14),
+            style: TextStyle(color: AppTheme.textGrey(context), fontSize: 14),
           ),
           const SizedBox(height: 24),
           SizedBox(
@@ -313,7 +313,7 @@ class _CancelScreenState extends State<CancelScreen> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.notes, size: 16, color: AppTheme.textGrey),
+                    Icon(Icons.notes, size: 16, color: AppTheme.textGrey(context)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -331,16 +331,16 @@ class _CancelScreenState extends State<CancelScreen> {
                 // ผู้ขอ
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.person,
                       size: 16,
-                      color: AppTheme.textGrey,
+                      color: AppTheme.textGrey(context),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'ขอโดย: ${log.requestBy}',
-                      style: const TextStyle(
-                        color: AppTheme.textGrey,
+                      style: TextStyle(
+                        color: AppTheme.textGrey(context),
                         fontSize: 13,
                       ),
                     ),

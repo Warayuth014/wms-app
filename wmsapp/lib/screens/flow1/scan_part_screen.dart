@@ -139,7 +139,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                 ),
                 Text(
                   poItem.itemDesc,
-                  style: const TextStyle(color: AppTheme.textGrey, fontSize: 13),
+                  style: TextStyle(color: AppTheme.textGrey(ctx), fontSize: 13),
                 ),
                 const Divider(height: 20),
 
@@ -212,7 +212,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                           Icons.calendar_month,
                           color: _selectedExpDate != null
                               ? AppTheme.primary
-                              : AppTheme.textGrey,
+                              : AppTheme.textGrey(ctx),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -225,15 +225,15 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                             style: TextStyle(
                               fontSize: 16,
                               color: _selectedExpDate != null
-                                  ? AppTheme.textPrimary
-                                  : AppTheme.textGrey,
+                                  ? AppTheme.textPrimary(ctx)
+                                  : AppTheme.textGrey(ctx),
                             ),
                           ),
                         ),
                         if (_selectedExpDate != null)
                           GestureDetector(
                             onTap: () => setModal(() => _selectedExpDate = null),
-                            child: const Icon(Icons.clear, color: AppTheme.textGrey, size: 20),
+                            child: Icon(Icons.clear, color: AppTheme.textGrey(ctx), size: 20),
                           ),
                       ],
                     ),
@@ -499,9 +499,9 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
             children: [
               Text(closeMessage),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Session ถูกปิดอัตโนมัติ',
-                style: TextStyle(color: AppTheme.textGrey, fontSize: 13),
+                style: TextStyle(color: AppTheme.textGrey(context), fontSize: 13),
               ),
               const SizedBox(height: 12),
               InfoRow(label: 'PO', value: widget.po.poId),
@@ -694,14 +694,14 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                 ),
                 Text(
                   widget.po.supplierName,
-                  style: const TextStyle(fontSize: 12, color: AppTheme.textGrey),
+                  style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
                 ),
               ],
             ),
           ),
           Text(
             'Session #${widget.session.sessionId}',
-            style: const TextStyle(fontSize: 12, color: AppTheme.textGrey),
+            style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
           ),
         ],
       ),
@@ -736,7 +736,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                 _lastPalletType = null;
               });
             },
-            child: const Icon(Icons.close, size: 18, color: AppTheme.textGrey),
+            child: Icon(Icons.close, size: 18, color: AppTheme.textGrey(context)),
           ),
         ],
       ),
@@ -783,7 +783,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                       ),
                       Text(
                         '${_pendingLine!.qtyReceived} ชิ้น',
-                        style: const TextStyle(fontSize: 12, color: AppTheme.textGrey),
+                        style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
                       ),
                     ],
                   ),
@@ -796,7 +796,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
 
           Text(
             'สินค้าเป็น ${_pendingLine!.condition} — สแกน Pallet ประเภท ${_pendingLine!.condition}',
-            style: const TextStyle(fontSize: 13, color: AppTheme.textGrey),
+            style: TextStyle(fontSize: 13, color: AppTheme.textGrey(context)),
           ),
           const SizedBox(height: 12),
 
@@ -860,7 +860,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(line.partId, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                      Text(line.itemDesc, style: const TextStyle(color: AppTheme.textGrey, fontSize: 12)),
+                      Text(line.itemDesc, style: TextStyle(color: AppTheme.textGrey(context), fontSize: 12)),
                     ],
                   ),
                 ),
@@ -923,7 +923,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(line.partId, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                      Text(line.itemDesc, style: const TextStyle(color: AppTheme.textGrey, fontSize: 12)),
+                      Text(line.itemDesc, style: TextStyle(color: AppTheme.textGrey(context), fontSize: 12)),
                     ],
                   ),
                 ),
@@ -933,7 +933,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                     Text('${line.qtyReceived} ชิ้น', style: const TextStyle(fontWeight: FontWeight.w700)),
                     Text(
                       '${line.palletId} (${line.condition})',
-                      style: const TextStyle(fontSize: 11, color: AppTheme.textGrey),
+                      style: TextStyle(fontSize: 11, color: AppTheme.textGrey(context)),
                     ),
                   ],
                 ),
@@ -951,16 +951,16 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'ยังไม่ได้สแกน',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textGrey),
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textGrey(context)),
           ),
           const SizedBox(height: 12),
           ...items.map((item) => Container(
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppTheme.background,
+              color: AppTheme.background(context),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -972,11 +972,11 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(item.partId, style: const TextStyle(fontWeight: FontWeight.w600)),
-                      Text(item.itemDesc, style: const TextStyle(color: AppTheme.textGrey, fontSize: 12)),
+                      Text(item.itemDesc, style: TextStyle(color: AppTheme.textGrey(context), fontSize: 12)),
                     ],
                   ),
                 ),
-                Text('${item.qtyRemaining > 0 ? item.qtyRemaining : item.qtyOrdered} ชิ้น', style: const TextStyle(color: AppTheme.textGrey, fontSize: 13)),
+                Text('${item.qtyRemaining > 0 ? item.qtyRemaining : item.qtyOrdered} ชิ้น', style: TextStyle(color: AppTheme.textGrey(context), fontSize: 13)),
               ],
             ),
           )),
@@ -1039,7 +1039,7 @@ class _ConditionButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.1) : AppTheme.background,
+          color: selected ? color.withValues(alpha: 0.1) : AppTheme.background(context),
           border: Border.all(
             color: selected ? color : Colors.grey.shade300,
             width: selected ? 2 : 1,
@@ -1148,7 +1148,7 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('ยกเลิก', style: TextStyle(color: AppTheme.textGrey)),
+                  child: Text('ยกเลิก', style: TextStyle(color: AppTheme.textGrey(context))),
                 ),
                 const Text('เลือกวันหมดอายุ (พ.ศ.)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                 TextButton(
@@ -1194,7 +1194,7 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
                                 style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: day == _day ? FontWeight.w700 : FontWeight.normal,
-                                  color: valid ? (day == _day ? AppTheme.primary : AppTheme.textPrimary) : Colors.grey.shade300,
+                                  color: valid ? (day == _day ? AppTheme.primary : AppTheme.textPrimary(context)) : Colors.grey.shade300,
                                 ),
                               ),
                             );
@@ -1217,7 +1217,7 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: (i + 1) == _month ? FontWeight.w700 : FontWeight.normal,
-                                color: (i + 1) == _month ? AppTheme.primary : AppTheme.textPrimary,
+                                color: (i + 1) == _month ? AppTheme.primary : AppTheme.textPrimary(context),
                               ),
                             ),
                           ),
@@ -1242,7 +1242,7 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
                                 style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: ceYear == _year ? FontWeight.w700 : FontWeight.normal,
-                                  color: ceYear == _year ? AppTheme.primary : AppTheme.textPrimary,
+                                  color: ceYear == _year ? AppTheme.primary : AppTheme.textPrimary(context),
                                 ),
                               ),
                             );

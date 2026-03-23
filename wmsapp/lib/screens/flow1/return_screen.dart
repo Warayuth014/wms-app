@@ -85,7 +85,7 @@ class _ReturnScreenState extends State<ReturnScreen> {
     final res = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppTheme.surface,
+      backgroundColor: AppTheme.surface(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -155,7 +155,7 @@ class _ReturnScreenState extends State<ReturnScreen> {
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.surface,
+        backgroundColor: AppTheme.surface(context),
         title: const Text('รับสินค้าคืนเสร็จสิ้น'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -165,7 +165,7 @@ class _ReturnScreenState extends State<ReturnScreen> {
             const SizedBox(height: 8),
             Text(
               'สถานะ Order: ${data.orderStatus}',
-              style: const TextStyle(color: AppTheme.textGrey, fontSize: 13),
+              style: TextStyle(color: AppTheme.textGrey(context), fontSize: 13),
             ),
           ],
         ),
@@ -224,12 +224,12 @@ class _ReturnScreenState extends State<ReturnScreen> {
             children: [
               // ── Scan Order ───────────────
               if (!_sessionOpen) ...[
-                const Text(
+                Text(
                   'สแกน Order Number',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
+                    color: AppTheme.textPrimary(context),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -276,12 +276,12 @@ class _ReturnScreenState extends State<ReturnScreen> {
                 const SizedBox(height: 20),
 
                 // ── Items List ───────────
-                const Text(
+                Text(
                   'รายการสินค้า',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
+                    color: AppTheme.textPrimary(context),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -335,7 +335,7 @@ class _ReturnItemCard extends StatelessWidget {
           // Status Icon
           Icon(
             isDone ? Icons.check_circle : Icons.radio_button_unchecked,
-            color: isDone ? AppTheme.success : AppTheme.textGrey,
+            color: isDone ? AppTheme.success : AppTheme.textGrey(context),
             size: 24,
           ),
           const SizedBox(width: 12),
@@ -354,16 +354,16 @@ class _ReturnItemCard extends StatelessWidget {
                 ),
                 Text(
                   item.itemDesc,
-                  style: const TextStyle(
-                    color: AppTheme.textGrey,
+                  style: TextStyle(
+                    color: AppTheme.textGrey(context),
                     fontSize: 13,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '${item.owner} / ${item.brand}',
-                  style: const TextStyle(
-                    color: AppTheme.textGrey,
+                  style: TextStyle(
+                    color: AppTheme.textGrey(context),
                     fontSize: 12,
                   ),
                 ),
@@ -444,11 +444,11 @@ class _ReturnItemSheetState extends State<_ReturnItemSheet> {
           ),
           Text(
             widget.item.itemDesc,
-            style: const TextStyle(color: AppTheme.textGrey),
+            style: TextStyle(color: AppTheme.textGrey(context)),
           ),
           Text(
             'ซื้อไป ${widget.item.qtySold} ชิ้น',
-            style: const TextStyle(color: AppTheme.textGrey, fontSize: 13),
+            style: TextStyle(color: AppTheme.textGrey(context), fontSize: 13),
           ),
           const SizedBox(height: 20),
           const Divider(),

@@ -25,12 +25,12 @@ class ReplenishmentMenuScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'เลือกประเภทการเติมสินค้า',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
+                color: AppTheme.textPrimary(context),
               ),
             ),
             const SizedBox(height: 16),

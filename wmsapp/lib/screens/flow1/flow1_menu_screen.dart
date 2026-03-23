@@ -49,12 +49,12 @@ class _Flow1MenuScreenState extends State<Flow1MenuScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'เลือกประเภทการรับสินค้า',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
+                color: AppTheme.textPrimary(context),
               ),
             ),
             const SizedBox(height: 16),
@@ -89,7 +89,7 @@ class _Flow1MenuScreenState extends State<Flow1MenuScreen> {
                   ? 'ไม่มีรายการค้าง'
                   : 'มี $_pendingPalletCount รายการรอผูก Pallet',
               color: _pendingPalletCount == 0
-                  ? AppTheme.textGrey
+                  ? AppTheme.textGrey(context)
                   : AppTheme.danger,
               badge: _pendingPalletCount > 0 ? '$_pendingPalletCount' : null,
               onTap: () async {

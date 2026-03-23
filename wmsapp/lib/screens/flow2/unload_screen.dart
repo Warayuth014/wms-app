@@ -384,20 +384,20 @@ class _UnloadScreenState extends State<UnloadScreen>
               ),
             ),
             const SizedBox(height: 32),
-            const Icon(Icons.forklift, color: AppTheme.textGrey, size: 56),
+            Icon(Icons.forklift, color: AppTheme.textGrey(context), size: 56),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'โฟล์คลิฟกำลังรับ Pallet...',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
+                color: AppTheme.textPrimary(context),
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'กรุณารอสักครู่',
-              style: TextStyle(color: AppTheme.textGrey),
+              style: TextStyle(color: AppTheme.textGrey(context)),
             ),
             const SizedBox(height: 32),
             const _CountdownTimer(seconds: 5),
@@ -439,12 +439,12 @@ class _UnloadScreenState extends State<UnloadScreen>
 
               // ── Scan Pallet ───────────────
               if (!_sessionOpen) ...[
-                const Text(
+                Text(
                   'สแกน Pallet',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
+                    color: AppTheme.textPrimary(context),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -480,8 +480,8 @@ class _UnloadScreenState extends State<UnloadScreen>
                             ),
                             Text(
                               'Session #$_sessionId · ${_pallet!.items.length} รายการ',
-                              style: const TextStyle(
-                                color: AppTheme.textGrey,
+                              style: TextStyle(
+                                color: AppTheme.textGrey(context),
                                 fontSize: 13,
                               ),
                             ),
@@ -504,12 +504,12 @@ class _UnloadScreenState extends State<UnloadScreen>
 
               // ── Scan Part ─────────────────
               if (_sessionOpen) ...[
-                const Text(
+              Text(
                   'สแกน Part',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
+                    color: AppTheme.textPrimary(context),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -620,16 +620,16 @@ class _UnloadScreenState extends State<UnloadScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (pending.isNotEmpty) ...[
-          const Row(
+          Row(
             children: [
-              Icon(Icons.inventory_2, color: AppTheme.textPrimary, size: 18),
-              SizedBox(width: 6),
+              Icon(Icons.inventory_2, color: AppTheme.textPrimary(context), size: 18),
+              const SizedBox(width: 6),
               Text(
                 'รอ Unload (ระบุจำนวนที่จะหยิบออก)',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimary,
+                  color: AppTheme.textPrimary(context),
                 ),
               ),
             ],
@@ -673,7 +673,7 @@ class _UnloadScreenState extends State<UnloadScreen>
               ? AppTheme.success.withValues(alpha: 0.3)
               : isScanned
                   ? AppTheme.primary
-                  : AppTheme.border,
+                  : AppTheme.border(context),
           width: isScanned ? 2 : 1,
         ),
         boxShadow: [
@@ -713,8 +713,8 @@ class _UnloadScreenState extends State<UnloadScreen>
                     ),
                     Text(
                       item.itemDesc,
-                      style: const TextStyle(
-                        color: AppTheme.textGrey,
+                      style: TextStyle(
+                        color: AppTheme.textGrey(context),
                         fontSize: 12,
                       ),
                     ),
@@ -748,24 +748,24 @@ class _UnloadScreenState extends State<UnloadScreen>
                   children: [
                     Text(
                       'บน Pallet: ${item.qty} ชิ้น',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        color: AppTheme.textGrey,
+                        color: AppTheme.textGrey(context),
                       ),
                     ),
                     Text(
                       '${item.owner} / ${item.brand}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppTheme.textGrey,
+                        color: AppTheme.textGrey(context),
                       ),
                     ),
                   ],
                 ),
                 const Spacer(),
-                const Text(
+                Text(
                   'จำนวน Unload: ',
-                  style: TextStyle(fontSize: 13, color: AppTheme.textGrey),
+                  style: TextStyle(fontSize: 13, color: AppTheme.textGrey(context)),
                 ),
                 SizedBox(
                   width: 72,
@@ -799,9 +799,9 @@ class _UnloadScreenState extends State<UnloadScreen>
               children: [
                 Text(
                   '${item.owner} / ${item.brand}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppTheme.textGrey,
+                    color: AppTheme.textGrey(context),
                   ),
                 ),
                 const Spacer(),

@@ -108,7 +108,7 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
                       )
                     : null,
                 filled: true,
-                fillColor: AppTheme.surface,
+                fillColor: AppTheme.surface(context),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -124,8 +124,8 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
               children: [
                 Text(
                   'พบ ${_filtered.length} รายการ',
-                  style: const TextStyle(
-                    color: AppTheme.textGrey,
+                  style: TextStyle(
+                    color: AppTheme.textGrey(context),
                     fontSize: 13,
                   ),
                 ),
@@ -184,13 +184,13 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
             _allItems.isEmpty
                 ? 'ยังไม่มีสินค้ารอ Load Basket'
                 : 'ไม่พบสินค้าที่ค้นหา',
-            style: const TextStyle(color: AppTheme.textGrey, fontSize: 15),
+            style: TextStyle(color: AppTheme.textGrey(context), fontSize: 15),
           ),
           if (_allItems.isEmpty) ...[
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'กรุณา Unload สินค้าก่อน',
-              style: TextStyle(color: AppTheme.textGrey, fontSize: 13),
+              style: TextStyle(color: AppTheme.textGrey(context), fontSize: 13),
             ),
           ],
         ],
@@ -216,7 +216,7 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppTheme.surface,
+          color: AppTheme.surface(context),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.grey.shade200),
         ),
@@ -249,16 +249,16 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
                   ),
                   Text(
                     item.itemDesc,
-                    style: const TextStyle(
-                      color: AppTheme.textGrey,
+                    style: TextStyle(
+                      color: AppTheme.textGrey(context),
                       fontSize: 13,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '${item.owner} / ${item.brand}',
-                    style: const TextStyle(
-                      color: AppTheme.textGrey,
+                    style: TextStyle(
+                      color: AppTheme.textGrey(context),
                       fontSize: 12,
                     ),
                   ),
@@ -281,7 +281,7 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            const Icon(Icons.chevron_right, color: AppTheme.textGrey),
+            Icon(Icons.chevron_right, color: AppTheme.textGrey(context)),
           ],
         ),
       ),

@@ -78,7 +78,7 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
           children: [
             Text(
               errorMsg ?? 'ไม่มีสินค้าที่ต้อง Pick บน Pallet นี้',
-              style: const TextStyle(fontSize: 13, color: AppTheme.textGrey),
+              style: TextStyle(fontSize: 13, color: AppTheme.textGrey(context)),
             ),
             const SizedBox(height: 6),
             const Text(
@@ -131,7 +131,7 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
               child: OutlinedButton(
                 onPressed: () => Navigator.pop(ctx),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.textGrey,
+                  foregroundColor: AppTheme.textGrey(context),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),

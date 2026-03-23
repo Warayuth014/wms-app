@@ -254,9 +254,9 @@ class _PutawayScreenState extends State<PutawayScreen>
                     ],
                   ),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     'หรือกดที่รูป Station ด้านล่าง',
-                    style: TextStyle(fontSize: 12, color: AppTheme.textGrey),
+                    style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
                   ),
                   const SizedBox(height: 12),
                   ScanTextField(
@@ -288,7 +288,7 @@ class _PutawayScreenState extends State<PutawayScreen>
                 borderRadius: BorderRadius.circular(12),
               ),
               labelColor: Colors.white,
-              unselectedLabelColor: AppTheme.textPrimary,
+              unselectedLabelColor: AppTheme.textPrimary(context),
               labelStyle: const TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
@@ -337,18 +337,18 @@ class _PutawayScreenState extends State<PutawayScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'เลือก Station (FG & PW)',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
+                          color: AppTheme.textPrimary(context),
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
+                      Text(
                         'สแกน Pallet → เลือก ASRS หรือ Prework',
-                        style: TextStyle(fontSize: 12, color: AppTheme.textGrey),
+                        style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
                       ),
                       const SizedBox(height: 12),
                       _buildStationRow(_kStations),
@@ -902,9 +902,9 @@ class _StationSheetState extends State<_StationSheet> {
               ),
               if (_isReceive) ...[
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'ใส่ Pallet ID (PW) ที่ต้องการเรียกจาก ASRS',
-                  style: TextStyle(fontSize: 12, color: AppTheme.textGrey),
+                  style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
                 ),
               ],
               const SizedBox(height: 10),
@@ -970,7 +970,7 @@ class _StationSheetState extends State<_StationSheet> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.background,
+        color: AppTheme.background(context),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade200),
       ),
@@ -982,10 +982,10 @@ class _StationSheetState extends State<_StationSheet> {
             children: [
               Text(
                 _pallet!.palletId,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
-                  color: AppTheme.textPrimary,
+                  color: AppTheme.textPrimary(context),
                 ),
               ),
               Container(
@@ -1021,7 +1021,7 @@ class _StationSheetState extends State<_StationSheet> {
             const SizedBox(height: 4),
             Text(
               _pallet!.message,
-              style: const TextStyle(color: AppTheme.textGrey, fontSize: 12),
+              style: TextStyle(color: AppTheme.textGrey(context), fontSize: 12),
             ),
           ],
         ],
@@ -1126,14 +1126,14 @@ class _DestButton extends StatelessWidget {
           children: [
             Icon(
               icon,
-              color: selected ? Colors.white : AppTheme.textGrey,
+              color: selected ? Colors.white : AppTheme.textGrey(context),
               size: 22,
             ),
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
-                color: selected ? Colors.white : AppTheme.textPrimary,
+                color: selected ? Colors.white : AppTheme.textPrimary(context),
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
               ),
@@ -1141,7 +1141,7 @@ class _DestButton extends StatelessWidget {
             Text(
               subtitle,
               style: TextStyle(
-                color: selected ? Colors.white70 : AppTheme.textGrey,
+                color: selected ? Colors.white70 : AppTheme.textGrey(context),
                 fontSize: 10,
               ),
               textAlign: TextAlign.center,

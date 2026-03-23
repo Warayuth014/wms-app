@@ -336,7 +336,7 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.background,
+                color: AppTheme.background(context),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: item.status == 'RECEIVED'
@@ -374,8 +374,8 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
                         ),
                         Text(
                           item.itemDesc,
-                          style: const TextStyle(
-                            color: AppTheme.textGrey,
+                          style: TextStyle(
+                            color: AppTheme.textGrey(context),
                             fontSize: 12,
                           ),
                         ),
@@ -394,8 +394,8 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
                       ),
                       Text(
                         'ชิ้น',
-                        style: const TextStyle(
-                          color: AppTheme.textGrey,
+                        style: TextStyle(
+                          color: AppTheme.textGrey(context),
                           fontSize: 12,
                         ),
                       ),

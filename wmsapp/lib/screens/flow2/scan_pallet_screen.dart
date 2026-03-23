@@ -294,15 +294,15 @@ class _ScanPalletScreenState extends State<ScanPalletScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.warning.withValues(alpha: 0.4)),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.warning_amber, color: AppTheme.warning, size: 28),
-          SizedBox(width: 12),
+          const Icon(Icons.warning_amber, color: AppTheme.warning, size: 28),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'ต้องติดสติ๊กเกอร์ก่อน',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
@@ -310,10 +310,10 @@ class _ScanPalletScreenState extends State<ScanPalletScreen> {
                     fontSize: 15,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   'Pallet นี้เป็นประเภท PW\nกรุณาส่งไปจุด Labeling\nแล้วกดยืนยันเมื่อติดสติ๊กเกอร์เรียบร้อย',
-                  style: TextStyle(color: AppTheme.textGrey, fontSize: 13),
+                  style: TextStyle(color: AppTheme.textGrey(context), fontSize: 13),
                 ),
               ],
             ),
@@ -339,7 +339,7 @@ class _ScanPalletScreenState extends State<ScanPalletScreen> {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.background,
+                color: AppTheme.background(context),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
@@ -370,8 +370,8 @@ class _ScanPalletScreenState extends State<ScanPalletScreen> {
                   const SizedBox(height: 4),
                   Text(
                     '${item.owner} · ${item.itemDesc}',
-                    style: const TextStyle(
-                      color: AppTheme.textGrey,
+                    style: TextStyle(
+                      color: AppTheme.textGrey(context),
                       fontSize: 12,
                     ),
                   ),
@@ -425,11 +425,11 @@ class _InfoChip extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 12, color: AppTheme.textGrey),
+        Icon(icon, size: 12, color: AppTheme.textGrey(context)),
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: AppTheme.textGrey),
+          style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
         ),
       ],
     );

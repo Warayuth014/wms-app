@@ -169,9 +169,9 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
             children: [
               Text(closeMessage),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Session ถูกปิดอัตโนมัติ',
-                style: TextStyle(color: AppTheme.textGrey, fontSize: 13),
+                style: TextStyle(color: AppTheme.textGrey(context), fontSize: 13),
               ),
               const SizedBox(height: 12),
               InfoRow(label: 'PO', value: widget.po.poId),
@@ -444,7 +444,7 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
                 decoration: BoxDecoration(
                   color: selected
                       ? AppTheme.primary.withValues(alpha: 0.05)
-                      : AppTheme.background,
+                      : AppTheme.background(context),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: selected
@@ -472,8 +472,8 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
                           ),
                           Text(
                             line.itemDesc,
-                            style: const TextStyle(
-                              color: AppTheme.textGrey,
+                            style: TextStyle(
+                              color: AppTheme.textGrey(context),
                               fontSize: 12,
                             ),
                           ),
@@ -536,7 +536,7 @@ class _TypeButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.1) : AppTheme.background,
+          color: selected ? color.withValues(alpha: 0.1) : AppTheme.background(context),
           border: Border.all(
             color: selected ? color : Colors.grey.shade300,
             width: selected ? 2 : 1,

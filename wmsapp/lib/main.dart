@@ -19,21 +19,26 @@ class WmsApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'WMS',
-      theme: AppTheme.light,
-      debugShowCheckedModeBanner: false,
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('th', 'TH'),
-        Locale('en', 'US'),
-      ],
-      locale: const Locale('th', 'TH'),
-      home: const HomeScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeProvider,
+      builder: (_, themeMode, __) => MaterialApp(
+        title: 'WMS',
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: themeMode,
+        debugShowCheckedModeBanner: false,
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [
+          Locale('th', 'TH'),
+          Locale('en', 'US'),
+        ],
+        locale: const Locale('th', 'TH'),
+        home: const HomeScreen(),
+      ),
     );
   }
 }
