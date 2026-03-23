@@ -41,7 +41,12 @@
       "Read(//c/Users/Admin/Documents/GitHub/**)",
       "Bash(find /c/Users/Admin/Documents/GitHub/WMS_Synnex -name *.cs)",
       "Bash(dotnet --version)",
-      "Bash(dotnet new:*)"
+      "Bash(dotnet new:*)",
+      "Bash(taskkill //F //PID 54056)",
+      "Bash(curl -s http://localhost:5000/api/unload/scan-pallet/PAL-003)",
+      "Bash(tasklist)",
+      "Bash(netstat -ano)",
+      "Bash(dotnet run:*)"
     ]
   }
 }
