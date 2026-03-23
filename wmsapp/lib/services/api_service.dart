@@ -278,13 +278,16 @@ class ApiService {
     required String palletId,
     required String partId,
     required String operatorId,
+    int? qtyUnloaded,
   }) async {
-    final r = await _post('/unload/confirm-unload', {
+    final body = <String, dynamic>{
       'sessionId': sessionId,
       'palletId': palletId,
       'partId': partId,
       'operatorId': operatorId,
-    });
+    };
+    if (qtyUnloaded != null) body['qtyUnloaded'] = qtyUnloaded;
+    final r = await _post('/unload/confirm-unload', body);
     if (!r.success) return ApiResult.error(r.error);
     return ApiResult.success(r.data!);
   }
@@ -295,7 +298,7 @@ class ApiService {
     return ApiResult.success(BasketScanResponse.fromJson(r.data!));
   }
 
-  Future<ApiResult<Map<String, dynamic>>> loadToBasket({
+  Future<ApiResult<Map<String, dynamic>>> loadToBasketBySession({
     required int sessionId,
     required String basketId,
     required String partId,
@@ -458,12 +461,12 @@ class ApiService {
     return ApiResult.success(CloseReturnResponse.fromJson(r.data!));
   }
 
-  // GET confirmed items สำหรับ Load Basket
-  Future<ApiResult<List<ConfirmedUnloadItem>>> getConfirmedUnloadItems() async {
+  // GET confirmed items สำหรับ Load Basket (grouped by PartId)
+  Future<ApiResult<List<GroupedUnloadItem>>> getConfirmedUnloadItems() async {
     final r = await _get('/unload/confirmed-items');
     if (!r.success) return ApiResult.error(r.error);
     final list = (r.data!['items'] as List)
-        .map((i) => ConfirmedUnloadItem.fromJson(i))
+        .map((i) => GroupedUnloadItem.fromJson(i))
         .toList();
     return ApiResult.success(list);
   }
@@ -644,6 +647,29 @@ class ApiService {
   }
 
   // =============================================
+  // TEST — สร้าง Pick Order สำหรับทดสอบ
+  // =============================================
+
+  Future<ApiResult<List<Map<String, dynamic>>>> getAvailableLines() async {
+    final r = await _get('/picking/available-lines');
+    if (!r.success) return ApiResult.error(r.error);
+    final list = (r.data!['items'] as List).cast<Map<String, dynamic>>();
+    return ApiResult.success(list);
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> createTestOrder({
+    required String operatorId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    final r = await _post('/picking/create-test-order', {
+      'operatorId': operatorId,
+      'items': items,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(r.data!);
+  }
+
+  // =============================================
   // SIMULATION — จำลองระบบอัตโนมัติ (AGV/ASRS/Labeling)
   // =============================================
 
@@ -723,19 +749,17 @@ class ApiService {
     return ApiResult.success(CompletePickingResult.fromJson(r.data!));
   }
 
-  // Load to basket (independent)
-  Future<ApiResult<Map<String, dynamic>>> loadToBasketIndependent({
-    required int unloadLineId,
-    required String basketId,
+  // Load to basket (by PartId + Qty)
+  Future<ApiResult<Map<String, dynamic>>> loadToBasket({
     required String partId,
-    required String palletId,
+    required String basketId,
+    required int qty,
     required String operatorId,
   }) async {
     final r = await _post('/unload/load-basket', {
-      'unloadLineId': unloadLineId,
-      'basketId': basketId,
       'partId': partId,
-      'palletId': palletId,
+      'basketId': basketId,
+      'qty': qty,
       'operatorId': operatorId,
     });
     if (!r.success) return ApiResult.error(r.error);

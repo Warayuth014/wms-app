@@ -249,7 +249,7 @@ class OfflineService {
         );
 
       case 'load-to-basket':
-        return api.loadToBasket(
+        return api.loadToBasketBySession(
           sessionId: data['sessionId'],
           basketId: data['basketId'],
           partId: data['partId'],
