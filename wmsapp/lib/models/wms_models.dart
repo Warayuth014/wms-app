@@ -31,12 +31,14 @@ class Part {
   final String owner;
   final String brand;
   final String itemDesc;
+  final String? imageUrl;
 
   Part({
     required this.partId,
     required this.owner,
     required this.brand,
     required this.itemDesc,
+    this.imageUrl,
   });
 
   factory Part.fromJson(Map<String, dynamic> json) => Part(
@@ -44,6 +46,7 @@ class Part {
     owner: json['owner'],
     brand: json['brand'],
     itemDesc: json['itemDesc'],
+    imageUrl: json['imageUrl'],
   );
 }
 
@@ -85,10 +88,14 @@ class POItem {
   final String owner;
   final String brand;
   final String itemDesc;
+  final String? imageUrl;
   final int qtyOrdered;
   final int qtyReceived;
   final int qtyRemaining;
   final String status;
+  final String condition;
+  final String? lotNumber;
+  final String? expiredDate;
 
   POItem({
     required this.id,
@@ -96,10 +103,14 @@ class POItem {
     required this.owner,
     required this.brand,
     required this.itemDesc,
+    this.imageUrl,
     required this.qtyOrdered,
     required this.qtyReceived,
     required this.qtyRemaining,
     required this.status,
+    required this.condition,
+    this.lotNumber,
+    this.expiredDate,
   });
 
   factory POItem.fromJson(Map<String, dynamic> json) => POItem(
@@ -108,10 +119,14 @@ class POItem {
     owner: json['owner'],
     brand: json['brand'],
     itemDesc: json['itemDesc'],
+    imageUrl: json['imageUrl'],
     qtyOrdered: json['qtyOrdered'],
     qtyReceived: json['qtyReceived'],
     qtyRemaining: json['qtyRemaining'] ?? 0,
     status: json['status'],
+    condition: json['condition'] ?? 'FG',
+    lotNumber: json['lotNumber'],
+    expiredDate: json['expiredDate'],
   );
 }
 
@@ -156,9 +171,11 @@ class ReceiptLineResponse {
   final String owner;
   final String brand;
   final String itemDesc;
+  final String? imageUrl;
   final int qtyOrdered;
   final int qtyReceived;
   final String condition;
+  final String? lotNumber;
   final String poItemStatus;
   final String message;
 
@@ -168,9 +185,11 @@ class ReceiptLineResponse {
     required this.owner,
     required this.brand,
     required this.itemDesc,
+    this.imageUrl,
     required this.qtyOrdered,
     required this.qtyReceived,
     required this.condition,
+    this.lotNumber,
     required this.poItemStatus,
     required this.message,
   });
@@ -182,9 +201,11 @@ class ReceiptLineResponse {
         owner: json['owner'],
         brand: json['brand'],
         itemDesc: json['itemDesc'],
+        imageUrl: json['imageUrl'],
         qtyOrdered: json['qtyOrdered'],
         qtyReceived: json['qtyReceived'],
         condition: json['condition'],
+        lotNumber: json['lotNumber'],
         poItemStatus: json['poItemStatus'],
         message: json['message'],
       );
@@ -228,6 +249,7 @@ class UnloadItem {
   final String owner;
   final String brand;
   final String itemDesc;
+  final String? imageUrl;
   final String? lotNumber;
   final String? expiredDate;
   final int qty;
@@ -238,6 +260,7 @@ class UnloadItem {
     required this.owner,
     required this.brand,
     required this.itemDesc,
+    this.imageUrl,
     this.lotNumber,
     this.expiredDate,
     required this.qty,
@@ -249,6 +272,7 @@ class UnloadItem {
     owner: json['owner'],
     brand: json['brand'],
     itemDesc: json['itemDesc'],
+    imageUrl: json['imageUrl'],
     lotNumber: json['lotNumber'],
     expiredDate: json['expiredDate'],
     qty: json['qty'],
@@ -386,6 +410,7 @@ class OrderItemResponse {
   final String owner;
   final String brand;
   final String itemDesc;
+  final String? imageUrl;
   final int qtySold;
   String status;
 
@@ -395,6 +420,7 @@ class OrderItemResponse {
     required this.owner,
     required this.brand,
     required this.itemDesc,
+    this.imageUrl,
     required this.qtySold,
     required this.status,
   });
@@ -406,6 +432,7 @@ class OrderItemResponse {
         owner: j['owner'],
         brand: j['brand'],
         itemDesc: j['itemDesc'],
+        imageUrl: j['imageUrl'],
         qtySold: j['qtySold'],
         status: j['status'],
       );
@@ -416,6 +443,7 @@ class OrderItemResponse {
     owner: owner,
     brand: brand,
     itemDesc: itemDesc,
+    imageUrl: imageUrl,
     qtySold: qtySold,
     status: status ?? this.status,
   );
@@ -698,6 +726,7 @@ class SourceItem {
   final String owner;
   final String brand;
   final String itemDesc;
+  final String? imageUrl;
   final String? lotNumber;
   final String? expiredDate;
   final int qty;
@@ -708,6 +737,7 @@ class SourceItem {
     required this.owner,
     required this.brand,
     required this.itemDesc,
+    this.imageUrl,
     this.lotNumber,
     this.expiredDate,
     required this.qty,
@@ -719,6 +749,7 @@ class SourceItem {
     owner: json['owner'],
     brand: json['brand'],
     itemDesc: json['itemDesc'],
+    imageUrl: json['imageUrl'],
     lotNumber: json['lotNumber'],
     expiredDate: json['expiredDate'],
     qty: json['qty'],
@@ -786,6 +817,7 @@ class PendingPalletLine {
   final String owner;
   final String brand;
   final String itemDesc;
+  final String? imageUrl;
   final int qtyReceived;
   final String condition;
   final String? lotNumber;
@@ -799,6 +831,7 @@ class PendingPalletLine {
     required this.owner,
     required this.brand,
     required this.itemDesc,
+    this.imageUrl,
     required this.qtyReceived,
     required this.condition,
     this.lotNumber,
@@ -813,6 +846,7 @@ class PendingPalletLine {
     owner: j['owner'],
     brand: j['brand'],
     itemDesc: j['itemDesc'],
+    imageUrl: j['imageUrl'],
     qtyReceived: j['qtyReceived'],
     condition: j['condition'],
     lotNumber: j['lotNumber'],
@@ -856,6 +890,7 @@ class PickOrderDetail {
   final String owner;
   final String brand;
   final String itemDesc;
+  final String? imageUrl;
   final int requiredQty;
   final int reservedQty;
   final int remainingQty;
@@ -868,6 +903,7 @@ class PickOrderDetail {
     required this.owner,
     required this.brand,
     required this.itemDesc,
+    this.imageUrl,
     required this.requiredQty,
     required this.reservedQty,
     required this.remainingQty,
@@ -881,6 +917,7 @@ class PickOrderDetail {
     owner: j['owner'],
     brand: j['brand'],
     itemDesc: j['itemDesc'],
+    imageUrl: j['imageUrl'],
     requiredQty: j['requiredQty'],
     reservedQty: j['reservedQty'],
     remainingQty: j['remainingQty'],
@@ -961,6 +998,8 @@ class PickItemOnPallet {
   final String owner;
   final String brand;
   final String itemDesc;
+  final String? imageUrl;
+  final String? lotNumber;
   final int qtyOnPallet;
   final int qtyToPickSuggested;
   final String condition;
@@ -970,6 +1009,8 @@ class PickItemOnPallet {
     required this.owner,
     required this.brand,
     required this.itemDesc,
+    this.imageUrl,
+    this.lotNumber,
     required this.qtyOnPallet,
     required this.qtyToPickSuggested,
     required this.condition,
@@ -980,6 +1021,8 @@ class PickItemOnPallet {
     owner: j['owner'],
     brand: j['brand'],
     itemDesc: j['itemDesc'],
+    imageUrl: j['imageUrl'],
+    lotNumber: j['lotNumber'],
     qtyOnPallet: j['qtyOnPallet'],
     qtyToPickSuggested: j['qtyToPickSuggested'],
     condition: j['condition'],
@@ -1045,6 +1088,8 @@ class GroupedUnloadItem {
   final String owner;
   final String brand;
   final String itemDesc;
+  final String? imageUrl;
+  final String? lotNumber;
   final int totalQty;
 
   GroupedUnloadItem({
@@ -1052,6 +1097,8 @@ class GroupedUnloadItem {
     required this.owner,
     required this.brand,
     required this.itemDesc,
+    this.imageUrl,
+    this.lotNumber,
     required this.totalQty,
   });
 
@@ -1061,6 +1108,8 @@ class GroupedUnloadItem {
         owner: j['owner'],
         brand: j['brand'],
         itemDesc: j['itemDesc'],
+        imageUrl: j['imageUrl'],
+        lotNumber: j['lotNumber'],
         totalQty: j['totalQty'],
       );
 }

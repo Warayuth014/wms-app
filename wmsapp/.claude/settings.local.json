@@ -47,7 +47,11 @@
       "Bash(tasklist)",
       "Bash(netstat -ano)",
       "Bash(dotnet run:*)",
-      "Bash(flutter build:*)"
+      "Bash(flutter build:*)",
+      "Bash(xargs ls:*)",
+      "Bash(grep -v \"^.\\\\{0,30\\\\}$\")",
+      "Bash(flutter pub:*)",
+      "Bash(flutter clean:*)"
     ]
   }
 }

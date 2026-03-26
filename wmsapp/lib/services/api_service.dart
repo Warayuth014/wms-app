@@ -35,7 +35,7 @@ class ApiService {
   // ลำดับการ probe:
   //   Android  → 10.0.2.2 (emulator) → physicalIp
   //   อื่นๆ    → localhost           → physicalIp
-  static const _physicalIp = '192.168.1.141'; // แก้ IP ตรงนี้เมื่อ server ย้าย
+  static const _physicalIp = '192.168.1.159'; // แก้ IP ตรงนี้เมื่อ server ย้าย
   static const _port = 5000;
   static String? _cachedBase;
 
@@ -135,6 +135,62 @@ class ApiService {
     return ApiResult.error(msg, statusCode: res.statusCode);
   }
 
+  // ── Multipart upload helper ─────────────────
+  Future<ApiResult<Map<String, dynamic>>> _uploadFile(
+    String path,
+    File file, {
+    Map<String, String> fields = const {},
+  }) async {
+    try {
+      final base = await ApiService._resolveBase();
+      final uri = Uri.parse('$base$path');
+      final req = http.MultipartRequest('POST', uri);
+      req.fields.addAll(fields);
+      req.files.add(await http.MultipartFile.fromPath('file', file.path));
+      final streamed = await req.send().timeout(const Duration(seconds: 30));
+      final res = await http.Response.fromStream(streamed);
+      return _handle(res);
+    } on SocketException {
+      return ApiResult.error('ไม่สามารถเชื่อมต่อ server ได้');
+    } on TimeoutException {
+      return ApiResult.error('การเชื่อมต่อหมดเวลา กรุณาลองใหม่');
+    } catch (e) {
+      return ApiResult.error('เกิดข้อผิดพลาด: $e');
+    }
+  }
+
+  // =============================================
+  // Upload — Part Image
+  // =============================================
+
+  /// ดึงรายการ Parts ทั้งหมด (สำหรับหน้าจัดการรูป)
+  Future<ApiResult<List<Map<String, dynamic>>>> getAllParts() async {
+    final r = await _get('/upload/parts');
+    if (!r.success) return ApiResult.error(r.error);
+    final items = r.data!['items'] as List;
+    return ApiResult.success(items.cast<Map<String, dynamic>>());
+  }
+
+  /// อัปโหลดรูป Part
+  Future<ApiResult<Map<String, dynamic>>> uploadPartImage({
+    required String partId,
+    required File imageFile,
+  }) async {
+    return _uploadFile(
+      '/upload/part-image',
+      imageFile,
+      fields: {'partId': partId},
+    );
+  }
+
+  /// สร้าง full URL ของรูปจาก relative path
+  Future<String> getImageFullUrl(String relativePath) async {
+    final base = await _resolveBase();
+    // base = "http://x.x.x.x:5000/api" → ตัด /api ออก
+    final serverBase = base.replaceAll('/api', '');
+    return '$serverBase$relativePath';
+  }
+
   // =============================================
   // FLOW 1 — Receiving
   // =============================================
@@ -183,9 +239,6 @@ class ApiService {
     required String poId,
     required String partId,
     required int qtyReceived,
-    String? lotNumber,
-    String? expiredDate,
-    required String condition,
     required String operatorId,
   }) async {
     final r = await _post('/receiving/scan-part', {
@@ -193,9 +246,6 @@ class ApiService {
       'poId': poId,
       'partId': partId,
       'qtyReceived': qtyReceived,
-      'lotNumber': lotNumber,
-      'expiredDate': expiredDate,
-      'condition': condition,
       'operatorId': operatorId,
     });
     if (!r.success) return ApiResult.error(r.error);
