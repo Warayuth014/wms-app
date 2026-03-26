@@ -6,6 +6,7 @@ import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../models/wms_models.dart';
+import '../../widgets/part_thumbnail.dart';
 import 'unload_screen.dart';
 
 class ScanPalletScreen extends StatefulWidget {
@@ -346,33 +347,39 @@ class _ScanPalletScreenState extends State<ScanPalletScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        item.partId,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
+                      PartThumbnail(imageUrl: item.imageUrl, size: 36),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          item.partId,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
-                      Row(
-                        children: [
-                          Text(
-                            '${item.qty} ชิ้น',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(width: 8),
-                          StatusBadge(item.condition),
-                        ],
+                      Text(
+                        '${item.qty} ชิ้น',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
+                      const SizedBox(width: 8),
+                      StatusBadge(item.condition),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${item.owner} · ${item.itemDesc}',
+                    item.itemDesc,
                     style: TextStyle(
                       color: AppTheme.textGrey(context),
                       fontSize: 12,
+                    ),
+                  ),
+                  Text(
+                    '${item.owner} / ${item.brand}',
+                    style: TextStyle(
+                      color: AppTheme.textGrey(context),
+                      fontSize: 11,
                     ),
                   ),
                   if (item.lotNumber != null || item.expiredDate != null) ...[
@@ -380,7 +387,7 @@ class _ScanPalletScreenState extends State<ScanPalletScreen> {
                     Row(
                       children: [
                         if (item.lotNumber != null)
-                          _InfoChip(icon: Icons.tag, label: item.lotNumber!),
+                          _InfoChip(icon: Icons.label_outline, label: 'Batch No.: ${item.lotNumber!}'),
                         if (item.expiredDate != null) ...[
                           const SizedBox(width: 8),
                           _InfoChip(

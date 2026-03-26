@@ -3,6 +3,7 @@ import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import '../../models/wms_models.dart';
+import '../../widgets/part_thumbnail.dart';
 
 class ReturnScreen extends StatefulWidget {
   final String userId;
@@ -332,6 +333,9 @@ class _ReturnItemCard extends StatelessWidget {
     return WmsCard(
       child: Row(
         children: [
+          // Product thumbnail
+          PartThumbnail(imageUrl: item.imageUrl, size: 40),
+          const SizedBox(width: 10),
           // Status Icon
           Icon(
             isDone ? Icons.check_circle : Icons.radio_button_unchecked,

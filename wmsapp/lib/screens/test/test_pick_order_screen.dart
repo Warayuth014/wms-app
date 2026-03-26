@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
+import '../../widgets/part_thumbnail.dart';
 
 class TestPickOrderScreen extends StatefulWidget {
   final String userId;
@@ -215,7 +216,9 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
     final palletType = line['palletType'] as String;
     final available = line['availableQty'] as int;
     final owner = line['owner'] as String;
-    final condition = line['condition'] as String;
+    final brand = (line['brand'] as String?) ?? '';
+    final lotNumber = line['lotNumber'] as String?;
+
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -245,22 +248,18 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
                 color: selected ? AppTheme.primary : Colors.grey,
               ),
               const SizedBox(width: 10),
+              PartThumbnail(imageUrl: line['imageUrl'] as String?, size: 40),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          partId,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        StatusBadge(condition),
-                      ],
+                    Text(
+                      partId,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
                     ),
                     Text(
                       itemDesc,
@@ -269,14 +268,30 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
                         color: AppTheme.textGrey(context),
                       ),
                     ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        if (lotNumber != null && lotNumber.isNotEmpty) ...[
+                          Icon(Icons.label_outline, size: 12, color: AppTheme.textGrey(context)),
+                          const SizedBox(width: 2),
+                          Text(
+                            'Batch No.: $lotNumber',
+                            style: TextStyle(fontSize: 11, color: AppTheme.textGrey(context)),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(
+                          '$owner / $brand',
+                          style: TextStyle(fontSize: 11, color: AppTheme.textGrey(context)),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 4),
                     Row(
                       children: [
                         _InfoChip(Icons.inventory_2, palletId),
                         const SizedBox(width: 6),
                         _InfoChip(Icons.label, palletType),
-                        const SizedBox(width: 6),
-                        _InfoChip(Icons.person, owner),
                       ],
                     ),
                   ],

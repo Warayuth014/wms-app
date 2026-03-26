@@ -6,6 +6,7 @@ import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import '../../models/wms_models.dart';
+import '../../widgets/part_thumbnail.dart';
 
 class UnloadScreen extends StatefulWidget {
   final String userId;
@@ -690,6 +691,8 @@ class _UnloadScreenState extends State<UnloadScreen>
         children: [
           Row(
             children: [
+              PartThumbnail(imageUrl: item.imageUrl, size: 36),
+              const SizedBox(width: 10),
               Icon(
                 confirmed ? Icons.check_circle : Icons.radio_button_unchecked,
                 color: confirmed
@@ -717,6 +720,23 @@ class _UnloadScreenState extends State<UnloadScreen>
                         color: AppTheme.textGrey(context),
                         fontSize: 12,
                       ),
+                    ),
+                    Row(
+                      children: [
+                        if (item.lotNumber != null && item.lotNumber!.isNotEmpty) ...[
+                          Icon(Icons.label_outline, size: 12, color: AppTheme.textGrey(context)),
+                          const SizedBox(width: 2),
+                          Text(
+                            'Batch No.: ${item.lotNumber}',
+                            style: TextStyle(fontSize: 11, color: AppTheme.textGrey(context)),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(
+                          '${item.owner} / ${item.brand}',
+                          style: TextStyle(fontSize: 11, color: AppTheme.textGrey(context)),
+                        ),
+                      ],
                     ),
                   ],
                 ),

@@ -5,6 +5,7 @@ import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import '../../models/wms_models.dart';
+import '../../widgets/part_thumbnail.dart';
 import 'load_basket_detail_screen.dart';
 
 class LoadBasketScreen extends StatefulWidget {
@@ -151,18 +152,16 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _filtered.isEmpty
-                    ? _buildEmpty()
-                    : RefreshIndicator(
-                        onRefresh: _loadItems,
-                        child: ListView.separated(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _filtered.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 8),
-                          itemBuilder: (_, i) =>
-                              _buildItemCard(_filtered[i]),
-                        ),
-                      ),
+                ? _buildEmpty()
+                : RefreshIndicator(
+                    onRefresh: _loadItems,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _filtered.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (_, i) => _buildItemCard(_filtered[i]),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -222,19 +221,7 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
         ),
         child: Row(
           children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.category,
-                color: AppTheme.primary,
-                size: 24,
-              ),
-            ),
+            PartThumbnail(imageUrl: item.imageUrl, size: 48),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -254,6 +241,24 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
                       fontSize: 13,
                     ),
                   ),
+                  if (item.lotNumber != null && item.lotNumber!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.label_outline, size: 14, color: AppTheme.textGrey(context)),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            'Batch No.: ${item.lotNumber}',
+                            style: TextStyle(
+                              color: AppTheme.textGrey(context),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Text(
                     '${item.owner} / ${item.brand}',

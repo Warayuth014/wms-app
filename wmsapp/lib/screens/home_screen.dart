@@ -10,6 +10,7 @@ import '../services/offline_service.dart';
 import 'login_screen.dart';
 import 'package:wmsapp/screens/flow1/flow1_menu_screen.dart';
 import 'package:wmsapp/screens/supervisor/cancel_screen.dart';
+import 'package:wmsapp/screens/supervisor/part_image_screen.dart';
 import 'package:wmsapp/screens/putaway/putaway_screen.dart';
 import 'package:wmsapp/screens/picking/picking_session_screen.dart';
 import 'package:wmsapp/screens/test/test_pick_order_screen.dart';
@@ -150,14 +151,16 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
         ],
       ),
-      body: Column(
-        children: [
-          // ── Offline Banner ──────────────────
-          if (!_isOnline) OfflineBanner(pendingCount: _pendingCount),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            // ── Offline Banner ──────────────────
+            if (!_isOnline) OfflineBanner(pendingCount: _pendingCount),
 
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -294,6 +297,22 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    _ActionCard(
+                      icon: Icons.add_photo_alternate_rounded,
+                      iconColor: AppTheme.primary,
+                      title: 'จัดการรูปสินค้า',
+                      subtitle: 'อัปโหลด/แก้ไขรูปภาพ Parts',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PartImageScreen(
+                            userId: _userId!,
+                            fullName: _fullName!,
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
 
                   // ── TEST Section ────────────
@@ -345,6 +364,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

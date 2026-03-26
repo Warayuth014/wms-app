@@ -5,6 +5,7 @@ import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import '../../models/wms_models.dart';
+import '../../widgets/part_thumbnail.dart';
 
 // ── Screen states ──────────────────────────────────────────────────────────
 enum _PickState {
@@ -531,6 +532,8 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
         children: [
           Row(
             children: [
+              PartThumbnail(imageUrl: item.imageUrl, size: 40),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   item.partId,
@@ -548,9 +551,22 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
             item.itemDesc,
             style: TextStyle(fontSize: 13, color: AppTheme.textGrey(context)),
           ),
-          Text(
-            '${item.owner} / ${item.brand}',
-            style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
+          Row(
+            children: [
+              if (item.lotNumber != null && item.lotNumber!.isNotEmpty) ...[
+                Icon(Icons.label_outline, size: 12, color: AppTheme.textGrey(context)),
+                const SizedBox(width: 2),
+                Text(
+                  'Batch No.: ${item.lotNumber}',
+                  style: TextStyle(fontSize: 11, color: AppTheme.textGrey(context)),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                '${item.owner} / ${item.brand}',
+                style: TextStyle(fontSize: 11, color: AppTheme.textGrey(context)),
+              ),
+            ],
           ),
           const Divider(height: 14),
           Row(

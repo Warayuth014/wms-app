@@ -402,11 +402,43 @@ class _PutawayScreenState extends State<PutawayScreen>
                       ),
                       const SizedBox(height: 16),
 
-                      // PW-STN-1 ~ 3
-                      _buildStationRow(_kPWStations.sublist(0, 3)),
-                      const SizedBox(height: 10),
-                      // PW-STN-4 ~ 6
-                      _buildStationRow(_kPWStations.sublist(3, 6)),
+                      // 2 columns: left = รับ (receive), right = ส่ง (send)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ── Left column: รับ Pallet ──
+                          Expanded(
+                            child: Column(
+                              children: [
+                                for (final s in _kPWStations.where((s) => s.pwRole == PWRole.receive)) ...[
+                                  _StationCard(
+                                    station: s,
+                                    isDispatching: _dispatchingStations.contains(s.id),
+                                    onTap: () => _openStationPopup(s),
+                                  ),
+                                  const SizedBox(height: 10),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          // ── Right column: ส่ง Pallet ──
+                          Expanded(
+                            child: Column(
+                              children: [
+                                for (final s in _kPWStations.where((s) => s.pwRole == PWRole.send)) ...[
+                                  _StationCard(
+                                    station: s,
+                                    isDispatching: _dispatchingStations.contains(s.id),
+                                    onTap: () => _openStationPopup(s),
+                                  ),
+                                  const SizedBox(height: 10),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),

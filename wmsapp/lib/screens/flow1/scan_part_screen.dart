@@ -30,13 +30,10 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
   final _partController = TextEditingController();
   final _partFocus = FocusNode();
   final _qtyController = TextEditingController();
-  final _lotController = TextEditingController();
   final _palletController = TextEditingController();
   final _palletFocus = FocusNode();
   final _api = ApiService();
 
-  DateTime? _selectedExpDate;
-  String _condition = 'FG'; // FG | PW (แทน NORMAL/DAMAGED)
   bool _loading = false;
   bool _isOnline = true;
 
@@ -89,41 +86,47 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
     // ตรวจว่า Part อยู่ใน PO ไหม
     final inPO = _currentPo.items.any((i) => i.partId == partId);
     if (!inPO) {
-      showErrorDialog(context, message: 'Part $partId ไม่อยู่ใน PO ${_currentPo.poId}');
+      showErrorDialog(
+        context,
+        message: 'Part $partId ไม่อยู่ใน PO ${_currentPo.poId}',
+      );
       return;
     }
 
     final poItem = _currentPo.items.firstWhere((i) => i.partId == partId);
-    _qtyController.text = (poItem.qtyRemaining > 0 ? poItem.qtyRemaining : poItem.qtyOrdered).toString();
+    _qtyController.text =
+        (poItem.qtyRemaining > 0 ? poItem.qtyRemaining : poItem.qtyOrdered)
+            .toString();
     _showPartForm(poItem);
   }
 
-  // ── Form กรอก qty, lot, expired, condition ────
+  // ── Form กรอก qty (lot/condition แสดงอัตโนมัติจาก master) ────
   void _showPartForm(POItem poItem) {
+    final condColor = poItem.condition == 'FG'
+        ? AppTheme.success
+        : AppTheme.warning;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModal) => Container(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          ),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
+      builder: (ctx) => Container(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
                       poItem.partId,
                       style: const TextStyle(
                         fontSize: 18,
@@ -131,161 +134,98 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                         color: AppTheme.primary,
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
-                ),
-                Text(
-                  poItem.itemDesc,
-                  style: TextStyle(color: AppTheme.textGrey(ctx), fontSize: 13),
-                ),
-                const Divider(height: 20),
-
-                InfoRow(
-                  label: 'Owner',
-                  value: '${poItem.owner} (${poItem.brand})',
-                ),
-                InfoRow(label: 'สั่งซื้อ', value: '${poItem.qtyOrdered} ชิ้น'),
-                if (poItem.qtyRemaining > 0 && poItem.qtyRemaining < poItem.qtyOrdered)
-                  InfoRow(
-                    label: 'รับได้อีก',
-                    value: '${poItem.qtyRemaining} ชิ้น',
-                    valueColor: AppTheme.warning,
                   ),
-                const SizedBox(height: 16),
-
-                // Qty
-                TextField(
-                  controller: _qtyController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'จำนวนที่รับจริง',
-                    prefixIcon: Icon(Icons.numbers),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
                   ),
-                ),
-                const SizedBox(height: 12),
+                ],
+              ),
+              Text(
+                poItem.itemDesc,
+                style: TextStyle(color: AppTheme.textGrey(ctx), fontSize: 13),
+              ),
+              const Divider(height: 20),
 
-                // Lot
-                TextField(
-                  controller: _lotController,
-                  decoration: const InputDecoration(
-                    labelText: 'Lot Number',
-                    prefixIcon: Icon(Icons.tag),
-                    hintText: 'เช่น L001',
-                  ),
+              // ── Big Condition Badge (FG / PW) ──
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: condColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: condColor, width: 2),
                 ),
-                const SizedBox(height: 12),
-
-                // Expired Date
-                GestureDetector(
-                  onTap: () async {
-                    final picked = await showModalBottomSheet<DateTime>(
-                      context: ctx,
-                      isScrollControlled: false,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => _ThaiDatePicker(
-                        initialDate: _selectedExpDate ?? DateTime.now(),
-                        firstDate: DateTime.now(),
-                      ),
-                    );
-                    if (picked != null) {
-                      setModal(() => _selectedExpDate = picked);
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(
-                        color: _selectedExpDate != null
-                            ? AppTheme.primary
-                            : const Color(0xFFE0E0E0),
-                        width: _selectedExpDate != null ? 2 : 1,
-                      ),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.calendar_month,
-                          color: _selectedExpDate != null
-                              ? AppTheme.primary
-                              : AppTheme.textGrey(ctx),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _selectedExpDate != null
-                                ? '${_selectedExpDate!.day.toString().padLeft(2, '0')}/'
-                                    '${_selectedExpDate!.month.toString().padLeft(2, '0')}/'
-                                    '${_selectedExpDate!.year + 543}'
-                                : 'Expired Date (ไม่บังคับ)',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: _selectedExpDate != null
-                                  ? AppTheme.textPrimary(ctx)
-                                  : AppTheme.textGrey(ctx),
-                            ),
-                          ),
-                        ),
-                        if (_selectedExpDate != null)
-                          GestureDetector(
-                            onTap: () => setModal(() => _selectedExpDate = null),
-                            child: Icon(Icons.clear, color: AppTheme.textGrey(ctx), size: 20),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Condition — FG / PW
-                const Text(
-                  'ประเภทสินค้า',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                ),
-                const SizedBox(height: 8),
-                Row(
+                child: Column(
                   children: [
-                    Expanded(
-                      child: _ConditionButton(
-                        label: 'FG',
-                        desc: 'สินค้าปกติ',
-                        icon: Icons.check_circle,
-                        color: AppTheme.success,
-                        selected: _condition == 'FG',
-                        onTap: () => setModal(() => _condition = 'FG'),
+                    Icon(
+                      poItem.condition == 'FG'
+                          ? Icons.check_circle
+                          : Icons.build_circle,
+                      color: condColor,
+                      size: 36,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      poItem.condition,
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: condColor,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _ConditionButton(
-                        label: 'PW',
-                        desc: 'ต้องติดสติ๊กเกอร์',
-                        icon: Icons.build_circle,
-                        color: AppTheme.warning,
-                        selected: _condition == 'PW',
-                        onTap: () => setModal(() => _condition = 'PW'),
-                      ),
+                    Text(
+                      poItem.condition == 'FG'
+                          ? 'สินค้าปกติ'
+                          : 'ต้องติดสติ๊กเกอร์',
+                      style: TextStyle(fontSize: 13, color: condColor),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+              ),
+              const SizedBox(height: 12),
 
-                // Confirm
-                PrimaryButton(
-                  label: 'บันทึก',
-                  icon: Icons.save,
-                  loading: _loading,
-                  onPressed: () async {
-                    Navigator.pop(ctx);
-                    await _confirmPart(poItem);
-                  },
+              InfoRow(
+                label: 'Owner',
+                value: '${poItem.owner} (${poItem.brand})',
+              ),
+              InfoRow(label: 'สั่งซื้อ', value: '${poItem.qtyOrdered} ชิ้น'),
+              if (poItem.qtyRemaining > 0 &&
+                  poItem.qtyRemaining < poItem.qtyOrdered)
+                InfoRow(
+                  label: 'รับได้อีก',
+                  value: '${poItem.qtyRemaining} ชิ้น',
+                  valueColor: AppTheme.warning,
                 ),
-              ],
-            ),
+              if (poItem.lotNumber != null && poItem.lotNumber!.isNotEmpty)
+                InfoRow(label: 'Batch No.', value: poItem.lotNumber!),
+              if (poItem.expiredDate != null && poItem.expiredDate!.isNotEmpty)
+                InfoRow(label: 'Exp', value: poItem.expiredDate!),
+              const SizedBox(height: 16),
+
+              // Qty
+              TextField(
+                controller: _qtyController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'จำนวนที่รับจริง',
+                  prefixIcon: Icon(Icons.numbers),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Confirm
+              PrimaryButton(
+                label: 'บันทึก',
+                icon: Icons.save,
+                loading: _loading,
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await _confirmPart(poItem);
+                },
+              ),
+            ],
           ),
         ),
       ),
@@ -300,9 +240,15 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       return;
     }
 
-    final maxQty = poItem.qtyRemaining > 0 ? poItem.qtyRemaining : poItem.qtyOrdered;
+    final maxQty = poItem.qtyRemaining > 0
+        ? poItem.qtyRemaining
+        : poItem.qtyOrdered;
     if (qty > maxQty) {
-      showErrorDialog(context, message: 'รับได้สูงสุด $maxQty ชิ้น (รับไปแล้ว ${poItem.qtyReceived} ชิ้น)');
+      showErrorDialog(
+        context,
+        message:
+            'รับได้สูงสุด $maxQty ชิ้น (รับไปแล้ว ${poItem.qtyReceived} ชิ้น)',
+      );
       return;
     }
 
@@ -317,13 +263,6 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
           'poId': widget.po.poId,
           'partId': poItem.partId,
           'qtyReceived': qty,
-          'lotNumber': _lotController.text.trim(),
-          'expiredDate': _selectedExpDate != null
-              ? '${_selectedExpDate!.year}-'
-                  '${_selectedExpDate!.month.toString().padLeft(2, '0')}-'
-                  '${_selectedExpDate!.day.toString().padLeft(2, '0')}'
-              : '',
-          'condition': _condition,
           'operatorId': widget.userId,
         },
       );
@@ -339,7 +278,8 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
           itemDesc: poItem.itemDesc,
           qtyOrdered: poItem.qtyOrdered,
           qtyReceived: qty,
-          condition: _condition,
+          condition: poItem.condition,
+          lotNumber: poItem.lotNumber,
           poItemStatus: 'PENDING',
           message: '⚠️ offline',
         );
@@ -355,13 +295,6 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       poId: widget.po.poId,
       partId: poItem.partId,
       qtyReceived: qty,
-      lotNumber: _lotController.text.trim().isEmpty ? null : _lotController.text.trim(),
-      expiredDate: _selectedExpDate != null
-          ? '${_selectedExpDate!.year}-'
-              '${_selectedExpDate!.month.toString().padLeft(2, '0')}-'
-              '${_selectedExpDate!.day.toString().padLeft(2, '0')}'
-          : null,
-      condition: _condition,
       operatorId: widget.userId,
     );
 
@@ -403,7 +336,10 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
   }
 
   // ── Assign to Pallet ────────────────────────────
-  Future<void> _assignToPallet(ReceiptLineResponse line, String palletId) async {
+  Future<void> _assignToPallet(
+    ReceiptLineResponse line,
+    String palletId,
+  ) async {
     setState(() => _loading = true);
 
     final result = await _api.assignPallet(
@@ -452,42 +388,50 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
           palletId: old.palletId,
         );
       } else {
-        _assignedLines.add(_AssignedLine(
-          partId: line.partId,
-          itemDesc: line.itemDesc,
-          qtyReceived: line.qtyReceived,
-          condition: line.condition,
-          palletId: palletId,
-        ));
+        _assignedLines.add(
+          _AssignedLine(
+            partId: line.partId,
+            itemDesc: line.itemDesc,
+            qtyReceived: line.qtyReceived,
+            condition: line.condition,
+            palletId: palletId,
+          ),
+        );
       }
     });
 
-    showSuccessSnackbar(
-      context,
-      '${line.partId} → Pallet $palletId สำเร็จ',
-    );
+    showSuccessSnackbar(context, '${line.partId} → Pallet $palletId สำเร็จ');
 
     // ── Auto-closed → แสดง dialog แล้ว navigate กลับ ──
     if (autoClosed) {
       final poStatus = data['poStatus'] as String? ?? 'RECEIVED';
-      final closeMessage = data['closeMessage'] as String? ?? 'ปิด Session อัตโนมัติ';
+      final closeMessage =
+          data['closeMessage'] as String? ?? 'ปิด Session อัตโนมัติ';
 
       if (!mounted) return;
       await showDialog(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           title: Row(
             children: [
               Icon(
-                poStatus == 'RECEIVED' ? Icons.check_circle : Icons.warning_amber,
-                color: poStatus == 'RECEIVED' ? AppTheme.success : AppTheme.warning,
+                poStatus == 'RECEIVED'
+                    ? Icons.check_circle
+                    : Icons.warning_amber,
+                color: poStatus == 'RECEIVED'
+                    ? AppTheme.success
+                    : AppTheme.warning,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  poStatus == 'RECEIVED' ? 'รับสินค้าครบแล้ว' : 'รับสินค้าบางส่วน',
+                  poStatus == 'RECEIVED'
+                      ? 'รับสินค้าครบแล้ว'
+                      : 'รับสินค้าบางส่วน',
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
@@ -501,7 +445,10 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
               const SizedBox(height: 8),
               Text(
                 'Session ถูกปิดอัตโนมัติ',
-                style: TextStyle(color: AppTheme.textGrey(context), fontSize: 13),
+                style: TextStyle(
+                  color: AppTheme.textGrey(context),
+                  fontSize: 13,
+                ),
               ),
               const SizedBox(height: 12),
               InfoRow(label: 'PO', value: widget.po.poId),
@@ -512,7 +459,10 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(ctx);
-                Navigator.popUntil(context, (route) => route.isFirst || route.settings.name == '/');
+                Navigator.popUntil(
+                  context,
+                  (route) => route.isFirst || route.settings.name == '/',
+                );
               },
               child: const Text('เสร็จสิ้น'),
             ),
@@ -560,9 +510,6 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
   void _clearFormFields() {
     _partController.clear();
     _qtyController.clear();
-    _lotController.clear();
-    _selectedExpDate = null;
-    _condition = 'FG';
   }
 
   @override
@@ -586,88 +533,91 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
         _reloadPo();
       },
       child: Scaffold(
-      appBar: WmsAppBar(title: 'รับสินค้า', userName: widget.fullName),
-      body: Column(
-        children: [
-          if (!_isOnline) const OfflineBanner(pendingCount: 0),
-          Expanded(
-            child: LoadingOverlay(
-              loading: _loading,
-              message: 'กำลังดำเนินการ...',
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ── Session Info ────────────
-                    _buildSessionBar(),
-                    const SizedBox(height: 16),
-
-                    // ── Pallet ที่ใช้อยู่ ────────
-                    if (_lastPalletId != null) _buildCurrentPalletBar(),
-                    if (_lastPalletId != null) const SizedBox(height: 12),
-
-                    // ── Scan Pallet Section (เมื่อต้องสแกน pallet ใหม่) ──
-                    if (showPalletSection) ...[
-                      _buildPalletSection(),
+        appBar: WmsAppBar(title: 'รับสินค้า', userName: widget.fullName),
+        body: Column(
+          children: [
+            if (!_isOnline) const OfflineBanner(pendingCount: 0),
+            Expanded(
+              child: LoadingOverlay(
+                loading: _loading,
+                message: 'กำลังดำเนินการ...',
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── Session Info ────────────
+                      _buildSessionBar(),
                       const SizedBox(height: 16),
-                    ],
 
-                    // ── Scan Part Section (ซ่อนเมื่อรอ pallet) ──
-                    if (!showPalletSection) ...[
-                      WmsCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'สแกน Part',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                            ),
-                            const SizedBox(height: 12),
-                            ScanTextField(
-                              label: 'Part ID',
-                              hint: 'เช่น PT-9821',
-                              controller: _partController,
-                              focusNode: _partFocus,
-                              onSubmit: _scanPart,
-                            ),
-                            const SizedBox(height: 12),
-                            PrimaryButton(
-                              label: 'สแกน',
-                              icon: Icons.qr_code_scanner,
-                              onPressed: _scanPart,
-                            ),
-                          ],
+                      // ── Pallet ที่ใช้อยู่ ────────
+                      if (_lastPalletId != null) _buildCurrentPalletBar(),
+                      if (_lastPalletId != null) const SizedBox(height: 12),
+
+                      // ── Scan Pallet Section (เมื่อต้องสแกน pallet ใหม่) ──
+                      if (showPalletSection) ...[
+                        _buildPalletSection(),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // ── Scan Part Section (ซ่อนเมื่อรอ pallet) ──
+                      if (!showPalletSection) ...[
+                        WmsCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'สแกน Part',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              ScanTextField(
+                                label: 'Part ID',
+                                hint: 'เช่น PT-9821',
+                                controller: _partController,
+                                focusNode: _partFocus,
+                                onSubmit: _scanPart,
+                              ),
+                              const SizedBox(height: 12),
+                              PrimaryButton(
+                                label: 'สแกน',
+                                icon: Icons.qr_code_scanner,
+                                onPressed: _scanPart,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // ── Resumed pending lines (จาก session เก่า) ──
+                      if (_resumedPendingLines.isNotEmpty) ...[
+                        _buildResumedPendingList(),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // ── รายการที่ผูก Pallet แล้ว ──
+                      if (_assignedLines.isNotEmpty) ...[
+                        _buildAssignedList(),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // ── Pending PO Items ──────────
+                      if (pendingItems.isNotEmpty && !showPalletSection)
+                        _buildPendingList(pendingItems),
+
+                      // auto-close เมื่อรับครบ — ไม่ต้องมีปุ่มปิด manual
                     ],
-
-                    // ── Resumed pending lines (จาก session เก่า) ──
-                    if (_resumedPendingLines.isNotEmpty) ...[
-                      _buildResumedPendingList(),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // ── รายการที่ผูก Pallet แล้ว ──
-                    if (_assignedLines.isNotEmpty) ...[
-                      _buildAssignedList(),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // ── Pending PO Items ──────────
-                    if (pendingItems.isNotEmpty && !showPalletSection)
-                      _buildPendingList(pendingItems),
-
-                    // auto-close เมื่อรับครบ — ไม่ต้องมีปุ่มปิด manual
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
     );
   }
 
@@ -690,11 +640,18 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
               children: [
                 Text(
                   widget.po.poId,
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.primary),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: AppTheme.primary,
+                  ),
                 ),
                 Text(
                   widget.po.supplierName,
-                  style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textGrey(context),
+                  ),
                 ),
               ],
             ),
@@ -724,7 +681,11 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
           const SizedBox(width: 8),
           Text(
             'Pallet: $_lastPalletId',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: color),
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              color: color,
+            ),
           ),
           const SizedBox(width: 8),
           StatusBadge(_lastPalletType!),
@@ -736,7 +697,11 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                 _lastPalletType = null;
               });
             },
-            child: Icon(Icons.close, size: 18, color: AppTheme.textGrey(context)),
+            child: Icon(
+              Icons.close,
+              size: 18,
+              color: AppTheme.textGrey(context),
+            ),
           ),
         ],
       ),
@@ -755,7 +720,11 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
               SizedBox(width: 8),
               Text(
                 'สแกน Pallet',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.secondary),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.secondary,
+                ),
               ),
             ],
           ),
@@ -767,7 +736,9 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
             decoration: BoxDecoration(
               color: AppTheme.warning.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.warning.withValues(alpha: 0.2)),
+              border: Border.all(
+                color: AppTheme.warning.withValues(alpha: 0.2),
+              ),
             ),
             child: Row(
               children: [
@@ -779,11 +750,17 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                     children: [
                       Text(
                         _pendingLine!.partId,
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
                       ),
                       Text(
                         '${_pendingLine!.qtyReceived} ชิ้น',
-                        style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textGrey(context),
+                        ),
                       ),
                     ],
                   ),
@@ -839,51 +816,78 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                 ),
                 child: Text(
                   '${_resumedPendingLines.length}',
-                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          ..._resumedPendingLines.map((line) => Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.warning.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.warning.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          ..._resumedPendingLines.map(
+            (line) => Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.warning.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppTheme.warning.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          line.partId,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                        ),
+                        Text(
+                          line.itemDesc,
+                          style: TextStyle(
+                            color: AppTheme.textGrey(context),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(line.partId, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                      Text(line.itemDesc, style: TextStyle(color: AppTheme.textGrey(context), fontSize: 12)),
+                      Text(
+                        '${line.qtyReceived} ชิ้น',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      StatusBadge(line.condition),
                     ],
                   ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('${line.qtyReceived} ชิ้น', style: const TextStyle(fontWeight: FontWeight.w700)),
-                    StatusBadge(line.condition),
-                  ],
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _pendingLine == null ? () => _assignResumedLine(line) : null,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(0, 36),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _pendingLine == null
+                        ? () => _assignResumedLine(line)
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(0, 36),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('ผูก', style: TextStyle(fontSize: 13)),
                   ),
-                  child: const Text('ผูก', style: TextStyle(fontSize: 13)),
-                ),
-              ],
+                ],
+              ),
             ),
-          )),
+          ),
         ],
       ),
     );
@@ -901,45 +905,74 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
               const SizedBox(width: 6),
               Text(
                 'ผูก Pallet แล้ว (${_assignedLines.length})',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          ..._assignedLines.map((line) => Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.success.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.success.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.check_circle, color: AppTheme.success, size: 18),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          ..._assignedLines.map(
+            (line) => Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.success.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppTheme.success.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.check_circle,
+                    color: AppTheme.success,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          line.partId,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                        ),
+                        Text(
+                          line.itemDesc,
+                          style: TextStyle(
+                            color: AppTheme.textGrey(context),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(line.partId, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                      Text(line.itemDesc, style: TextStyle(color: AppTheme.textGrey(context), fontSize: 12)),
+                      Text(
+                        '${line.qtyReceived} ชิ้น',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      Text(
+                        '${line.palletId} (${line.condition})',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textGrey(context),
+                        ),
+                      ),
                     ],
                   ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('${line.qtyReceived} ชิ้น', style: const TextStyle(fontWeight: FontWeight.w700)),
-                    Text(
-                      '${line.palletId} (${line.condition})',
-                      style: TextStyle(fontSize: 11, color: AppTheme.textGrey(context)),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
-          )),
+          ),
         ],
       ),
     );
@@ -953,33 +986,80 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
         children: [
           Text(
             'ยังไม่ได้สแกน',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textGrey(context)),
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textGrey(context),
+            ),
           ),
           const SizedBox(height: 12),
-          ...items.map((item) => Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.background(context),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.radio_button_unchecked, color: Colors.grey, size: 18),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(item.partId, style: const TextStyle(fontWeight: FontWeight.w600)),
-                      Text(item.itemDesc, style: TextStyle(color: AppTheme.textGrey(context), fontSize: 12)),
-                    ],
+          ...items.map(
+            (item) => Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.background(context),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.radio_button_unchecked,
+                    color: Colors.grey,
+                    size: 18,
                   ),
-                ),
-                Text('${item.qtyRemaining > 0 ? item.qtyRemaining : item.qtyOrdered} ชิ้น', style: TextStyle(color: AppTheme.textGrey(context), fontSize: 13)),
-              ],
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.partId,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          item.itemDesc,
+                          style: TextStyle(
+                            color: AppTheme.textGrey(context),
+                            fontSize: 12,
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            if (item.lotNumber != null &&
+                                item.lotNumber!.isNotEmpty) ...[
+                              Icon(
+                                Icons.label_outline,
+                                size: 12,
+                                color: AppTheme.textGrey(context),
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                "Batch No.: ${item.lotNumber!}",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.textGrey(context),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            StatusBadge(item.condition),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '${item.qtyRemaining > 0 ? item.qtyRemaining : item.qtyOrdered} ชิ้น',
+                    style: TextStyle(
+                      color: AppTheme.textGrey(context),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          )),
+          ),
         ],
       ),
     );
@@ -990,7 +1070,6 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
     _partController.dispose();
     _partFocus.dispose();
     _qtyController.dispose();
-    _lotController.dispose();
     _palletController.dispose();
     _palletFocus.dispose();
     super.dispose();
@@ -1014,74 +1093,12 @@ class _AssignedLine {
   });
 }
 
-// ── Condition Button ────────────────────────────
-class _ConditionButton extends StatelessWidget {
-  final String label;
-  final String desc;
-  final IconData icon;
-  final Color color;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _ConditionButton({
-    required this.label,
-    required this.desc,
-    required this.icon,
-    required this.color,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.1) : AppTheme.background(context),
-          border: Border.all(
-            color: selected ? color : Colors.grey.shade300,
-            width: selected ? 2 : 1,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: selected ? color : Colors.grey, size: 22),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: selected ? color : Colors.grey,
-              ),
-            ),
-            Text(
-              desc,
-              style: TextStyle(
-                fontSize: 11,
-                color: selected ? color : Colors.grey,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ── Thai Buddhist Era Date Picker ─────────────
 class _ThaiDatePicker extends StatefulWidget {
   final DateTime initialDate;
   final DateTime firstDate;
 
-  const _ThaiDatePicker({
-    required this.initialDate,
-    required this.firstDate,
-  });
+  const _ThaiDatePicker({required this.initialDate, required this.firstDate});
 
   @override
   State<_ThaiDatePicker> createState() => _ThaiDatePickerState();
@@ -1097,9 +1114,18 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
   late FixedExtentScrollController _yearCtrl;
 
   static const _monthNames = [
-    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน',
-    'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม',
-    'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+    'มกราคม',
+    'กุมภาพันธ์',
+    'มีนาคม',
+    'เมษายน',
+    'พฤษภาคม',
+    'มิถุนายน',
+    'กรกฎาคม',
+    'สิงหาคม',
+    'กันยายน',
+    'ตุลาคม',
+    'พฤศจิกายน',
+    'ธันวาคม',
   ];
 
   int get _startYear => widget.firstDate.year;
@@ -1148,12 +1174,24 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text('ยกเลิก', style: TextStyle(color: AppTheme.textGrey(context))),
+                  child: Text(
+                    'ยกเลิก',
+                    style: TextStyle(color: AppTheme.textGrey(context)),
+                  ),
                 ),
-                const Text('เลือกวันหมดอายุ (พ.ศ.)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                const Text(
+                  'เลือกวันหมดอายุ (พ.ศ.)',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                ),
                 TextButton(
                   onPressed: _confirm,
-                  child: const Text('ตกลง', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w700)),
+                  child: const Text(
+                    'ตกลง',
+                    style: TextStyle(
+                      color: AppTheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -1168,7 +1206,10 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
                       height: itemH,
                       decoration: BoxDecoration(
                         border: Border.symmetric(
-                          horizontal: BorderSide(color: AppTheme.primary.withValues(alpha: 0.35), width: 1.5),
+                          horizontal: BorderSide(
+                            color: AppTheme.primary.withValues(alpha: 0.35),
+                            width: 1.5,
+                          ),
                         ),
                         color: AppTheme.primary.withValues(alpha: 0.05),
                       ),
@@ -1182,7 +1223,8 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
                         controller: _dayCtrl,
                         itemExtent: itemH,
                         physics: const FixedExtentScrollPhysics(),
-                        onSelectedItemChanged: (i) => setState(() => _day = i + 1),
+                        onSelectedItemChanged: (i) =>
+                            setState(() => _day = i + 1),
                         childDelegate: ListWheelChildBuilderDelegate(
                           childCount: 31,
                           builder: (_, i) {
@@ -1193,8 +1235,14 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
                                 '$day',
                                 style: TextStyle(
                                   fontSize: 20,
-                                  fontWeight: day == _day ? FontWeight.w700 : FontWeight.normal,
-                                  color: valid ? (day == _day ? AppTheme.primary : AppTheme.textPrimary(context)) : Colors.grey.shade300,
+                                  fontWeight: day == _day
+                                      ? FontWeight.w700
+                                      : FontWeight.normal,
+                                  color: valid
+                                      ? (day == _day
+                                            ? AppTheme.primary
+                                            : AppTheme.textPrimary(context))
+                                      : Colors.grey.shade300,
                                 ),
                               ),
                             );
@@ -1208,7 +1256,8 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
                         controller: _monthCtrl,
                         itemExtent: itemH,
                         physics: const FixedExtentScrollPhysics(),
-                        onSelectedItemChanged: (i) => setState(() => _month = i + 1),
+                        onSelectedItemChanged: (i) =>
+                            setState(() => _month = i + 1),
                         childDelegate: ListWheelChildBuilderDelegate(
                           childCount: 12,
                           builder: (_, i) => Center(
@@ -1216,8 +1265,12 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
                               _monthNames[i],
                               style: TextStyle(
                                 fontSize: 18,
-                                fontWeight: (i + 1) == _month ? FontWeight.w700 : FontWeight.normal,
-                                color: (i + 1) == _month ? AppTheme.primary : AppTheme.textPrimary(context),
+                                fontWeight: (i + 1) == _month
+                                    ? FontWeight.w700
+                                    : FontWeight.normal,
+                                color: (i + 1) == _month
+                                    ? AppTheme.primary
+                                    : AppTheme.textPrimary(context),
                               ),
                             ),
                           ),
@@ -1230,7 +1283,8 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
                         controller: _yearCtrl,
                         itemExtent: itemH,
                         physics: const FixedExtentScrollPhysics(),
-                        onSelectedItemChanged: (i) => setState(() => _year = _startYear + i),
+                        onSelectedItemChanged: (i) =>
+                            setState(() => _year = _startYear + i),
                         childDelegate: ListWheelChildBuilderDelegate(
                           childCount: _endYear - _startYear + 1,
                           builder: (_, i) {
@@ -1241,8 +1295,12 @@ class _ThaiDatePickerState extends State<_ThaiDatePicker> {
                                 '$beYear',
                                 style: TextStyle(
                                   fontSize: 20,
-                                  fontWeight: ceYear == _year ? FontWeight.w700 : FontWeight.normal,
-                                  color: ceYear == _year ? AppTheme.primary : AppTheme.textPrimary(context),
+                                  fontWeight: ceYear == _year
+                                      ? FontWeight.w700
+                                      : FontWeight.normal,
+                                  color: ceYear == _year
+                                      ? AppTheme.primary
+                                      : AppTheme.textPrimary(context),
                                 ),
                               ),
                             );

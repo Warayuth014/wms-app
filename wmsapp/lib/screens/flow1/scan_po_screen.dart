@@ -8,6 +8,7 @@ import '../../services/offline_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../models/wms_models.dart';
 import 'scan_part_screen.dart';
+import '../../widgets/part_thumbnail.dart';
 
 class ScanPoScreen extends StatefulWidget {
   final String userId;
@@ -346,20 +347,8 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
               ),
               child: Row(
                 children: [
-                  // Check icon
-                  Icon(
-                    item.status == 'RECEIVED'
-                        ? Icons.check_circle
-                        : item.status == 'PARTIAL'
-                        ? Icons.incomplete_circle
-                        : Icons.radio_button_unchecked,
-                    color: item.status == 'RECEIVED'
-                        ? AppTheme.success
-                        : item.status == 'PARTIAL'
-                        ? AppTheme.warning
-                        : Colors.grey,
-                    size: 20,
-                  ),
+                  // Product thumbnail
+                  PartThumbnail(imageUrl: item.imageUrl),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -377,6 +366,38 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
                           style: TextStyle(
                             color: AppTheme.textGrey(context),
                             fontSize: 12,
+                          ),
+                        ),
+                        // ── Batch No + Condition ──
+                        Row(
+                          children: [
+                            if (item.lotNumber != null &&
+                                item.lotNumber!.isNotEmpty) ...[
+                              Icon(
+                                Icons.label_outline,
+                                size: 12,
+                                color: AppTheme.textGrey(context),
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                "Batch No.: ${item.lotNumber!}",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.textGrey(context),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            StatusBadge(item.condition),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        // ── Owner / Brand ──
+                        Text(
+                          '${item.owner} / ${item.brand}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textGrey(context),
                           ),
                         ),
                       ],

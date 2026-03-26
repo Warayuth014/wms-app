@@ -5,6 +5,7 @@ import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import '../../models/wms_models.dart';
+import '../../widgets/part_thumbnail.dart';
 
 class PendingPalletScreen extends StatefulWidget {
   final String userId;
@@ -372,24 +373,8 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              // ── ไอคอน condition ───────────────
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: line.condition == 'FG'
-                      ? AppTheme.success.withValues(alpha: 0.12)
-                      : AppTheme.warning.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.inventory_2_outlined,
-                  color: line.condition == 'FG'
-                      ? AppTheme.success
-                      : AppTheme.warning,
-                  size: 24,
-                ),
-              ),
+              // ── Product thumbnail ───────────────
+              PartThumbnail(imageUrl: line.imageUrl, size: 44),
               const SizedBox(width: 12),
               // ── ข้อมูล ────────────────────────
               Expanded(
@@ -417,8 +402,26 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
+                        if (line.lotNumber != null) ...[
+                          Icon(Icons.label_outline, size: 12, color: AppTheme.textGrey(context)),
+                          const SizedBox(width: 2),
+                          Text(
+                            'Batch No.: ${line.lotNumber}',
+                            style: TextStyle(fontSize: 11, color: AppTheme.textGrey(context)),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
                         StatusBadge(line.condition),
-                        const SizedBox(width: 8),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Text(
+                          '${line.owner} / ${line.brand}',
+                          style: TextStyle(fontSize: 11, color: AppTheme.textGrey(context)),
+                        ),
+                        const Spacer(),
                         Text(
                           'Qty: ${line.qtyReceived}',
                           style: TextStyle(
@@ -427,16 +430,6 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
                             color: AppTheme.textPrimary(context),
                           ),
                         ),
-                        if (line.lotNumber != null) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            'LOT: ${line.lotNumber}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textGrey(context),
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                   ],

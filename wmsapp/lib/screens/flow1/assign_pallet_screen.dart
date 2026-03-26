@@ -7,6 +7,7 @@ import '../../services/api_service.dart';
 import '../../services/offline_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../models/wms_models.dart';
+import '../../widgets/part_thumbnail.dart';
 
 class AssignPalletScreen extends StatefulWidget {
   final String userId;
@@ -462,13 +463,21 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
                       color: selected ? AppTheme.primary : Colors.grey,
                     ),
                     const SizedBox(width: 10),
+                    PartThumbnail(imageUrl: line.imageUrl, size: 36),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            line.partId,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          Row(
+                            children: [
+                              Text(
+                                line.partId,
+                                style: const TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(width: 8),
+                              StatusBadge(line.condition),
+                            ],
                           ),
                           Text(
                             line.itemDesc,
@@ -477,18 +486,29 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
                               fontSize: 12,
                             ),
                           ),
+                          Row(
+                            children: [
+                              if (line.lotNumber != null) ...[
+                                Icon(Icons.label_outline, size: 12, color: AppTheme.textGrey(context)),
+                                const SizedBox(width: 2),
+                                Text(
+                                  'Batch No.: ${line.lotNumber}',
+                                  style: TextStyle(fontSize: 11, color: AppTheme.textGrey(context)),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              Text(
+                                '${line.owner} / ${line.brand}',
+                                style: TextStyle(fontSize: 11, color: AppTheme.textGrey(context)),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '${line.qtyReceived} ชิ้น',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        StatusBadge(line.condition),
-                      ],
+                    Text(
+                      '${line.qtyReceived} ชิ้น',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
