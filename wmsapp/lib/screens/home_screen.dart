@@ -127,7 +127,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.white.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.warehouse_rounded, color: Colors.white, size: 20),
+              child: const Icon(
+                Icons.warehouse_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 10),
             const Text('WMS'),
@@ -145,7 +149,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           if (_userId != null)
             IconButton(
-              icon: Icon(Icons.logout_rounded, color: Colors.white.withValues(alpha: 0.8)),
+              icon: Icon(
+                Icons.logout_rounded,
+                color: Colors.white.withValues(alpha: 0.8),
+              ),
               tooltip: 'ออกจากระบบ',
               onPressed: _logout,
             ),
@@ -161,210 +168,219 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ── User Info / Login ───────
-                  if (_userId == null)
-                    _buildLoginPrompt()
-                  else
-                    _buildUserCard(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── User Info / Login ───────
+                    if (_userId == null)
+                      _buildLoginPrompt()
+                    else
+                      _buildUserCard(),
 
-                  const SizedBox(height: 24),
-
-                  // ── Flow Cards ──────────────
-                  SectionHeader(
-                    title: 'เลือกการทำงาน',
-                    icon: Icons.apps_rounded,
-                  ),
-                  const SizedBox(height: 14),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _FlowCard(
-                          icon: Icons.local_shipping_rounded,
-                          title: 'Receive',
-                          subtitle: 'รับสินค้าเข้า',
-                          gradient: const [Color(0xFF1B5E20), Color(0xFF43A047)],
-                          onTap: () async {
-                            if (!await _requireLogin()) return;
-                            if (!context.mounted) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => Flow1MenuScreen(
-                                  userId: _userId!,
-                                  fullName: _fullName!,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _FlowCard(
-                          icon: Icons.warehouse_rounded,
-                          title: 'Putaway',
-                          subtitle: 'เก็บ Pallet เข้าคลัง',
-                          gradient: const [Color(0xFF0D47A1), Color(0xFF1E88E5)],
-                          onTap: () async {
-                            if (!await _requireLogin()) return;
-                            if (!context.mounted) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => PutawayScreen(
-                                  userId: _userId!,
-                                  fullName: _fullName!,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _FlowCard(
-                          icon: Icons.inventory_2_rounded,
-                          title: 'Replenishment',
-                          subtitle: 'เติมสินค้า',
-                          gradient: const [Color(0xFFE65100), Color(0xFFFB8C00)],
-                          onTap: () async {
-                            if (!await _requireLogin()) return;
-                            if (!context.mounted) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ReplenishmentMenuScreen(
-                                  userId: _userId!,
-                                  fullName: _fullName!,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _FlowCard(
-                          icon: Icons.content_cut_rounded,
-                          title: 'Picking',
-                          subtitle: 'เบิกสินค้า Pick/Pack',
-                          gradient: const [Color(0xFF4A148C), Color(0xFF8E24AA)],
-                          onTap: () async {
-                            if (!await _requireLogin()) return;
-                            if (!context.mounted) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => PickingSessionScreen(
-                                  userId: _userId!,
-                                  fullName: _fullName!,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // ── Supervisor Section ──────
-                  if (_role == 'SUPERVISOR') ...[
-                    const SizedBox(height: 28),
-                    SectionHeader(
-                      title: 'Supervisor',
-                      icon: Icons.shield_rounded,
-                    ),
-                    const SizedBox(height: 14),
-                    _ActionCard(
-                      icon: Icons.approval_rounded,
-                      iconColor: AppTheme.warning,
-                      title: 'Cancel Approval',
-                      subtitle: 'อนุมัติคำขอยกเลิกรายการ',
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => CancelScreen(userId: _userId!),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _ActionCard(
-                      icon: Icons.add_photo_alternate_rounded,
-                      iconColor: AppTheme.primary,
-                      title: 'จัดการรูปสินค้า',
-                      subtitle: 'อัปโหลด/แก้ไขรูปภาพ Parts',
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PartImageScreen(
-                            userId: _userId!,
-                            fullName: _fullName!,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  // ── TEST Section ────────────
-                  if (_userId != null) ...[
-                    const SizedBox(height: 28),
-                    SectionHeader(
-                      title: 'TEST',
-                      icon: Icons.science_rounded,
-                    ),
-                    const SizedBox(height: 14),
-                    _ActionCard(
-                      icon: Icons.science_rounded,
-                      iconColor: AppTheme.textGrey(context),
-                      title: 'สร้าง Pick Order (TEST)',
-                      subtitle: 'เลือกสินค้าจาก ReceiptLines',
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => TestPickOrderScreen(
-                            userId: _userId!,
-                            fullName: _fullName!,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  // ── Pending Sync ────────────
-                  if (_userId != null && _pendingCount > 0) ...[
                     const SizedBox(height: 24),
-                    _PendingSyncCard(
-                      count: _pendingCount,
-                      isOnline: _isOnline,
-                      onSync: () async {
-                        final result = await OfflineService().syncQueue();
-                        if (context.mounted) {
-                          result.hasErrors
-                              ? showWarningSnackbar(context, result.summary)
-                              : showSuccessSnackbar(context, result.summary);
-                          _updatePendingCount();
-                        }
-                      },
-                    ),
-                  ],
 
-                  const SizedBox(height: 16),
-                ],
+                    // ── Flow Cards ──────────────
+                    SectionHeader(
+                      title: 'เลือกการทำงาน',
+                      icon: Icons.apps_rounded,
+                    ),
+                    const SizedBox(height: 14),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _FlowCard(
+                            icon: Icons.local_shipping_rounded,
+                            title: 'Receive',
+                            subtitle: 'รับสินค้าเข้า',
+                            gradient: const [
+                              Color(0xFF1B5E20),
+                              Color(0xFF43A047),
+                            ],
+                            onTap: () async {
+                              if (!await _requireLogin()) return;
+                              if (!context.mounted) return;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => Flow1MenuScreen(
+                                    userId: _userId!,
+                                    fullName: _fullName!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _FlowCard(
+                            icon: Icons.warehouse_rounded,
+                            title: 'Putaway',
+                            subtitle: 'เก็บ Pallet เข้าคลัง',
+                            gradient: const [
+                              Color(0xFF0D47A1),
+                              Color(0xFF1E88E5),
+                            ],
+                            onTap: () async {
+                              if (!await _requireLogin()) return;
+                              if (!context.mounted) return;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PutawayScreen(
+                                    userId: _userId!,
+                                    fullName: _fullName!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _FlowCard(
+                            icon: Icons.inventory_2_rounded,
+                            title: 'Replenishment',
+                            subtitle: 'เติมสินค้า',
+                            gradient: const [
+                              Color(0xFFE65100),
+                              Color(0xFFFB8C00),
+                            ],
+                            onTap: () async {
+                              if (!await _requireLogin()) return;
+                              if (!context.mounted) return;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ReplenishmentMenuScreen(
+                                    userId: _userId!,
+                                    fullName: _fullName!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _FlowCard(
+                            icon: Icons.content_cut_rounded,
+                            title: 'Picking',
+                            subtitle: 'เบิกสินค้า Pick/Pack',
+                            gradient: const [
+                              Color(0xFF4A148C),
+                              Color(0xFF8E24AA),
+                            ],
+                            onTap: () async {
+                              if (!await _requireLogin()) return;
+                              if (!context.mounted) return;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PickingSessionScreen(
+                                    userId: _userId!,
+                                    fullName: _fullName!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // ── Supervisor Section ──────
+                    if (_role == 'SUPERVISOR') ...[
+                      const SizedBox(height: 28),
+                      SectionHeader(
+                        title: 'Supervisor',
+                        icon: Icons.shield_rounded,
+                      ),
+                      const SizedBox(height: 14),
+                      _ActionCard(
+                        icon: Icons.approval_rounded,
+                        iconColor: AppTheme.warning,
+                        title: 'Cancel Approval',
+                        subtitle: 'อนุมัติคำขอยกเลิกรายการ',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CancelScreen(userId: _userId!),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _ActionCard(
+                        icon: Icons.add_photo_alternate_rounded,
+                        iconColor: AppTheme.primary,
+                        title: 'จัดการรูปสินค้า',
+                        subtitle: 'อัปโหลด/แก้ไขรูปภาพ Parts',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => PartImageScreen(
+                              userId: _userId!,
+                              fullName: _fullName!,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+
+                    // ── TEST Section ────────────
+                    if (_userId != null) ...[
+                      const SizedBox(height: 28),
+                      SectionHeader(title: 'TEST', icon: Icons.science_rounded),
+                      const SizedBox(height: 14),
+                      _ActionCard(
+                        icon: Icons.science_rounded,
+                        iconColor: AppTheme.textGrey(context),
+                        title: 'สร้าง Pick Order (TEST)',
+                        subtitle: 'เลือกสินค้าจาก ReceiptLines',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => TestPickOrderScreen(
+                              userId: _userId!,
+                              fullName: _fullName!,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+
+                    // ── Pending Sync ────────────
+                    if (_userId != null && _pendingCount > 0) ...[
+                      const SizedBox(height: 24),
+                      _PendingSyncCard(
+                        count: _pendingCount,
+                        isOnline: _isOnline,
+                        onSync: () async {
+                          final result = await OfflineService().syncQueue();
+                          if (context.mounted) {
+                            result.hasErrors
+                                ? showWarningSnackbar(context, result.summary)
+                                : showSuccessSnackbar(context, result.summary);
+                            _updatePendingCount();
+                          }
+                        },
+                      ),
+                    ],
+
+                    const SizedBox(height: 16),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -379,7 +395,11 @@ class _HomeScreenState extends State<HomeScreen> {
               color: AppTheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(AppTheme.radiusSm),
             ),
-            child: const Icon(Icons.info_outline_rounded, color: AppTheme.primary, size: 20),
+            child: const Icon(
+              Icons.info_outline_rounded,
+              color: AppTheme.primary,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -629,7 +649,10 @@ class _ActionCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: AppTheme.textGrey(context)),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppTheme.textGrey(context),
+              ),
             ],
           ),
         ),
@@ -663,7 +686,11 @@ class _PendingSyncCard extends StatelessWidget {
               color: AppTheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(AppTheme.radiusSm),
             ),
-            child: const Icon(Icons.sync_rounded, color: AppTheme.primary, size: 20),
+            child: const Icon(
+              Icons.sync_rounded,
+              color: AppTheme.primary,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(

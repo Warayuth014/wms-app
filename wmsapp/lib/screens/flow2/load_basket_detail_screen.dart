@@ -117,7 +117,10 @@ class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen> {
       return;
     }
 
-    showSuccessSnackbar(context, 'Load สำเร็จ — ${widget.item.partId} x$qty → ${_basket!.label}');
+    showSuccessSnackbar(
+      context,
+      'Load สำเร็จ — ${widget.item.partId} x$qty → ${_basket!.label}',
+    );
     Navigator.pop(context);
   }
 
@@ -135,79 +138,82 @@ class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen> {
       loading: _loading,
       child: Scaffold(
         appBar: WmsAppBar(title: 'Load Basket', userName: widget.fullName),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Part Info ─────────────
-              _buildPartInfo(),
-              const SizedBox(height: 20),
-
-              // ── Qty Input ─────────────
-              Text(
-                'จำนวนที่จะ Load เข้าตะกร้า',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimary(context),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _qtyController,
-                keyboardType: TextInputType.number,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
-                decoration: InputDecoration(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  suffixText: '/ ${widget.item.totalQty} ชิ้น',
-                  suffixStyle: TextStyle(
-                    fontSize: 14,
-                    color: AppTheme.textGrey(context),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // ── Scan Basket ───────────
-              Text(
-                'สแกน Basket',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimary(context),
-                ),
-              ),
-              const SizedBox(height: 12),
-              ScanTextField(
-                controller: _basketController,
-                label: 'Basket ID เช่น BKT-A1',
-                hint: 'BKT-A1',
-                onSubmit: _scanBasket,
-              ),
-
-              // ── Basket Info + Load Button ──
-              if (_basket != null) ...[
-                const SizedBox(height: 16),
-                _buildBasketInfo(),
+        body: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Part Info ─────────────
+                _buildPartInfo(),
                 const SizedBox(height: 20),
-                PrimaryButton(
-                  label: 'Load เข้า Basket',
-                  icon: Icons.add_box,
-                  onPressed: _loadToBasket,
+
+                // ── Qty Input ─────────────
+                Text(
+                  'จำนวนที่จะ Load เข้าตะกร้า',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary(context),
+                  ),
                 ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _qtyController,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    suffixText: '/ ${widget.item.totalQty} ชิ้น',
+                    suffixStyle: TextStyle(
+                      fontSize: 14,
+                      color: AppTheme.textGrey(context),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // ── Scan Basket ───────────
+                Text(
+                  'สแกน Basket',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary(context),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ScanTextField(
+                  controller: _basketController,
+                  label: 'Basket ID เช่น BKT-A1',
+                  hint: 'BKT-A1',
+                  onSubmit: _scanBasket,
+                ),
+
+                // ── Basket Info + Load Button ──
+                if (_basket != null) ...[
+                  const SizedBox(height: 16),
+                  _buildBasketInfo(),
+                  const SizedBox(height: 20),
+                  PrimaryButton(
+                    label: 'Load เข้า Basket',
+                    icon: Icons.add_box,
+                    onPressed: _loadToBasket,
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -232,7 +238,10 @@ class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen> {
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -250,7 +259,10 @@ class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen> {
           ),
           const SizedBox(height: 8),
           InfoRow(label: 'สินค้า', value: widget.item.itemDesc),
-          InfoRow(label: 'เจ้าของ', value: '${widget.item.owner} / ${widget.item.brand}'),
+          InfoRow(
+            label: 'เจ้าของ',
+            value: '${widget.item.owner} / ${widget.item.brand}',
+          ),
         ],
       ),
     );

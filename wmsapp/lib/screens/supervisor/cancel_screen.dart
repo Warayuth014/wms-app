@@ -133,14 +133,17 @@ class _CancelScreenState extends State<CancelScreen> {
           ),
         ],
       ),
-      body: LoadingOverlay(
-        loading: _processing,
-        message: 'กำลังดำเนินการ...',
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _pendingLogs.isEmpty
-            ? _buildEmptyState()
-            : _buildList(),
+      body: SafeArea(
+        top: false,
+        child: LoadingOverlay(
+          loading: _processing,
+          message: 'กำลังดำเนินการ...',
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _pendingLogs.isEmpty
+              ? _buildEmptyState()
+              : _buildList(),
+        ),
       ),
     );
   }
@@ -313,7 +316,11 @@ class _CancelScreenState extends State<CancelScreen> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.notes, size: 16, color: AppTheme.textGrey(context)),
+                    Icon(
+                      Icons.notes,
+                      size: 16,
+                      color: AppTheme.textGrey(context),
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(

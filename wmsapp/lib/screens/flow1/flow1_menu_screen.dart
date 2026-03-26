@@ -44,87 +44,90 @@ class _Flow1MenuScreenState extends State<Flow1MenuScreen> {
         title: 'Receive — รับสินค้าเข้า',
         userName: widget.fullName,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'เลือกประเภทการรับสินค้า',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary(context),
+      body: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'เลือกประเภทการรับสินค้า',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary(context),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // ── รับสินค้าจาก PO ──────────────
-            _MenuCard(
-              icon: Icons.move_to_inbox,
-              title: 'รับเอกสาร',
-              subtitle: 'สแกน PO Number เพื่อรับสินค้าจาก Supplier',
-              color: AppTheme.primary,
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ScanPoScreen(
-                      userId: widget.userId,
-                      fullName: widget.fullName,
+              // ── รับสินค้าจาก PO ──────────────
+              _MenuCard(
+                icon: Icons.move_to_inbox,
+                title: 'รับเอกสาร',
+                subtitle: 'สแกน PO Number เพื่อรับสินค้าจาก Supplier',
+                color: AppTheme.primary,
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ScanPoScreen(
+                        userId: widget.userId,
+                        fullName: widget.fullName,
+                      ),
                     ),
-                  ),
-                );
-                _loadPendingCount(); // รีเฟรชหลังกลับมา
-              },
-            ),
+                  );
+                  _loadPendingCount(); // รีเฟรชหลังกลับมา
+                },
+              ),
 
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
 
-            // ── ค้างการผูก Pallet ─────────────
-            _MenuCard(
-              icon: Icons.pallet,
-              title: 'ค้างการผูก Pallet',
-              subtitle: _pendingPalletCount == 0
-                  ? 'ไม่มีรายการค้าง'
-                  : 'มี $_pendingPalletCount รายการรอผูก Pallet',
-              color: _pendingPalletCount == 0
-                  ? AppTheme.textGrey(context)
-                  : AppTheme.danger,
-              badge: _pendingPalletCount > 0 ? '$_pendingPalletCount' : null,
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => PendingPalletScreen(
-                      userId: widget.userId,
-                      fullName: widget.fullName,
+              // ── ค้างการผูก Pallet ─────────────
+              _MenuCard(
+                icon: Icons.pallet,
+                title: 'ค้างการผูก Pallet',
+                subtitle: _pendingPalletCount == 0
+                    ? 'ไม่มีรายการค้าง'
+                    : 'มี $_pendingPalletCount รายการรอผูก Pallet',
+                color: _pendingPalletCount == 0
+                    ? AppTheme.textGrey(context)
+                    : AppTheme.danger,
+                badge: _pendingPalletCount > 0 ? '$_pendingPalletCount' : null,
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PendingPalletScreen(
+                        userId: widget.userId,
+                        fullName: widget.fullName,
+                      ),
                     ),
-                  ),
-                );
-                _loadPendingCount(); // รีเฟรชหลังกลับมา
-              },
-            ),
+                  );
+                  _loadPendingCount(); // รีเฟรชหลังกลับมา
+                },
+              ),
 
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
 
-            // ── รับสินค้าคืน ─────────────────
-            // _MenuCard(
-            //   icon: Icons.replay,
-            //   title: 'รับสินค้าคืน',
-            //   subtitle: 'สแกน Order Number รับสินค้าคืนจากลูกค้า',
-            //   color: AppTheme.warning,
-            //   onTap: () => Navigator.push(
-            //     context,
-            //     MaterialPageRoute(
-            //       builder: (_) => ReturnScreen(
-            //         userId: widget.userId,
-            //         fullName: widget.fullName,
-            //       ),
-            //     ),
-            //   ),
-            // ),
-          ],
+              // ── รับสินค้าคืน ─────────────────
+              // _MenuCard(
+              //   icon: Icons.replay,
+              //   title: 'รับสินค้าคืน',
+              //   subtitle: 'สแกน Order Number รับสินค้าคืนจากลูกค้า',
+              //   color: AppTheme.warning,
+              //   onTap: () => Navigator.push(
+              //     context,
+              //     MaterialPageRoute(
+              //       builder: (_) => ReturnScreen(
+              //         userId: widget.userId,
+              //         fullName: widget.fullName,
+              //       ),
+              //     ),
+              //   ),
+              // ),
+            ],
+          ),
         ),
       ),
     );

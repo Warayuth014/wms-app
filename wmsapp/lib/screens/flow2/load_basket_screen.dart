@@ -88,82 +88,85 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // ── Search Bar ───────────────────
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _filterController,
-              onChanged: _filter,
-              decoration: InputDecoration(
-                hintText: 'ค้นหา Part ID หรือชื่อสินค้า...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _filterController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _filterController.clear();
-                          _filter('');
-                        },
-                      )
-                    : null,
-                filled: true,
-                fillColor: AppTheme.surface(context),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            // ── Search Bar ───────────────────
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _filterController,
+                onChanged: _filter,
+                decoration: InputDecoration(
+                  hintText: 'ค้นหา Part ID หรือชื่อสินค้า...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _filterController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _filterController.clear();
+                            _filter('');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: AppTheme.surface(context),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
             ),
-          ),
 
-          // ── Count ────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Text(
-                  'พบ ${_filtered.length} รายการ',
-                  style: TextStyle(
-                    color: AppTheme.textGrey(context),
-                    fontSize: 13,
-                  ),
-                ),
-                if (_allItems.isNotEmpty) ...[
-                  const Spacer(),
+            // ── Count ────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
                   Text(
-                    'รวม ${_allItems.fold<int>(0, (s, i) => s + i.totalQty)} ชิ้นรอ load',
-                    style: const TextStyle(
-                      color: AppTheme.warning,
+                    'พบ ${_filtered.length} รายการ',
+                    style: TextStyle(
+                      color: AppTheme.textGrey(context),
                       fontSize: 13,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
+                  if (_allItems.isNotEmpty) ...[
+                    const Spacer(),
+                    Text(
+                      'รวม ${_allItems.fold<int>(0, (s, i) => s + i.totalQty)} ชิ้นรอ load',
+                      style: const TextStyle(
+                        color: AppTheme.warning,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
 
-          const SizedBox(height: 8),
+            const SizedBox(height: 8),
 
-          // ── List ─────────────────────────
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _filtered.isEmpty
-                ? _buildEmpty()
-                : RefreshIndicator(
-                    onRefresh: _loadItems,
-                    child: ListView.separated(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _filtered.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (_, i) => _buildItemCard(_filtered[i]),
+            // ── List ─────────────────────────
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _filtered.isEmpty
+                  ? _buildEmpty()
+                  : RefreshIndicator(
+                      onRefresh: _loadItems,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _filtered.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (_, i) => _buildItemCard(_filtered[i]),
+                      ),
                     ),
-                  ),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -245,7 +248,11 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(Icons.label_outline, size: 14, color: AppTheme.textGrey(context)),
+                        Icon(
+                          Icons.label_outline,
+                          size: 14,
+                          color: AppTheme.textGrey(context),
+                        ),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(

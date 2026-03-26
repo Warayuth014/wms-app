@@ -132,109 +132,113 @@ class _PartImageScreenState extends State<PartImageScreen> {
 
     return Scaffold(
       appBar: WmsAppBar(title: 'จัดการรูปสินค้า', userName: widget.fullName),
-      body: LoadingOverlay(
-        loading: _loading,
-        message: 'กำลังดำเนินการ...',
-        child: Column(
-          children: [
-            // ── Search + Stats ──
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: AppTheme.primary.withValues(alpha: 0.05),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _searchCtrl,
-                    decoration: InputDecoration(
-                      hintText: 'ค้นหา Part ID, ชื่อสินค้า, แบรนด์...',
-                      prefixIcon: const Icon(Icons.search),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 10,
-                        horizontal: 12,
+      body: SafeArea(
+        top: false,
+        child: LoadingOverlay(
+          loading: _loading,
+          message: 'กำลังดำเนินการ...',
+          child: Column(
+            children: [
+              // ── Search + Stats ──
+              Container(
+                padding: const EdgeInsets.all(16),
+                color: AppTheme.primary.withValues(alpha: 0.05),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _searchCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'ค้นหา Part ID, ชื่อสินค้า, แบรนด์...',
+                        prefixIcon: const Icon(Icons.search),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 10,
+                          horizontal: 12,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        filled: true,
+                        fillColor: AppTheme.surface(context),
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      filled: true,
-                      fillColor: AppTheme.surface(context),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Text(
-                        'ทั้งหมด $total รายการ',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppTheme.textGrey(context),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.success.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'มีรูป $hasImage',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.success,
-                            fontWeight: FontWeight.w600,
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text(
+                          'ทั้งหมด $total รายการ',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.textGrey(context),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.warning.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'ยังไม่มี ${total - hasImage}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.warning,
-                            fontWeight: FontWeight.w600,
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.success.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'มีรูป $hasImage',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.success,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.refresh, size: 20),
-                        onPressed: _loadParts,
-                      ),
-                    ],
-                  ),
-                ],
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.warning.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'ยังไม่มี ${total - hasImage}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.warning,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.refresh, size: 20),
+                          onPressed: _loadParts,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
 
-            // ── List ──
-            Expanded(
-              child: _filteredParts.isEmpty
-                  ? Center(
-                      child: Text(
-                        'ไม่พบรายการ',
-                        style: TextStyle(color: AppTheme.textGrey(context)),
+              // ── List ──
+              Expanded(
+                child: _filteredParts.isEmpty
+                    ? Center(
+                        child: Text(
+                          'ไม่พบรายการ',
+                          style: TextStyle(color: AppTheme.textGrey(context)),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: _filteredParts.length,
+                        itemBuilder: (_, i) =>
+                            _buildPartCard(_filteredParts[i]),
                       ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: _filteredParts.length,
-                      itemBuilder: (_, i) => _buildPartCard(_filteredParts[i]),
-                    ),
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -281,7 +285,9 @@ class _PartImageScreenState extends State<PartImageScreen> {
                                 child: SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 ),
                               );
                             }
@@ -320,11 +326,17 @@ class _PartImageScreenState extends State<PartImageScreen> {
                         ),
                         const SizedBox(width: 8),
                         if (hasImg)
-                          const Icon(Icons.check_circle,
-                              color: AppTheme.success, size: 16)
+                          const Icon(
+                            Icons.check_circle,
+                            color: AppTheme.success,
+                            size: 16,
+                          )
                         else
-                          Icon(Icons.image_not_supported,
-                              color: AppTheme.textGrey(context), size: 16),
+                          Icon(
+                            Icons.image_not_supported,
+                            color: AppTheme.textGrey(context),
+                            size: 16,
+                          ),
                       ],
                     ),
                     Text(

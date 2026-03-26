@@ -110,7 +110,11 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        padding: EdgeInsets.only(
+          bottom:
+              MediaQuery.of(ctx).viewInsets.bottom +
+              MediaQuery.of(ctx).padding.bottom,
+        ),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -534,88 +538,91 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       },
       child: Scaffold(
         appBar: WmsAppBar(title: 'รับสินค้า', userName: widget.fullName),
-        body: Column(
-          children: [
-            if (!_isOnline) const OfflineBanner(pendingCount: 0),
-            Expanded(
-              child: LoadingOverlay(
-                loading: _loading,
-                message: 'กำลังดำเนินการ...',
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── Session Info ────────────
-                      _buildSessionBar(),
-                      const SizedBox(height: 16),
-
-                      // ── Pallet ที่ใช้อยู่ ────────
-                      if (_lastPalletId != null) _buildCurrentPalletBar(),
-                      if (_lastPalletId != null) const SizedBox(height: 12),
-
-                      // ── Scan Pallet Section (เมื่อต้องสแกน pallet ใหม่) ──
-                      if (showPalletSection) ...[
-                        _buildPalletSection(),
+        body: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              if (!_isOnline) const OfflineBanner(pendingCount: 0),
+              Expanded(
+                child: LoadingOverlay(
+                  loading: _loading,
+                  message: 'กำลังดำเนินการ...',
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Session Info ────────────
+                        _buildSessionBar(),
                         const SizedBox(height: 16),
-                      ],
 
-                      // ── Scan Part Section (ซ่อนเมื่อรอ pallet) ──
-                      if (!showPalletSection) ...[
-                        WmsCard(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'สแกน Part',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
+                        // ── Pallet ที่ใช้อยู่ ────────
+                        if (_lastPalletId != null) _buildCurrentPalletBar(),
+                        if (_lastPalletId != null) const SizedBox(height: 12),
+
+                        // ── Scan Pallet Section (เมื่อต้องสแกน pallet ใหม่) ──
+                        if (showPalletSection) ...[
+                          _buildPalletSection(),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // ── Scan Part Section (ซ่อนเมื่อรอ pallet) ──
+                        if (!showPalletSection) ...[
+                          WmsCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'สแกน Part',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 12),
-                              ScanTextField(
-                                label: 'Part ID',
-                                hint: 'เช่น PT-9821',
-                                controller: _partController,
-                                focusNode: _partFocus,
-                                onSubmit: _scanPart,
-                              ),
-                              const SizedBox(height: 12),
-                              PrimaryButton(
-                                label: 'สแกน',
-                                icon: Icons.qr_code_scanner,
-                                onPressed: _scanPart,
-                              ),
-                            ],
+                                const SizedBox(height: 12),
+                                ScanTextField(
+                                  label: 'Part ID',
+                                  hint: 'เช่น PT-9821',
+                                  controller: _partController,
+                                  focusNode: _partFocus,
+                                  onSubmit: _scanPart,
+                                ),
+                                const SizedBox(height: 12),
+                                PrimaryButton(
+                                  label: 'สแกน',
+                                  icon: Icons.qr_code_scanner,
+                                  onPressed: _scanPart,
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // ── Resumed pending lines (จาก session เก่า) ──
+                        if (_resumedPendingLines.isNotEmpty) ...[
+                          _buildResumedPendingList(),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // ── รายการที่ผูก Pallet แล้ว ──
+                        if (_assignedLines.isNotEmpty) ...[
+                          _buildAssignedList(),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // ── Pending PO Items ──────────
+                        if (pendingItems.isNotEmpty && !showPalletSection)
+                          _buildPendingList(pendingItems),
+
+                        // auto-close เมื่อรับครบ — ไม่ต้องมีปุ่มปิด manual
                       ],
-
-                      // ── Resumed pending lines (จาก session เก่า) ──
-                      if (_resumedPendingLines.isNotEmpty) ...[
-                        _buildResumedPendingList(),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // ── รายการที่ผูก Pallet แล้ว ──
-                      if (_assignedLines.isNotEmpty) ...[
-                        _buildAssignedList(),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // ── Pending PO Items ──────────
-                      if (pendingItems.isNotEmpty && !showPalletSection)
-                        _buildPendingList(pendingItems),
-
-                      // auto-close เมื่อรับครบ — ไม่ต้องมีปุ่มปิด manual
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

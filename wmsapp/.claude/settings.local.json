@@ -51,7 +51,9 @@
       "Bash(xargs ls:*)",
       "Bash(grep -v \"^.\\\\{0,30\\\\}$\")",
       "Bash(flutter pub:*)",
-      "Bash(flutter clean:*)"
+      "Bash(flutter clean:*)",
+      "Bash(dart format:*)",
+      "Bash(dart analyze:*)"
     ]
   }
 }

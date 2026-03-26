@@ -259,11 +259,14 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
           ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _lines.isEmpty
-          ? _buildEmpty()
-          : _buildList(),
+      body: SafeArea(
+        top: false,
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _lines.isEmpty
+            ? _buildEmpty()
+            : _buildList(),
+      ),
     );
   }
 
@@ -403,11 +406,18 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
                     Row(
                       children: [
                         if (line.lotNumber != null) ...[
-                          Icon(Icons.label_outline, size: 12, color: AppTheme.textGrey(context)),
+                          Icon(
+                            Icons.label_outline,
+                            size: 12,
+                            color: AppTheme.textGrey(context),
+                          ),
                           const SizedBox(width: 2),
                           Text(
                             'Batch No.: ${line.lotNumber}',
-                            style: TextStyle(fontSize: 11, color: AppTheme.textGrey(context)),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textGrey(context),
+                            ),
                           ),
                           const SizedBox(width: 8),
                         ],
@@ -419,7 +429,10 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
                       children: [
                         Text(
                           '${line.owner} / ${line.brand}',
-                          style: TextStyle(fontSize: 11, color: AppTheme.textGrey(context)),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textGrey(context),
+                          ),
                         ),
                         const Spacer(),
                         Text(
