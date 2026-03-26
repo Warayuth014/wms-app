@@ -10,6 +10,7 @@ import '../services/offline_service.dart';
 import 'login_screen.dart';
 import 'package:wmsapp/screens/flow1/flow1_menu_screen.dart';
 import 'package:wmsapp/screens/supervisor/cancel_screen.dart';
+import 'package:wmsapp/screens/supervisor/part_image_screen.dart';
 import 'package:wmsapp/screens/putaway/putaway_screen.dart';
 import 'package:wmsapp/screens/picking/picking_session_screen.dart';
 import 'package:wmsapp/screens/test/test_pick_order_screen.dart';
@@ -114,277 +115,272 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      appBar: WmsAppBar(
-        title: 'WMS',
-        userName: _fullName,
+      appBar: AppBar(
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.warehouse_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text('WMS'),
+          ],
+        ),
         actions: [
+          // ── Dark mode toggle ──
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+              color: Colors.white.withValues(alpha: 0.8),
+            ),
+            tooltip: isDark ? 'Light mode' : 'Dark mode',
+            onPressed: () => themeProvider.toggle(),
+          ),
           if (_userId != null)
             IconButton(
-              icon: const Icon(Icons.logout, color: Colors.white),
+              icon: Icon(
+                Icons.logout_rounded,
+                color: Colors.white.withValues(alpha: 0.8),
+              ),
               tooltip: 'ออกจากระบบ',
               onPressed: _logout,
             ),
         ],
       ),
-      body: Column(
-        children: [
-          // ── Offline Banner ──────────────────
-          if (!_isOnline) OfflineBanner(pendingCount: _pendingCount),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            // ── Offline Banner ──────────────────
+            if (!_isOnline) OfflineBanner(pendingCount: _pendingCount),
 
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ── User Info / Login ───────
-                  if (_userId == null)
-                    _buildLoginPrompt()
-                  else
-                    _buildUserInfo(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── User Info / Login ───────
+                    if (_userId == null)
+                      _buildLoginPrompt()
+                    else
+                      _buildUserCard(),
 
-                  const SizedBox(height: 24),
-
-                  // ── Flow Cards ──────────────
-                  const Text(
-                    'เลือกการทำงาน',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _FlowCard(
-                          icon: const _CompositeIcon(
-                            mainIcon: Icons.local_shipping,
-                            accentIcon: Icons.south,
-                            accentColor: Color(0xFFFFC107),
-                          ),
-                          title: 'Receive',
-                          subtitle: 'รับสินค้าเข้า',
-                          gradientColors: const [
-                            Color(0xFF1B5E20),
-                            Color(0xFF4CAF50),
-                          ],
-                          onTap: () async {
-                            if (!await _requireLogin()) return;
-                            if (!context.mounted) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => Flow1MenuScreen(
-                                  userId: _userId!,
-                                  fullName: _fullName!,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _FlowCard(
-                          icon: const _CompositeIcon(
-                            mainIcon: Icons.warehouse,
-                            accentIcon: Icons.add,
-                            accentColor: Color(0xFF00BCD4),
-                          ),
-                          title: 'Putaway',
-                          subtitle: 'เก็บ Pallet เข้าคลัง',
-                          gradientColors: const [
-                            Color(0xFF0D47A1),
-                            Color(0xFF42A5F5),
-                          ],
-                          onTap: () async {
-                            if (!await _requireLogin()) return;
-                            if (!context.mounted) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => PutawayScreen(
-                                  userId: _userId!,
-                                  fullName: _fullName!,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _FlowCard(
-                          icon: const _CompositeIcon(
-                            mainIcon: Icons.inventory_2,
-                            accentIcon: Icons.autorenew,
-                            accentColor: Color(0xFFFFC107),
-                          ),
-                          title: 'Replenishment',
-                          subtitle: 'เติมสินค้า',
-                          gradientColors: const [
-                            Color(0xFFE65100),
-                            Color(0xFFFF9800),
-                          ],
-                          onTap: () async {
-                            if (!await _requireLogin()) return;
-                            if (!context.mounted) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ReplenishmentMenuScreen(
-                                  userId: _userId!,
-                                  fullName: _fullName!,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _FlowCard(
-                          icon: const _CompositeIcon(
-                            mainIcon: Icons.content_cut,
-                            accentIcon: Icons.arrow_forward,
-                            accentColor: Color(0xFF7C4DFF),
-                          ),
-                          title: 'Picking',
-                          subtitle: 'เบิกสินค้า Pick/Pack',
-                          gradientColors: const [
-                            Color(0xFF4A148C),
-                            Color(0xFF9C27B0),
-                          ],
-                          onTap: () async {
-                            if (!await _requireLogin()) return;
-                            if (!context.mounted) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => PickingSessionScreen(
-                                  userId: _userId!,
-                                  fullName: _fullName!,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // ── Supervisor Section ──────
-                  if (_role == 'SUPERVISOR') ...[
                     const SizedBox(height: 24),
-                    const Text(
-                      'Supervisor',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _SupervisorCard(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => CancelScreen(userId: _userId!),
-                        ),
-                      ),
-                    ),
-                  ],
 
-                  // ── TEST Section ────────────
-                  if (_userId != null) ...[
-                    const SizedBox(height: 24),
-                    const Text(
-                      'TEST',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textGrey,
-                      ),
+                    // ── Flow Cards ──────────────
+                    SectionHeader(
+                      title: 'เลือกการทำงาน',
+                      icon: Icons.apps_rounded,
                     ),
+                    const SizedBox(height: 14),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _FlowCard(
+                            icon: Icons.local_shipping_rounded,
+                            title: 'Receive',
+                            subtitle: 'รับสินค้าเข้า',
+                            gradient: const [
+                              Color(0xFF1B5E20),
+                              Color(0xFF43A047),
+                            ],
+                            onTap: () async {
+                              if (!await _requireLogin()) return;
+                              if (!context.mounted) return;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => Flow1MenuScreen(
+                                    userId: _userId!,
+                                    fullName: _fullName!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _FlowCard(
+                            icon: Icons.warehouse_rounded,
+                            title: 'Putaway',
+                            subtitle: 'เก็บ Pallet เข้าคลัง',
+                            gradient: const [
+                              Color(0xFF0D47A1),
+                              Color(0xFF1E88E5),
+                            ],
+                            onTap: () async {
+                              if (!await _requireLogin()) return;
+                              if (!context.mounted) return;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PutawayScreen(
+                                    userId: _userId!,
+                                    fullName: _fullName!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+
                     const SizedBox(height: 12),
-                    GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => TestPickOrderScreen(
-                            userId: _userId!,
-                            fullName: _fullName!,
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _FlowCard(
+                            icon: Icons.inventory_2_rounded,
+                            title: 'Replenishment',
+                            subtitle: 'เติมสินค้า',
+                            gradient: const [
+                              Color(0xFFE65100),
+                              Color(0xFFFB8C00),
+                            ],
+                            onTap: () async {
+                              if (!await _requireLogin()) return;
+                              if (!context.mounted) return;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ReplenishmentMenuScreen(
+                                    userId: _userId!,
+                                    fullName: _fullName!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _FlowCard(
+                            icon: Icons.content_cut_rounded,
+                            title: 'Picking',
+                            subtitle: 'เบิกสินค้า Pick/Pack',
+                            gradient: const [
+                              Color(0xFF4A148C),
+                              Color(0xFF8E24AA),
+                            ],
+                            onTap: () async {
+                              if (!await _requireLogin()) return;
+                              if (!context.mounted) return;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PickingSessionScreen(
+                                    userId: _userId!,
+                                    fullName: _fullName!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // ── Supervisor Section ──────
+                    if (_role == 'SUPERVISOR') ...[
+                      const SizedBox(height: 28),
+                      SectionHeader(
+                        title: 'Supervisor',
+                        icon: Icons.shield_rounded,
+                      ),
+                      const SizedBox(height: 14),
+                      _ActionCard(
+                        icon: Icons.approval_rounded,
+                        iconColor: AppTheme.warning,
+                        title: 'Cancel Approval',
+                        subtitle: 'อนุมัติคำขอยกเลิกรายการ',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CancelScreen(userId: _userId!),
                           ),
                         ),
                       ),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.science, color: AppTheme.textGrey),
-                            SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'สร้าง Pick Order (TEST)',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      color: AppTheme.textPrimary,
-                                    ),
-                                  ),
-                                  Text(
-                                    'เลือกสินค้าจาก ReceiptLines แล้วสร้าง Pick Order',
-                                    style: TextStyle(fontSize: 13, color: AppTheme.textGrey),
-                                  ),
-                                ],
-                              ),
+                      const SizedBox(height: 8),
+                      _ActionCard(
+                        icon: Icons.add_photo_alternate_rounded,
+                        iconColor: AppTheme.primary,
+                        title: 'จัดการรูปสินค้า',
+                        subtitle: 'อัปโหลด/แก้ไขรูปภาพ Parts',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => PartImageScreen(
+                              userId: _userId!,
+                              fullName: _fullName!,
                             ),
-                            Icon(Icons.chevron_right, color: AppTheme.textGrey),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
 
-                  // ── Pending Sync ────────────
-                  if (_userId != null && _pendingCount > 0) ...[
-                    const SizedBox(height: 24),
-                    _PendingSyncCard(
-                      count: _pendingCount,
-                      isOnline: _isOnline,
-                      onSync: () async {
-                        final result = await OfflineService().syncQueue();
-                        if (context.mounted) {
-                          result.hasErrors
-                              ? showWarningSnackbar(context, result.summary)
-                              : showSuccessSnackbar(context, result.summary);
-                          _updatePendingCount();
-                        }
-                      },
-                    ),
+                    // ── TEST Section ────────────
+                    if (_userId != null) ...[
+                      const SizedBox(height: 28),
+                      SectionHeader(title: 'TEST', icon: Icons.science_rounded),
+                      const SizedBox(height: 14),
+                      _ActionCard(
+                        icon: Icons.science_rounded,
+                        iconColor: AppTheme.textGrey(context),
+                        title: 'สร้าง Pick Order (TEST)',
+                        subtitle: 'เลือกสินค้าจาก ReceiptLines',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => TestPickOrderScreen(
+                              userId: _userId!,
+                              fullName: _fullName!,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+
+                    // ── Pending Sync ────────────
+                    if (_userId != null && _pendingCount > 0) ...[
+                      const SizedBox(height: 24),
+                      _PendingSyncCard(
+                        count: _pendingCount,
+                        isOnline: _isOnline,
+                        onSync: () async {
+                          final result = await OfflineService().syncQueue();
+                          if (context.mounted) {
+                            result.hasErrors
+                                ? showWarningSnackbar(context, result.summary)
+                                : showSuccessSnackbar(context, result.summary);
+                            _updatePendingCount();
+                          }
+                        },
+                      ),
+                    ],
+
+                    const SizedBox(height: 16),
                   ],
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -393,12 +389,23 @@ class _HomeScreenState extends State<HomeScreen> {
     return WmsCard(
       child: Row(
         children: [
-          const Icon(Icons.info_outline, color: AppTheme.textGrey),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+            ),
+            child: const Icon(
+              Icons.info_outline_rounded,
+              color: AppTheme.primary,
+              size: 20,
+            ),
+          ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Text(
               'กดเลือก Flow เพื่อเข้าสู่ระบบ',
-              style: TextStyle(color: AppTheme.textGrey),
+              style: TextStyle(color: AppTheme.textGrey(context), fontSize: 14),
             ),
           ),
           TextButton(
@@ -422,30 +429,48 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildUserInfo() {
+  Widget _buildUserCard() {
     return WmsCard(
       child: Row(
         children: [
-          CircleAvatar(
-            backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
-            child: const Icon(Icons.person, color: AppTheme.primary),
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1565C0), Color(0xFF1E88E5)],
+              ),
+              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+            ),
+            child: Center(
+              child: Text(
+                (_fullName ?? '?')[0],
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   _fullName ?? '',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
+                    color: AppTheme.textPrimary(context),
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   _userId ?? '',
-                  style: const TextStyle(
-                    color: AppTheme.textGrey,
+                  style: TextStyle(
+                    color: AppTheme.textGrey(context),
                     fontSize: 13,
                   ),
                 ),
@@ -460,172 +485,104 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // =============================================
-// _CompositeIcon — ไอคอนซ้อนสองชั้น
-// =============================================
-class _CompositeIcon extends StatelessWidget {
-  final IconData mainIcon;
-  final IconData accentIcon;
-  final Color accentColor;
-
-  const _CompositeIcon({
-    required this.mainIcon,
-    required this.accentIcon,
-    required this.accentColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 76,
-      height: 76,
-      child: Stack(
-        children: [
-          // shadow layer (depth effect)
-          Positioned(
-            left: 6,
-            top: 6,
-            child: Icon(
-              mainIcon,
-              color: Colors.white.withValues(alpha: 0.18),
-              size: 62,
-            ),
-          ),
-          // main icon
-          Icon(mainIcon, color: Colors.white, size: 62),
-          // accent badge
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: Container(
-              padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(
-                color: accentColor,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Icon(accentIcon, color: Colors.white, size: 16),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// =============================================
-// _FlowCard
+// _FlowCard — modern gradient card
 // =============================================
 class _FlowCard extends StatelessWidget {
-  final Widget icon;
+  final IconData icon;
   final String title;
   final String subtitle;
-  final List<Color> gradientColors;
+  final List<Color> gradient;
   final VoidCallback onTap;
 
   const _FlowCard({
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.gradientColors,
+    required this.gradient,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: gradientColors.first.withValues(alpha: 0.28),
-              blurRadius: 14,
-              offset: const Offset(0, 7),
+    return Material(
+      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+      clipBehavior: Clip.antiAlias,
+      elevation: 2,
+      shadowColor: gradient.first.withValues(alpha: 0.3),
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: gradient,
             ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // icon area with gradient + decorative circles
-            Container(
-              height: 118,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: gradientColors,
+          ),
+          child: Stack(
+            children: [
+              // decorative circle
+              Positioned(
+                right: -20,
+                top: -20,
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ),
-              child: Stack(
-                children: [
-                  // decorative circle top-right
-                  Positioned(
-                    right: -22,
-                    top: -22,
-                    child: Container(
-                      width: 90,
-                      height: 90,
+              Positioned(
+                left: -10,
+                bottom: -10,
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              // content
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.10),
-                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                      ),
+                      child: Icon(icon, color: Colors.white, size: 28),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: 0.3,
                       ),
                     ),
-                  ),
-                  // decorative circle bottom-left
-                  Positioned(
-                    left: -12,
-                    bottom: -18,
-                    child: Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.07),
-                        shape: BoxShape.circle,
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withValues(alpha: 0.8),
                       ),
                     ),
-                  ),
-                  // icon centered
-                  Center(child: icon),
-                ],
+                  ],
+                ),
               ),
-            ),
-            // text area
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textGrey,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -633,48 +590,71 @@ class _FlowCard extends StatelessWidget {
 }
 
 // =============================================
-// _SupervisorCard
+// _ActionCard — for supervisor / test items
 // =============================================
-class _SupervisorCard extends StatelessWidget {
+class _ActionCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
   final VoidCallback onTap;
 
-  const _SupervisorCard({required this.onTap});
+  const _ActionCard({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppTheme.warning.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.warning.withValues(alpha: 0.3)),
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.approval, color: AppTheme.warning),
-            SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Cancel Approval',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  Text(
-                    'อนุมัติคำขอยกเลิกรายการ',
-                    style: TextStyle(fontSize: 13, color: AppTheme.textGrey),
-                  ),
-                ],
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                ),
+                child: Icon(icon, color: iconColor, size: 22),
               ),
-            ),
-            Icon(Icons.chevron_right, color: AppTheme.textGrey),
-          ],
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: AppTheme.textPrimary(context),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textGrey(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppTheme.textGrey(context),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -700,20 +680,34 @@ class _PendingSyncCard extends StatelessWidget {
     return WmsCard(
       child: Row(
         children: [
-          const Icon(Icons.sync, color: AppTheme.primary),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+            ),
+            child: const Icon(
+              Icons.sync_rounded,
+              color: AppTheme.primary,
+              size: 20,
+            ),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'มี $count รายการรอ sync',
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              '$count pending sync',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textPrimary(context),
+              ),
             ),
           ),
           if (isOnline)
-            TextButton(onPressed: onSync, child: const Text('Sync เลย'))
+            TextButton(onPressed: onSync, child: const Text('Sync'))
           else
-            const Text(
+            Text(
               'รอ WiFi',
-              style: TextStyle(color: AppTheme.textGrey, fontSize: 13),
+              style: TextStyle(color: AppTheme.textGrey(context), fontSize: 13),
             ),
         ],
       ),

@@ -3,6 +3,7 @@ import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import '../../models/wms_models.dart';
+import '../../widgets/part_thumbnail.dart';
 
 class ReturnScreen extends StatefulWidget {
   final String userId;
@@ -85,7 +86,7 @@ class _ReturnScreenState extends State<ReturnScreen> {
     final res = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppTheme.surface,
+      backgroundColor: AppTheme.surface(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -155,7 +156,7 @@ class _ReturnScreenState extends State<ReturnScreen> {
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.surface,
+        backgroundColor: AppTheme.surface(context),
         title: const Text('รับสินค้าคืนเสร็จสิ้น'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -165,7 +166,7 @@ class _ReturnScreenState extends State<ReturnScreen> {
             const SizedBox(height: 8),
             Text(
               'สถานะ Order: ${data.orderStatus}',
-              style: const TextStyle(color: AppTheme.textGrey, fontSize: 13),
+              style: TextStyle(color: AppTheme.textGrey(context), fontSize: 13),
             ),
           ],
         ),
@@ -217,98 +218,101 @@ class _ReturnScreenState extends State<ReturnScreen> {
               ),
           ],
         ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Scan Order ───────────────
-              if (!_sessionOpen) ...[
-                const Text(
-                  'สแกน Order Number',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ScanTextField(
-                  controller: _orderController,
-                  label: 'Order ID',
-                  hint: 'เช่น ORD-001',
-                  onSubmit: () => _scanOrder(_orderController.text),
-                ),
-              ],
-
-              // ── Order Info ───────────────
-              if (_order != null) ...[
-                const SizedBox(height: 20),
-                WmsCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.receipt_long,
-                            color: AppTheme.primary,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _order!.orderId,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const Spacer(),
-                          StatusBadge(_order!.status),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      InfoRow(label: 'ลูกค้า', value: _order!.customerName),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // ── Items List ───────────
-                const Text(
-                  'รายการสินค้า',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                ..._order!.items.map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _ReturnItemCard(
-                      item: item,
-                      onReceive: _sessionOpen && item.status == 'ACTIVE'
-                          ? () => _receiveItem(item)
-                          : null,
+        body: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Scan Order ───────────────
+                if (!_sessionOpen) ...[
+                  Text(
+                    'สแกน Order Number',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary(context),
                     ),
                   ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // ── Close Button ─────────
-                if (_sessionOpen)
-                  PrimaryButton(
-                    label: 'ปิด Session รับคืน',
-                    icon: Icons.check_circle,
-                    onPressed: _closeSession,
+                  const SizedBox(height: 12),
+                  ScanTextField(
+                    controller: _orderController,
+                    label: 'Order ID',
+                    hint: 'เช่น ORD-001',
+                    onSubmit: () => _scanOrder(_orderController.text),
                   ),
+                ],
+
+                // ── Order Info ───────────────
+                if (_order != null) ...[
+                  const SizedBox(height: 20),
+                  WmsCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.receipt_long,
+                              color: AppTheme.primary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _order!.orderId,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const Spacer(),
+                            StatusBadge(_order!.status),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        InfoRow(label: 'ลูกค้า', value: _order!.customerName),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // ── Items List ───────────
+                  Text(
+                    'รายการสินค้า',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary(context),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  ..._order!.items.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _ReturnItemCard(
+                        item: item,
+                        onReceive: _sessionOpen && item.status == 'ACTIVE'
+                            ? () => _receiveItem(item)
+                            : null,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // ── Close Button ─────────
+                  if (_sessionOpen)
+                    PrimaryButton(
+                      label: 'ปิด Session รับคืน',
+                      icon: Icons.check_circle,
+                      onPressed: _closeSession,
+                    ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -332,10 +336,13 @@ class _ReturnItemCard extends StatelessWidget {
     return WmsCard(
       child: Row(
         children: [
+          // Product thumbnail
+          PartThumbnail(imageUrl: item.imageUrl, size: 40),
+          const SizedBox(width: 10),
           // Status Icon
           Icon(
             isDone ? Icons.check_circle : Icons.radio_button_unchecked,
-            color: isDone ? AppTheme.success : AppTheme.textGrey,
+            color: isDone ? AppTheme.success : AppTheme.textGrey(context),
             size: 24,
           ),
           const SizedBox(width: 12),
@@ -354,16 +361,16 @@ class _ReturnItemCard extends StatelessWidget {
                 ),
                 Text(
                   item.itemDesc,
-                  style: const TextStyle(
-                    color: AppTheme.textGrey,
+                  style: TextStyle(
+                    color: AppTheme.textGrey(context),
                     fontSize: 13,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '${item.owner} / ${item.brand}',
-                  style: const TextStyle(
-                    color: AppTheme.textGrey,
+                  style: TextStyle(
+                    color: AppTheme.textGrey(context),
                     fontSize: 12,
                   ),
                 ),
@@ -431,7 +438,10 @@ class _ReturnItemSheetState extends State<_ReturnItemSheet> {
         left: 16,
         right: 16,
         top: 24,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        bottom:
+            MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).padding.bottom +
+            24,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -444,11 +454,11 @@ class _ReturnItemSheetState extends State<_ReturnItemSheet> {
           ),
           Text(
             widget.item.itemDesc,
-            style: const TextStyle(color: AppTheme.textGrey),
+            style: TextStyle(color: AppTheme.textGrey(context)),
           ),
           Text(
             'ซื้อไป ${widget.item.qtySold} ชิ้น',
-            style: const TextStyle(color: AppTheme.textGrey, fontSize: 13),
+            style: TextStyle(color: AppTheme.textGrey(context), fontSize: 13),
           ),
           const SizedBox(height: 20),
           const Divider(),

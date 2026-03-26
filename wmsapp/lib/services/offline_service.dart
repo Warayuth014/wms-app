@@ -85,6 +85,9 @@ class OfflineService {
                 'qtyOrdered': i.qtyOrdered,
                 'qtyReceived': i.qtyReceived,
                 'status': i.status,
+                'condition': i.condition,
+                'lotNumber': i.lotNumber,
+                'expiredDate': i.expiredDate,
               },
             )
             .toList(),
@@ -225,9 +228,6 @@ class OfflineService {
           poId: data['poId'],
           partId: data['partId'],
           qtyReceived: data['qtyReceived'],
-          lotNumber: data['lotNumber'],
-          expiredDate: data['expiredDate'],
-          condition: data['condition'],
           operatorId: data['operatorId'],
         );
 

@@ -78,7 +78,7 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
           children: [
             Text(
               errorMsg ?? 'ไม่มีสินค้าที่ต้อง Pick บน Pallet นี้',
-              style: const TextStyle(fontSize: 13, color: AppTheme.textGrey),
+              style: TextStyle(fontSize: 13, color: AppTheme.textGrey(context)),
             ),
             const SizedBox(height: 6),
             const Text(
@@ -131,7 +131,7 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
               child: OutlinedButton(
                 onPressed: () => Navigator.pop(ctx),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.textGrey,
+                  foregroundColor: AppTheme.textGrey(context),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -196,61 +196,64 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: WmsAppBar(title: 'Picking', userName: widget.fullName),
-      body: LoadingOverlay(
-        loading: _loading,
-        message: 'กำลังค้นหา...',
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Scan card
-              WmsCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(
-                          Icons.qr_code_scanner,
-                          color: AppTheme.primary,
-                          size: 24,
-                        ),
-                        SizedBox(width: 8),
-                        Text(
-                          'Scan Pallet',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
+      body: SafeArea(
+        top: false,
+        child: LoadingOverlay(
+          loading: _loading,
+          message: 'กำลังค้นหา...',
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Scan card
+                WmsCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(
+                            Icons.qr_code_scanner,
                             color: AppTheme.primary,
+                            size: 24,
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    // const Text(
-                    //   'สแกน Pallet ที่ต้องการ Pick\nระบบจะหา Pick Order + Station อัตโนมัติ',
-                    //   style: TextStyle(fontSize: 13, color: AppTheme.textGrey),
-                    // ),
-                    const SizedBox(height: 16),
-                    ScanTextField(
-                      label: 'Pallet ID',
-                      hint: 'Scan Pallet ID',
-                      controller: _scanCtrl,
-                      focusNode: _scanFocus,
-                      onSubmit: _scanPallet,
-                    ),
-                    const SizedBox(height: 12),
-                    PrimaryButton(
-                      label: 'Scan',
-                      icon: Icons.search,
-                      onPressed: _scanPallet,
-                    ),
-                  ],
+                          SizedBox(width: 8),
+                          Text(
+                            'Scan Pallet',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      // const Text(
+                      //   'สแกน Pallet ที่ต้องการ Pick\nระบบจะหา Pick Order + Station อัตโนมัติ',
+                      //   style: TextStyle(fontSize: 13, color: AppTheme.textGrey),
+                      // ),
+                      const SizedBox(height: 16),
+                      ScanTextField(
+                        label: 'Pallet ID',
+                        hint: 'Scan Pallet ID',
+                        controller: _scanCtrl,
+                        focusNode: _scanFocus,
+                        onSubmit: _scanPallet,
+                      ),
+                      const SizedBox(height: 12),
+                      PrimaryButton(
+                        label: 'Scan',
+                        icon: Icons.search,
+                        onPressed: _scanPallet,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
-            ],
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),

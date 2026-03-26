@@ -7,6 +7,7 @@ import '../../services/api_service.dart';
 import '../../services/offline_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../models/wms_models.dart';
+import '../../widgets/part_thumbnail.dart';
 
 class AssignPalletScreen extends StatefulWidget {
   final String userId;
@@ -140,24 +141,33 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
 
     if (autoClosed) {
       final poStatus = data['poStatus'] as String? ?? 'RECEIVED';
-      final closeMessage = data['closeMessage'] as String? ?? 'ปิด Session อัตโนมัติ';
+      final closeMessage =
+          data['closeMessage'] as String? ?? 'ปิด Session อัตโนมัติ';
 
       if (!mounted) return;
       await showDialog(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           title: Row(
             children: [
               Icon(
-                poStatus == 'RECEIVED' ? Icons.check_circle : Icons.warning_amber,
-                color: poStatus == 'RECEIVED' ? AppTheme.success : AppTheme.warning,
+                poStatus == 'RECEIVED'
+                    ? Icons.check_circle
+                    : Icons.warning_amber,
+                color: poStatus == 'RECEIVED'
+                    ? AppTheme.success
+                    : AppTheme.warning,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  poStatus == 'RECEIVED' ? 'รับสินค้าครบแล้ว' : 'รับสินค้าบางส่วน',
+                  poStatus == 'RECEIVED'
+                      ? 'รับสินค้าครบแล้ว'
+                      : 'รับสินค้าบางส่วน',
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
@@ -169,9 +179,12 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
             children: [
               Text(closeMessage),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Session ถูกปิดอัตโนมัติ',
-                style: TextStyle(color: AppTheme.textGrey, fontSize: 13),
+                style: TextStyle(
+                  color: AppTheme.textGrey(context),
+                  fontSize: 13,
+                ),
               ),
               const SizedBox(height: 12),
               InfoRow(label: 'PO', value: widget.po.poId),
@@ -295,101 +308,104 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: WmsAppBar(title: 'สแกน Pallet', userName: widget.fullName),
-      body: Column(
-        children: [
-          if (!_isOnline) const OfflineBanner(pendingCount: 0),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            if (!_isOnline) const OfflineBanner(pendingCount: 0),
 
-          Expanded(
-            child: LoadingOverlay(
-              loading: _loading,
-              message: 'กำลังผูก Pallet...',
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ── Step Indicator ──────────
-                    _buildStepIndicator(),
-                    const SizedBox(height: 16),
+            Expanded(
+              child: LoadingOverlay(
+                loading: _loading,
+                message: 'กำลังผูก Pallet...',
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── Step Indicator ──────────
+                      _buildStepIndicator(),
+                      const SizedBox(height: 16),
 
-                    // ── Pallet Input ────────────
-                    WmsCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'สแกน Pallet',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          ScanTextField(
-                            label: 'Pallet ID',
-                            hint: 'เช่น PAL-001',
-                            controller: _palletController,
-                            onSubmit: () {},
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Pallet Type
-                          const Text(
-                            'ประเภท Pallet',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _TypeButton(
-                                  label: 'FG',
-                                  desc: 'พร้อมใช้ได้เลย',
-                                  color: AppTheme.success,
-                                  selected: _palletType == 'FG',
-                                  onTap: () =>
-                                      setState(() => _palletType = 'FG'),
-                                ),
+                      // ── Pallet Input ────────────
+                      WmsCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'สแกน Pallet',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: _TypeButton(
-                                  label: 'PW',
-                                  desc: 'ต้องติดสติ๊กเกอร์ก่อน',
-                                  color: AppTheme.warning,
-                                  selected: _palletType == 'PW',
-                                  onTap: () =>
-                                      setState(() => _palletType = 'PW'),
-                                ),
+                            ),
+                            const SizedBox(height: 12),
+                            ScanTextField(
+                              label: 'Pallet ID',
+                              hint: 'เช่น PAL-001',
+                              controller: _palletController,
+                              onSubmit: () {},
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Pallet Type
+                            const Text(
+                              'ประเภท Pallet',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
                               ),
-                            ],
-                          ),
-                        ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _TypeButton(
+                                    label: 'FG',
+                                    desc: 'พร้อมใช้ได้เลย',
+                                    color: AppTheme.success,
+                                    selected: _palletType == 'FG',
+                                    onTap: () =>
+                                        setState(() => _palletType = 'FG'),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _TypeButton(
+                                    label: 'PW',
+                                    desc: 'ต้องติดสติ๊กเกอร์ก่อน',
+                                    color: AppTheme.warning,
+                                    selected: _palletType == 'PW',
+                                    onTap: () =>
+                                        setState(() => _palletType = 'PW'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
-                    // ── เลือก Part ──────────────
-                    _buildSelectParts(),
-                    const SizedBox(height: 16),
+                      // ── เลือก Part ──────────────
+                      _buildSelectParts(),
+                      const SizedBox(height: 16),
 
-                    // ── Confirm ─────────────────
-                    PrimaryButton(
-                      label:
-                          'ผูก Pallet'
-                          ' (${_selectedLineIds.length} รายการ)',
-                      icon: Icons.link,
-                      onPressed: _assignPallet,
-                    ),
-                  ],
+                      // ── Confirm ─────────────────
+                      PrimaryButton(
+                        label:
+                            'ผูก Pallet'
+                            ' (${_selectedLineIds.length} รายการ)',
+                        icon: Icons.link,
+                        onPressed: _assignPallet,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -444,7 +460,7 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
                 decoration: BoxDecoration(
                   color: selected
                       ? AppTheme.primary.withValues(alpha: 0.05)
-                      : AppTheme.background,
+                      : AppTheme.background(context),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: selected
@@ -462,33 +478,64 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
                       color: selected ? AppTheme.primary : Colors.grey,
                     ),
                     const SizedBox(width: 10),
+                    PartThumbnail(imageUrl: line.imageUrl, size: 36),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            line.partId,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          Row(
+                            children: [
+                              Text(
+                                line.partId,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              StatusBadge(line.condition),
+                            ],
                           ),
                           Text(
                             line.itemDesc,
-                            style: const TextStyle(
-                              color: AppTheme.textGrey,
+                            style: TextStyle(
+                              color: AppTheme.textGrey(context),
                               fontSize: 12,
                             ),
+                          ),
+                          Row(
+                            children: [
+                              if (line.lotNumber != null) ...[
+                                Icon(
+                                  Icons.label_outline,
+                                  size: 12,
+                                  color: AppTheme.textGrey(context),
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  'Batch No.: ${line.lotNumber}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppTheme.textGrey(context),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              Text(
+                                '${line.owner} / ${line.brand}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.textGrey(context),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '${line.qtyReceived} ชิ้น',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        StatusBadge(line.condition),
-                      ],
+                    Text(
+                      '${line.qtyReceived} ชิ้น',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
@@ -536,7 +583,9 @@ class _TypeButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.1) : AppTheme.background,
+          color: selected
+              ? color.withValues(alpha: 0.1)
+              : AppTheme.background(context),
           border: Border.all(
             color: selected ? color : Colors.grey.shade300,
             width: selected ? 2 : 1,

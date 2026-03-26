@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
+import '../../widgets/part_thumbnail.dart';
 
 class TestPickOrderScreen extends StatefulWidget {
   final String userId;
@@ -137,70 +138,80 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: WmsAppBar(title: 'TEST Pick Order', userName: widget.fullName),
-      body: LoadingOverlay(
-        loading: _loading,
-        message: 'กำลังโหลด...',
-        child: Column(
-          children: [
-            // ── Header ──
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              color: AppTheme.primary.withValues(alpha: 0.05),
-              child: Row(
-                children: [
-                  const Icon(Icons.science, color: AppTheme.primary, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    'เลือกสินค้าที่ต้องการ Pick (${_selected.length}/${_lines.length})',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: _toggleAll,
-                    child: Text(
-                      _selected.length == _lines.length
-                          ? 'Clear All'
-                          : 'Select All',
+      body: SafeArea(
+        top: false,
+        child: LoadingOverlay(
+          loading: _loading,
+          message: 'กำลังโหลด...',
+          child: Column(
+            children: [
+              // ── Header ──
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                color: AppTheme.primary.withValues(alpha: 0.05),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.science,
+                      color: AppTheme.primary,
+                      size: 20,
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.refresh, size: 20),
-                    onPressed: _loadLines,
-                  ),
-                ],
-              ),
-            ),
-
-            // ── List ──
-            Expanded(
-              child: _lines.isEmpty
-                  ? const Center(
+                    const SizedBox(width: 8),
+                    Text(
+                      'เลือกสินค้าที่ต้องการ Pick (${_selected.length}/${_lines.length})',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: _toggleAll,
                       child: Text(
-                        'ไม่มีสินค้าที่ PALLETIZED\nหรือถูก allocate หมดแล้ว',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: AppTheme.textGrey),
+                        _selected.length == _lines.length
+                            ? 'Clear All'
+                            : 'Select All',
                       ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: _lines.length,
-                      itemBuilder: (_, i) => _buildLineItem(_lines[i]),
                     ),
-            ),
-
-            // ── Create Button ──
-            if (_selected.isNotEmpty)
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: PrimaryButton(
-                    label: 'สร้าง Pick Order (${_selected.length} รายการ)',
-                    icon: Icons.add_task,
-                    onPressed: _createOrder,
-                  ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh, size: 20),
+                      onPressed: _loadLines,
+                    ),
+                  ],
                 ),
               ),
-          ],
+
+              // ── List ──
+              Expanded(
+                child: _lines.isEmpty
+                    ? Center(
+                        child: Text(
+                          'ไม่มีสินค้าที่ PALLETIZED\nหรือถูก allocate หมดแล้ว',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppTheme.textGrey(context)),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: _lines.length,
+                        itemBuilder: (_, i) => _buildLineItem(_lines[i]),
+                      ),
+              ),
+
+              // ── Create Button ──
+              if (_selected.isNotEmpty)
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: PrimaryButton(
+                      label: 'สร้าง Pick Order (${_selected.length} รายการ)',
+                      icon: Icons.add_task,
+                      onPressed: _createOrder,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -215,7 +226,8 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
     final palletType = line['palletType'] as String;
     final available = line['availableQty'] as int;
     final owner = line['owner'] as String;
-    final condition = line['condition'] as String;
+    final brand = (line['brand'] as String?) ?? '';
+    final lotNumber = line['lotNumber'] as String?;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -245,29 +257,53 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
                 color: selected ? AppTheme.primary : Colors.grey,
               ),
               const SizedBox(width: 10),
+              PartThumbnail(imageUrl: line['imageUrl'] as String?, size: 40),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          partId,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        StatusBadge(condition),
-                      ],
+                    Text(
+                      partId,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
                     ),
                     Text(
                       itemDesc,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppTheme.textGrey,
+                        color: AppTheme.textGrey(context),
                       ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        if (lotNumber != null && lotNumber.isNotEmpty) ...[
+                          Icon(
+                            Icons.label_outline,
+                            size: 12,
+                            color: AppTheme.textGrey(context),
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            'Batch No.: $lotNumber',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textGrey(context),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(
+                          '$owner / $brand',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textGrey(context),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Row(
@@ -275,8 +311,6 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
                         _InfoChip(Icons.inventory_2, palletId),
                         const SizedBox(width: 6),
                         _InfoChip(Icons.label, palletType),
-                        const SizedBox(width: 6),
-                        _InfoChip(Icons.person, owner),
                       ],
                     ),
                   ],
@@ -305,9 +339,9 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     suffixText: '/$available',
-                    suffixStyle: const TextStyle(
+                    suffixStyle: TextStyle(
                       fontSize: 10,
-                      color: AppTheme.textGrey,
+                      color: AppTheme.textGrey(context),
                     ),
                   ),
                 ),
@@ -337,11 +371,11 @@ class _InfoChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: AppTheme.textGrey),
+          Icon(icon, size: 12, color: AppTheme.textGrey(context)),
           const SizedBox(width: 3),
           Text(
             label,
-            style: const TextStyle(fontSize: 11, color: AppTheme.textGrey),
+            style: TextStyle(fontSize: 11, color: AppTheme.textGrey(context)),
           ),
         ],
       ),

@@ -56,7 +56,7 @@ const _kStations = [
 
 // สีรับ = เขียว teal, สีส่ง = ส้มแดง — แยกชัดเจน
 const _kColorReceive = Color(0xFF00796B); // teal เข้ม
-const _kColorSend    = Color(0xFFD84315); // ส้มแดง
+const _kColorSend = Color(0xFFD84315); // ส้มแดง
 
 const _kPWStations = [
   // คี่ = รับ pallet จาก ASRS (recall)
@@ -234,186 +234,266 @@ class _PutawayScreenState extends State<PutawayScreen>
         title: 'Putaway — เก็บ pallet เข้า ASRS',
         userName: widget.fullName,
       ),
-      body: Column(
-        children: [
-          // ── Scan station barcode ──────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: WmsCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.qr_code_scanner, color: AppTheme.primary, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'สแกนบาร์โค้ด Station',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            // ── Scan station barcode ──────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: WmsCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.qr_code_scanner,
+                          color: AppTheme.primary,
+                          size: 20,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'สแกนบาร์โค้ด Station',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'หรือกดที่รูป Station ด้านล่าง',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textGrey(context),
                       ),
-                    ],
+                    ),
+                    const SizedBox(height: 12),
+                    ScanTextField(
+                      label: 'Station ID',
+                      hint: 'เช่น STN-1, PW-STN-1',
+                      controller: _stationController,
+                      onSubmit: _onStationBarcodeScan,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // ── Tab bar ─────────────────────────────
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: TabBar(
+                controller: _tabCtrl,
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                indicator: BoxDecoration(
+                  color: AppTheme.primary,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                labelColor: Colors.white,
+                unselectedLabelColor: AppTheme.textPrimary(context),
+                labelStyle: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  fontFamily: 'Sarabun',
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  fontFamily: 'Sarabun',
+                ),
+                tabs: const [
+                  Tab(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.warehouse, size: 18),
+                        SizedBox(width: 6),
+                        Text('Station'),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'หรือกดที่รูป Station ด้านล่าง',
-                    style: TextStyle(fontSize: 12, color: AppTheme.textGrey),
-                  ),
-                  const SizedBox(height: 12),
-                  ScanTextField(
-                    label: 'Station ID',
-                    hint: 'เช่น STN-1, PW-STN-1',
-                    controller: _stationController,
-                    onSubmit: _onStationBarcodeScan,
+                  Tab(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.build_circle, size: 18),
+                        SizedBox(width: 6),
+                        Text('Prework'),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
 
-          const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
-          // ── Tab bar ─────────────────────────────
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: TabBar(
-              controller: _tabCtrl,
-              indicatorSize: TabBarIndicatorSize.tab,
-              dividerColor: Colors.transparent,
-              indicator: BoxDecoration(
-                color: AppTheme.primary,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              labelColor: Colors.white,
-              unselectedLabelColor: AppTheme.textPrimary,
-              labelStyle: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                fontFamily: 'Sarabun',
-              ),
-              unselectedLabelStyle: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-                fontFamily: 'Sarabun',
-              ),
-              tabs: const [
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.warehouse, size: 18),
-                      SizedBox(width: 6),
-                      Text('Station'),
-                    ],
-                  ),
-                ),
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.build_circle, size: 18),
-                      SizedBox(width: 6),
-                      Text('Prework'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // ── Tab content ─────────────────────────
-          Expanded(
-            child: TabBarView(
-              controller: _tabCtrl,
-              children: [
-                // ── Tab 1: Station ──
-                SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'เลือก Station (FG & PW)',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
+            // ── Tab content ─────────────────────────
+            Expanded(
+              child: TabBarView(
+                controller: _tabCtrl,
+                children: [
+                  // ── Tab 1: Station ──
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'เลือก Station (FG & PW)',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimary(context),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'สแกน Pallet → เลือก ASRS หรือ Prework',
-                        style: TextStyle(fontSize: 12, color: AppTheme.textGrey),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildStationRow(_kStations),
-                    ],
-                  ),
-                ),
-
-                // ── Tab 2: Prework ──
-                SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── Legend ──
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: _kColorReceive.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.download, size: 14, color: _kColorReceive),
-                                SizedBox(width: 4),
-                                Text('รับ — เรียก Pallet จาก ASRS',
-                                    style: TextStyle(fontSize: 11, color: _kColorReceive, fontWeight: FontWeight.w600)),
-                              ],
-                            ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'สแกน Pallet → เลือก ASRS หรือ Prework',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textGrey(context),
                           ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: _kColorSend.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.upload, size: 14, color: _kColorSend),
-                                SizedBox(width: 4),
-                                Text('ส่ง — Convert & ส่ง ASRS',
-                                    style: TextStyle(fontSize: 11, color: _kColorSend, fontWeight: FontWeight.w600)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // PW-STN-1 ~ 3
-                      _buildStationRow(_kPWStations.sublist(0, 3)),
-                      const SizedBox(height: 10),
-                      // PW-STN-4 ~ 6
-                      _buildStationRow(_kPWStations.sublist(3, 6)),
-                    ],
+                        ),
+                        const SizedBox(height: 12),
+                        _buildStationRow(_kStations),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+
+                  // ── Tab 2: Prework ──
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Legend ──
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _kColorReceive.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.download,
+                                    size: 14,
+                                    color: _kColorReceive,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'รับ — เรียก Pallet จาก ASRS',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: _kColorReceive,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _kColorSend.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.upload,
+                                    size: 14,
+                                    color: _kColorSend,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'ส่ง — Convert & ส่ง ASRS',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: _kColorSend,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // 2 columns: left = รับ (receive), right = ส่ง (send)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // ── Left column: รับ Pallet ──
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  for (final s in _kPWStations.where(
+                                    (s) => s.pwRole == PWRole.receive,
+                                  )) ...[
+                                    _StationCard(
+                                      station: s,
+                                      isDispatching: _dispatchingStations
+                                          .contains(s.id),
+                                      onTap: () => _openStationPopup(s),
+                                    ),
+                                    const SizedBox(height: 10),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            // ── Right column: ส่ง Pallet ──
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  for (final s in _kPWStations.where(
+                                    (s) => s.pwRole == PWRole.send,
+                                  )) ...[
+                                    _StationCard(
+                                      station: s,
+                                      isDispatching: _dispatchingStations
+                                          .contains(s.id),
+                                      onTap: () => _openStationPopup(s),
+                                    ),
+                                    const SizedBox(height: 10),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -726,7 +806,8 @@ class _StationSheetState extends State<_StationSheet> {
     final confirm = await showConfirmDialog(
       context,
       title: 'เรียก Pallet จาก ASRS',
-      message: 'เรียก $palletId จาก ASRS\n'
+      message:
+          'เรียก $palletId จาก ASRS\n'
           'มาที่ ${widget.station.id}\n\n'
           'AGV จะนำ Pallet มาส่งทันที',
       confirmLabel: 'เรียก Pallet',
@@ -759,23 +840,27 @@ class _StationSheetState extends State<_StationSheet> {
 
     final destLabel = _selectedDestination == 'ASRS' ? 'ASRS' : 'Prework';
     final isConvert = widget.station.fixedDestination != null && convertToFG;
-    final isSendAsrsAsPW = widget.station.fixedDestination != null && !convertToFG;
+    final isSendAsrsAsPW =
+        widget.station.fixedDestination != null && !convertToFG;
 
     String title;
     String message;
     if (isConvert) {
       title = 'ยืนยัน Convert & Putaway';
-      message = 'เปลี่ยน ${_pallet!.palletId} (PW → FG)\n'
+      message =
+          'เปลี่ยน ${_pallet!.palletId} (PW → FG)\n'
           'แล้วส่งเข้า ASRS\n\n'
           'โฟล์คลิฟไร้คนขับจะมารับทันที';
     } else if (isSendAsrsAsPW) {
       title = 'ยืนยันส่งไป ASRS (ยังเป็น PW)';
-      message = 'ส่ง ${_pallet!.palletId} ไปเก็บที่ ASRS\n'
+      message =
+          'ส่ง ${_pallet!.palletId} ไปเก็บที่ ASRS\n'
           'โดยยังคงสถานะเป็น PW (ไม่ convert)\n\n'
           'โฟล์คลิฟไร้คนขับจะมารับทันที';
     } else {
       title = 'ยืนยัน Putaway';
-      message = 'เก็บ Pallet ${_pallet!.palletId}\n'
+      message =
+          'เก็บ Pallet ${_pallet!.palletId}\n'
           'ที่ ${widget.station.id} → $destLabel\n\n'
           'โฟล์คลิฟไร้คนขับจะมารับทันที';
     }
@@ -898,13 +983,19 @@ class _StationSheetState extends State<_StationSheet> {
               // ── Scan Pallet ─────────────────────
               Text(
                 _isReceive ? 'เรียก Pallet จาก ASRS' : 'สแกน Pallet',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               if (_isReceive) ...[
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'ใส่ Pallet ID (PW) ที่ต้องการเรียกจาก ASRS',
-                  style: TextStyle(fontSize: 12, color: AppTheme.textGrey),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textGrey(context),
+                  ),
                 ),
               ],
               const SizedBox(height: 10),
@@ -954,7 +1045,6 @@ class _StationSheetState extends State<_StationSheet> {
                 ],
               ],
 
-
               const SizedBox(height: 8),
             ],
           ),
@@ -970,7 +1060,7 @@ class _StationSheetState extends State<_StationSheet> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.background,
+        color: AppTheme.background(context),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade200),
       ),
@@ -982,10 +1072,10 @@ class _StationSheetState extends State<_StationSheet> {
             children: [
               Text(
                 _pallet!.palletId,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
-                  color: AppTheme.textPrimary,
+                  color: AppTheme.textPrimary(context),
                 ),
               ),
               Container(
@@ -1021,7 +1111,7 @@ class _StationSheetState extends State<_StationSheet> {
             const SizedBox(height: 4),
             Text(
               _pallet!.message,
-              style: const TextStyle(color: AppTheme.textGrey, fontSize: 12),
+              style: TextStyle(color: AppTheme.textGrey(context), fontSize: 12),
             ),
           ],
         ],
@@ -1126,14 +1216,14 @@ class _DestButton extends StatelessWidget {
           children: [
             Icon(
               icon,
-              color: selected ? Colors.white : AppTheme.textGrey,
+              color: selected ? Colors.white : AppTheme.textGrey(context),
               size: 22,
             ),
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
-                color: selected ? Colors.white : AppTheme.textPrimary,
+                color: selected ? Colors.white : AppTheme.textPrimary(context),
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
               ),
@@ -1141,7 +1231,7 @@ class _DestButton extends StatelessWidget {
             Text(
               subtitle,
               style: TextStyle(
-                color: selected ? Colors.white70 : AppTheme.textGrey,
+                color: selected ? Colors.white70 : AppTheme.textGrey(context),
                 fontSize: 10,
               ),
               textAlign: TextAlign.center,

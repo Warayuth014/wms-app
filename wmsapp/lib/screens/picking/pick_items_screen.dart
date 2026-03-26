@@ -5,6 +5,7 @@ import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import '../../models/wms_models.dart';
+import '../../widgets/part_thumbnail.dart';
 
 // ── Screen states ──────────────────────────────────────────────────────────
 enum _PickState {
@@ -262,16 +263,19 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
           title: 'Pick: $_pickOrderId',
           userName: widget.fullName,
         ),
-        body: LoadingOverlay(
-          loading: _loading,
-          message: 'กำลังดำเนินการ...',
-          child: switch (_state) {
-            _PickState.scanSource => _buildScanSource(),
-            _PickState.pickView => _buildPickView(),
-            _PickState.scanDest => _buildScanDest(),
-            _PickState.afterPick => _buildAfterPick(),
-            _PickState.returnSource => _buildReturnSource(),
-          },
+        body: SafeArea(
+          top: false,
+          child: LoadingOverlay(
+            loading: _loading,
+            message: 'กำลังดำเนินการ...',
+            child: switch (_state) {
+              _PickState.scanSource => _buildScanSource(),
+              _PickState.pickView => _buildPickView(),
+              _PickState.scanDest => _buildScanDest(),
+              _PickState.afterPick => _buildAfterPick(),
+              _PickState.returnSource => _buildReturnSource(),
+            },
+          ),
         ),
       ),
     );
@@ -312,9 +316,12 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                   ],
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'สแกน Pallet ที่ต้องการหยิบของออก',
-                  style: TextStyle(fontSize: 13, color: AppTheme.textGrey),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.textGrey(context),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 ScanTextField(
@@ -381,9 +388,9 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                     ),
                     Text(
                       'Station: ${a.stationId}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppTheme.textGrey,
+                        color: AppTheme.textGrey(context),
                       ),
                     ),
                   ],
@@ -441,10 +448,10 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.arrow_right,
                           size: 14,
-                          color: AppTheme.textGrey,
+                          color: AppTheme.textGrey(context),
                         ),
                         const SizedBox(width: 4),
                         Expanded(
@@ -472,16 +479,20 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
           const SizedBox(height: 12),
 
           // Pallet items (qty editors)
-          const Row(
+          Row(
             children: [
-              Icon(Icons.inventory_2, color: AppTheme.textPrimary, size: 18),
-              SizedBox(width: 6),
+              Icon(
+                Icons.inventory_2,
+                color: AppTheme.textPrimary(context),
+                size: 18,
+              ),
+              const SizedBox(width: 6),
               Text(
                 'รายการบน Pallet (ระบุจำนวนที่จะหยิบ)',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimary,
+                  color: AppTheme.textPrimary(context),
                 ),
               ),
             ],
@@ -517,7 +528,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.border),
+        border: Border.all(color: AppTheme.border(context)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -531,6 +542,8 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
         children: [
           Row(
             children: [
+              PartThumbnail(imageUrl: item.imageUrl, size: 40),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   item.partId,
@@ -546,11 +559,34 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
           const SizedBox(height: 4),
           Text(
             item.itemDesc,
-            style: const TextStyle(fontSize: 13, color: AppTheme.textGrey),
+            style: TextStyle(fontSize: 13, color: AppTheme.textGrey(context)),
           ),
-          Text(
-            '${item.owner} / ${item.brand}',
-            style: const TextStyle(fontSize: 12, color: AppTheme.textGrey),
+          Row(
+            children: [
+              if (item.lotNumber != null && item.lotNumber!.isNotEmpty) ...[
+                Icon(
+                  Icons.label_outline,
+                  size: 12,
+                  color: AppTheme.textGrey(context),
+                ),
+                const SizedBox(width: 2),
+                Text(
+                  'Batch No.: ${item.lotNumber}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.textGrey(context),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                '${item.owner} / ${item.brand}',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppTheme.textGrey(context),
+                ),
+              ),
+            ],
           ),
           const Divider(height: 14),
           Row(
@@ -560,9 +596,9 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                 children: [
                   Text(
                     'บน Pallet: ${item.qtyOnPallet}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: AppTheme.textGrey,
+                      color: AppTheme.textGrey(context),
                     ),
                   ),
                   if (needed > 0)
@@ -577,9 +613,12 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                 ],
               ),
               const Spacer(),
-              const Text(
+              Text(
                 'จำนวนหยิบ: ',
-                style: TextStyle(fontSize: 13, color: AppTheme.textGrey),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textGrey(context),
+                ),
               ),
               SizedBox(
                 width: 72,
@@ -704,9 +743,12 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                   ],
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'สแกน Pallet ปลายทางที่จะใส่สินค้าที่หยิบมา',
-                  style: TextStyle(fontSize: 13, color: AppTheme.textGrey),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.textGrey(context),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 ScanTextField(
@@ -777,10 +819,10 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                 const SizedBox(height: 4),
                 Text(
                   'Dest Pallet: $_destPalletId',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
+                    color: AppTheme.textPrimary(context),
                   ),
                 ),
               ],
@@ -820,10 +862,10 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                           padding: const EdgeInsets.only(bottom: 4),
                           child: Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.arrow_right,
                                 size: 14,
-                                color: AppTheme.textGrey,
+                                color: AppTheme.textGrey(context),
                               ),
                               const SizedBox(width: 4),
                               Expanded(
@@ -898,10 +940,10 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.secondary,
                 foregroundColor: Colors.white,
-                disabledBackgroundColor: AppTheme.textGrey.withValues(
-                  alpha: 0.3,
-                ),
-                disabledForegroundColor: AppTheme.textGrey,
+                disabledBackgroundColor: AppTheme.textGrey(
+                  context,
+                ).withValues(alpha: 0.3),
+                disabledForegroundColor: AppTheme.textGrey(context),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -952,28 +994,31 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                 const SizedBox(height: 8),
                 Text(
                   palletId,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
+                    color: AppTheme.textPrimary(context),
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'ไม่มีสินค้าที่ต้อง Pick บน Pallet นี้',
-                  style: TextStyle(fontSize: 14, color: AppTheme.textGrey),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppTheme.textGrey(context),
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 20),
 
-          const Text(
+          Text(
             'เลือกปลายทาง',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary,
+              color: AppTheme.textPrimary(context),
             ),
             textAlign: TextAlign.center,
           ),

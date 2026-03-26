@@ -19,53 +19,60 @@ class ReplenishmentMenuScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: WmsAppBar(title: 'Replenishment — เติมสินค้า', userName: fullName),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'เลือกประเภทการเติมสินค้า',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // ── Unload ────────────────────────
-            _MenuCard(
-              icon: Icons.upload,
-              title: 'Unload',
-              subtitle: 'ขนสินค้าออกจาก Pallet เพื่อเตรียมลงตะกร้า',
-              color: AppTheme.secondary,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => UnloadScreen(userId: userId, fullName: fullName),
+      appBar: WmsAppBar(
+        title: 'Replenishment — เติมสินค้า',
+        userName: fullName,
+      ),
+      body: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'เลือกประเภทการเติมสินค้า',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary(context),
                 ),
               ),
-            ),
+              const SizedBox(height: 16),
 
-            const SizedBox(height: 12),
-
-            // ── Load Basket ───────────────────
-            _MenuCard(
-              icon: Icons.shopping_basket,
-              title: 'Load Basket',
-              subtitle: 'โหลดสินค้าลงตะกร้าเพื่อส่งไปยังพื้นที่จำหน่าย',
-              color: AppTheme.success,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      LoadBasketScreen(userId: userId, fullName: fullName),
+              // ── Unload ────────────────────────
+              _MenuCard(
+                icon: Icons.upload,
+                title: 'Unload',
+                subtitle: 'ขนสินค้าออกจาก Pallet เพื่อเตรียมลงตะกร้า',
+                color: AppTheme.secondary,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        UnloadScreen(userId: userId, fullName: fullName),
+                  ),
                 ),
               ),
-            ),
-          ],
+
+              const SizedBox(height: 12),
+
+              // ── Load Basket ───────────────────
+              _MenuCard(
+                icon: Icons.shopping_basket,
+                title: 'Load Basket',
+                subtitle: 'โหลดสินค้าลงตะกร้าเพื่อส่งไปยังพื้นที่จำหน่าย',
+                color: AppTheme.success,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        LoadBasketScreen(userId: userId, fullName: fullName),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

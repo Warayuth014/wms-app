@@ -6,6 +6,7 @@ import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../models/wms_models.dart';
+import '../../widgets/part_thumbnail.dart';
 import 'unload_screen.dart';
 
 class ScanPalletScreen extends StatefulWidget {
@@ -167,91 +168,94 @@ class _ScanPalletScreenState extends State<ScanPalletScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: WmsAppBar(title: 'Flow 2 — Unload', userName: widget.fullName),
-      body: Column(
-        children: [
-          if (!_isOnline) const OfflineBanner(pendingCount: 0),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            if (!_isOnline) const OfflineBanner(pendingCount: 0),
 
-          Expanded(
-            child: LoadingOverlay(
-              loading: _loadingSession || _loadingLabeling,
-              message: _loadingLabeling
-                  ? 'กำลังอัปเดตสถานะ...'
-                  : 'กำลังเปิด session...',
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ── Step Indicator ──────────
-                    _buildStepIndicator(),
-                    const SizedBox(height: 20),
+            Expanded(
+              child: LoadingOverlay(
+                loading: _loadingSession || _loadingLabeling,
+                message: _loadingLabeling
+                    ? 'กำลังอัปเดตสถานะ...'
+                    : 'กำลังเปิด session...',
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── Step Indicator ──────────
+                      _buildStepIndicator(),
+                      const SizedBox(height: 20),
 
-                    // ── Scan Pallet ─────────────
-                    WmsCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'สแกน Pallet',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
+                      // ── Scan Pallet ─────────────
+                      WmsCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'สแกน Pallet',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          ScanTextField(
-                            label: 'Pallet ID',
-                            hint: 'เช่น PAL-001',
-                            controller: _palletController,
-                            onSubmit: _scanPallet,
-                          ),
-                          const SizedBox(height: 12),
-                          PrimaryButton(
-                            label: 'ค้นหา Pallet',
-                            icon: Icons.search,
-                            loading: _loadingPallet,
-                            onPressed: _scanPallet,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // ── Pallet Result ───────────
-                    if (_pallet != null) ...[
-                      _buildPalletInfo(),
-                      const SizedBox(height: 16),
-
-                      // ── PW Alert ───────────────
-                      if (_pallet!.needsLabeling) ...[
-                        _buildPWAlert(),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // ── Items List ─────────────
-                      _buildItemsList(),
-                      const SizedBox(height: 16),
-
-                      // ── Action Button ──────────
-                      if (_pallet!.needsLabeling)
-                        PrimaryButton(
-                          label: 'ติดสติ๊กเกอร์แล้ว',
-                          icon: Icons.label,
-                          onPressed: _confirmLabeling,
-                        )
-                      else
-                        PrimaryButton(
-                          label: 'เริ่ม Unload',
-                          icon: Icons.output,
-                          onPressed: _openUnloadSession,
+                            const SizedBox(height: 12),
+                            ScanTextField(
+                              label: 'Pallet ID',
+                              hint: 'เช่น PAL-001',
+                              controller: _palletController,
+                              onSubmit: _scanPallet,
+                            ),
+                            const SizedBox(height: 12),
+                            PrimaryButton(
+                              label: 'ค้นหา Pallet',
+                              icon: Icons.search,
+                              loading: _loadingPallet,
+                              onPressed: _scanPallet,
+                            ),
+                          ],
                         ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // ── Pallet Result ───────────
+                      if (_pallet != null) ...[
+                        _buildPalletInfo(),
+                        const SizedBox(height: 16),
+
+                        // ── PW Alert ───────────────
+                        if (_pallet!.needsLabeling) ...[
+                          _buildPWAlert(),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // ── Items List ─────────────
+                        _buildItemsList(),
+                        const SizedBox(height: 16),
+
+                        // ── Action Button ──────────
+                        if (_pallet!.needsLabeling)
+                          PrimaryButton(
+                            label: 'ติดสติ๊กเกอร์แล้ว',
+                            icon: Icons.label,
+                            onPressed: _confirmLabeling,
+                          )
+                        else
+                          PrimaryButton(
+                            label: 'เริ่ม Unload',
+                            icon: Icons.output,
+                            onPressed: _openUnloadSession,
+                          ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -294,15 +298,15 @@ class _ScanPalletScreenState extends State<ScanPalletScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.warning.withValues(alpha: 0.4)),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.warning_amber, color: AppTheme.warning, size: 28),
-          SizedBox(width: 12),
+          const Icon(Icons.warning_amber, color: AppTheme.warning, size: 28),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'ต้องติดสติ๊กเกอร์ก่อน',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
@@ -310,10 +314,13 @@ class _ScanPalletScreenState extends State<ScanPalletScreen> {
                     fontSize: 15,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   'Pallet นี้เป็นประเภท PW\nกรุณาส่งไปจุด Labeling\nแล้วกดยืนยันเมื่อติดสติ๊กเกอร์เรียบร้อย',
-                  style: TextStyle(color: AppTheme.textGrey, fontSize: 13),
+                  style: TextStyle(
+                    color: AppTheme.textGrey(context),
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
@@ -339,40 +346,46 @@ class _ScanPalletScreenState extends State<ScanPalletScreen> {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.background,
+                color: AppTheme.background(context),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        item.partId,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
+                      PartThumbnail(imageUrl: item.imageUrl, size: 36),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          item.partId,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
-                      Row(
-                        children: [
-                          Text(
-                            '${item.qty} ชิ้น',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(width: 8),
-                          StatusBadge(item.condition),
-                        ],
+                      Text(
+                        '${item.qty} ชิ้น',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
+                      const SizedBox(width: 8),
+                      StatusBadge(item.condition),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${item.owner} · ${item.itemDesc}',
-                    style: const TextStyle(
-                      color: AppTheme.textGrey,
+                    item.itemDesc,
+                    style: TextStyle(
+                      color: AppTheme.textGrey(context),
                       fontSize: 12,
+                    ),
+                  ),
+                  Text(
+                    '${item.owner} / ${item.brand}',
+                    style: TextStyle(
+                      color: AppTheme.textGrey(context),
+                      fontSize: 11,
                     ),
                   ),
                   if (item.lotNumber != null || item.expiredDate != null) ...[
@@ -380,7 +393,10 @@ class _ScanPalletScreenState extends State<ScanPalletScreen> {
                     Row(
                       children: [
                         if (item.lotNumber != null)
-                          _InfoChip(icon: Icons.tag, label: item.lotNumber!),
+                          _InfoChip(
+                            icon: Icons.label_outline,
+                            label: 'Batch No.: ${item.lotNumber!}',
+                          ),
                         if (item.expiredDate != null) ...[
                           const SizedBox(width: 8),
                           _InfoChip(
@@ -425,11 +441,11 @@ class _InfoChip extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 12, color: AppTheme.textGrey),
+        Icon(icon, size: 12, color: AppTheme.textGrey(context)),
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: AppTheme.textGrey),
+          style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
         ),
       ],
     );

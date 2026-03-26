@@ -46,7 +46,14 @@
       "Bash(curl -s http://localhost:5000/api/unload/scan-pallet/PAL-003)",
       "Bash(tasklist)",
       "Bash(netstat -ano)",
-      "Bash(dotnet run:*)"
+      "Bash(dotnet run:*)",
+      "Bash(flutter build:*)",
+      "Bash(xargs ls:*)",
+      "Bash(grep -v \"^.\\\\{0,30\\\\}$\")",
+      "Bash(flutter pub:*)",
+      "Bash(flutter clean:*)",
+      "Bash(dart format:*)",
+      "Bash(dart analyze:*)"
     ]
   }
 }

@@ -1,10 +1,11 @@
 // lib/widgets/common_widgets.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/theme.dart';
 
 // =============================================
-// WmsAppBar
+// WmsAppBar — theme-aware, modern
 // =============================================
 class WmsAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
@@ -31,10 +32,10 @@ class WmsAppBar extends StatelessWidget implements PreferredSizeWidget {
           if (userName != null)
             Text(
               userName!,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w400,
-                color: Colors.white70,
+                color: Colors.white.withValues(alpha: 0.7),
               ),
             ),
         ],
@@ -45,19 +46,21 @@ class WmsAppBar extends StatelessWidget implements PreferredSizeWidget {
 }
 
 // =============================================
-// WmsCard
+// WmsCard — theme-aware card
 // =============================================
 class WmsCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
+  final Color? color;
 
-  const WmsCard({super.key, required this.child, this.padding});
+  const WmsCard({super.key, required this.child, this.padding, this.color});
 
   @override
   Widget build(BuildContext context) {
     return Card(
+      color: color ?? Theme.of(context).cardColor,
       child: Padding(
-        padding: padding ?? const EdgeInsets.all(16),
+        padding: padding ?? const EdgeInsets.all(AppTheme.spacingMd),
         child: child,
       ),
     );
@@ -65,7 +68,7 @@ class WmsCard extends StatelessWidget {
 }
 
 // =============================================
-// ScanTextField
+// ScanTextField — large touch target, theme-aware
 // =============================================
 class ScanTextField extends StatelessWidget {
   final String label;
@@ -95,15 +98,33 @@ class ScanTextField extends StatelessWidget {
       enabled: enabled,
       keyboardType: keyboardType,
       textInputAction: TextInputAction.search,
+      style: TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+        color: AppTheme.textPrimary(context),
+      ),
       onSubmitted: (_) => onSubmit(),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        prefixIcon: const Icon(Icons.qr_code_scanner),
-        suffixIcon: IconButton(
-          icon: const Icon(Icons.send),
-          onPressed: enabled ? onSubmit : null,
+        prefixIcon: Icon(
+          Icons.qr_code_scanner_rounded,
           color: AppTheme.primary,
+        ),
+        suffixIcon: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+            onTap: enabled ? onSubmit : null,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Icon(
+                Icons.send_rounded,
+                color: enabled ? AppTheme.primary : AppTheme.textGrey(context),
+                size: 22,
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -111,13 +132,14 @@ class ScanTextField extends StatelessWidget {
 }
 
 // =============================================
-// PrimaryButton
+// PrimaryButton — large, accessible
 // =============================================
 class PrimaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
   final bool loading;
   final IconData? icon;
+  final Color? color;
 
   const PrimaryButton({
     super.key,
@@ -125,31 +147,48 @@ class PrimaryButton extends StatelessWidget {
     this.onPressed,
     this.loading = false,
     this.icon,
+    this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     return ElevatedButton(
       onPressed: loading ? null : onPressed,
-      child: loading
-          ? const SizedBox(
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(
-                color: Colors.white,
-                strokeWidth: 2,
-              ),
+      style: color != null
+          ? ElevatedButton.styleFrom(
+              backgroundColor: color,
+              foregroundColor: Colors.white,
             )
-          : Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (icon != null) ...[
-                  Icon(icon, size: 20),
-                  const SizedBox(width: 8),
+          : null,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        child: loading
+            ? const SizedBox(
+                key: ValueKey('loading'),
+                height: 22,
+                width: 22,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              )
+            : Row(
+                key: const ValueKey('content'),
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 20),
+                    const SizedBox(width: 8),
+                  ],
+                  Flexible(
+                    child: Text(
+                      label,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
-                Text(label),
-              ],
-            ),
+              ),
+      ),
     );
   }
 }
@@ -161,30 +200,36 @@ class DangerButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
+  final bool loading;
 
   const DangerButton({
     super.key,
     required this.label,
     this.onPressed,
     this.icon,
+    this.loading = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return ElevatedButton(
-      onPressed: onPressed,
+      onPressed: loading ? null : onPressed,
       style: ElevatedButton.styleFrom(
         backgroundColor: AppTheme.danger,
         foregroundColor: Colors.white,
-        minimumSize: const Size(double.infinity, 52),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (icon != null) ...[Icon(icon, size: 20), const SizedBox(width: 8)],
-          Text(label),
-        ],
-      ),
+      child: loading
+          ? const SizedBox(
+              height: 22, width: 22,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (icon != null) ...[Icon(icon, size: 20), const SizedBox(width: 8)],
+                Text(label),
+              ],
+            ),
     );
   }
 }
@@ -211,7 +256,6 @@ class WarningButton extends StatelessWidget {
       style: ElevatedButton.styleFrom(
         backgroundColor: AppTheme.warning,
         foregroundColor: Colors.white,
-        minimumSize: const Size(double.infinity, 52),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -225,12 +269,13 @@ class WarningButton extends StatelessWidget {
 }
 
 // =============================================
-// StatusBadge
+// StatusBadge — theme-aware
 // =============================================
 class StatusBadge extends StatelessWidget {
   final String status;
+  final double? fontSize;
 
-  const StatusBadge(this.status, {super.key});
+  const StatusBadge(this.status, {super.key, this.fontSize});
 
   Color get _color => switch (status.toUpperCase()) {
     'FG' => AppTheme.success,
@@ -238,34 +283,37 @@ class StatusBadge extends StatelessWidget {
     'DAMAGED' => AppTheme.danger,
     'RECEIVED' => AppTheme.primary,
     'PARTIAL' => AppTheme.warning,
-    'PENDING' => AppTheme.textGrey,
+    'PENDING' => const Color(0xFF78909C),
     'CONFIRMED' => AppTheme.success,
     'LOADED' => AppTheme.success,
     'CANCELLED' => AppTheme.danger,
     'NORMAL' => AppTheme.success,
     'OPEN' => AppTheme.primary,
-    'CLOSED' => AppTheme.textGrey,
+    'CLOSED' => const Color(0xFF78909C),
     'STEP1' => AppTheme.warning,
     'STEP2' => AppTheme.secondary,
     'COMPLETED' => AppTheme.success,
-    _ => AppTheme.textGrey,
+    'OPERATOR' => AppTheme.primary,
+    'SUPERVISOR' => AppTheme.purple,
+    _ => const Color(0xFF78909C),
   };
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(
         color: _color.withValues(alpha: 0.12),
-        border: Border.all(color: _color, width: 1),
-        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _color.withValues(alpha: 0.4), width: 1),
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
       ),
       child: Text(
         status.toUpperCase(),
         style: TextStyle(
           color: _color,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
+          fontSize: fontSize ?? 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.3,
         ),
       ),
     );
@@ -273,7 +321,7 @@ class StatusBadge extends StatelessWidget {
 }
 
 // =============================================
-// InfoRow
+// InfoRow — theme-aware
 // =============================================
 class InfoRow extends StatelessWidget {
   final String label;
@@ -300,7 +348,10 @@ class InfoRow extends StatelessWidget {
             width: 110,
             child: Text(
               label,
-              style: const TextStyle(color: AppTheme.textGrey, fontSize: 14),
+              style: TextStyle(
+                color: AppTheme.textGrey(context),
+                fontSize: 13,
+              ),
             ),
           ),
           Expanded(
@@ -309,7 +360,7 @@ class InfoRow extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-                color: valueColor ?? AppTheme.textPrimary,
+                color: valueColor ?? AppTheme.textPrimary(context),
               ),
             ),
           ),
@@ -320,7 +371,7 @@ class InfoRow extends StatelessWidget {
 }
 
 // =============================================
-// OfflineBanner
+// OfflineBanner — theme-aware
 // =============================================
 class OfflineBanner extends StatelessWidget {
   final int pendingCount;
@@ -331,15 +382,19 @@ class OfflineBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: AppTheme.warning,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFE65100), Color(0xFFF57C00)],
+        ),
+      ),
       child: Row(
         children: [
-          const Icon(Icons.wifi_off, color: Colors.white, size: 16),
-          const SizedBox(width: 8),
+          const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'ออฟไลน์ — มี $pendingCount รายการรอ sync',
+              'Offline — $pendingCount pending sync',
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 13,
@@ -354,7 +409,7 @@ class OfflineBanner extends StatelessWidget {
 }
 
 // =============================================
-// LoadingOverlay
+// LoadingOverlay — modern glass effect
 // =============================================
 class LoadingOverlay extends StatelessWidget {
   final bool loading;
@@ -375,17 +430,39 @@ class LoadingOverlay extends StatelessWidget {
         child,
         if (loading)
           Container(
-            color: Colors.black.withValues(alpha: 0.3),
+            color: Colors.black.withValues(alpha: 0.35),
             child: Center(
-              child: WmsCard(
-                padding: const EdgeInsets.all(24),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 20,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const CircularProgressIndicator(),
+                    const SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: CircularProgressIndicator(strokeWidth: 3),
+                    ),
                     if (message != null) ...[
                       const SizedBox(height: 16),
-                      Text(message!, style: const TextStyle(fontSize: 14)),
+                      Text(
+                        message!,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.textPrimary(context),
+                        ),
+                      ),
                     ],
                   ],
                 ),
@@ -398,7 +475,7 @@ class LoadingOverlay extends StatelessWidget {
 }
 
 // =============================================
-// ConfirmDialog
+// ConfirmDialog — modern
 // =============================================
 Future<bool> showConfirmDialog(
   BuildContext context, {
@@ -411,21 +488,29 @@ Future<bool> showConfirmDialog(
   final result = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-      content: Text(message),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+      content: Text(
+        message,
+        style: TextStyle(
+          height: 1.5,
+          color: AppTheme.textGrey(ctx),
+          fontSize: 14,
+        ),
+      ),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx, false),
           child: Text(
             cancelLabel,
-            style: const TextStyle(color: AppTheme.textGrey),
+            style: TextStyle(color: AppTheme.textGrey(ctx)),
           ),
         ),
         ElevatedButton(
           onPressed: () => Navigator.pop(ctx, true),
           style: ElevatedButton.styleFrom(
             backgroundColor: isDanger ? AppTheme.danger : AppTheme.primary,
+            minimumSize: const Size(100, 44),
           ),
           child: Text(confirmLabel),
         ),
@@ -436,7 +521,7 @@ Future<bool> showConfirmDialog(
 }
 
 // =============================================
-// ErrorDialog
+// ErrorDialog — modern with icon
 // =============================================
 Future<void> showErrorDialog(
   BuildContext context, {
@@ -446,17 +531,31 @@ Future<void> showErrorDialog(
   await showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       title: Row(
         children: [
-          const Icon(Icons.error_outline, color: AppTheme.danger),
-          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.danger.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+            ),
+            child: const Icon(Icons.error_outline_rounded, color: AppTheme.danger, size: 22),
+          ),
+          const SizedBox(width: 12),
           Expanded(
-            child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+            child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
           ),
         ],
       ),
-      content: Text(message, style: const TextStyle(height: 1.5)),
+      content: Text(
+        message,
+        style: TextStyle(
+          height: 1.5,
+          color: AppTheme.textGrey(ctx),
+          fontSize: 14,
+        ),
+      ),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       actions: [
         ElevatedButton(
           onPressed: () => Navigator.pop(ctx),
@@ -468,21 +567,30 @@ Future<void> showErrorDialog(
 }
 
 // =============================================
-// SuccessSnackbar
+// SuccessSnackbar — modern
 // =============================================
 void showSuccessSnackbar(BuildContext context, String message) {
+  HapticFeedback.lightImpact();
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Row(
         children: [
-          const Icon(Icons.check_circle, color: Colors.white),
-          const SizedBox(width: 8),
-          Expanded(child: Text(message)),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: const BoxDecoration(
+              color: Colors.white24,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check_rounded, color: Colors.white, size: 16),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(message, style: const TextStyle(fontWeight: FontWeight.w500)),
+          ),
         ],
       ),
       backgroundColor: AppTheme.success,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      duration: const Duration(seconds: 3),
     ),
   );
 }
@@ -491,18 +599,132 @@ void showSuccessSnackbar(BuildContext context, String message) {
 // WarningSnackbar
 // =============================================
 void showWarningSnackbar(BuildContext context, String message) {
+  HapticFeedback.mediumImpact();
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Row(
         children: [
-          const Icon(Icons.warning_amber, color: Colors.white),
-          const SizedBox(width: 8),
-          Expanded(child: Text(message)),
+          const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(message, style: const TextStyle(fontWeight: FontWeight.w500)),
+          ),
         ],
       ),
       backgroundColor: AppTheme.warning,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      duration: const Duration(seconds: 3),
     ),
   );
+}
+
+// =============================================
+// SectionHeader — reusable section title
+// =============================================
+class SectionHeader extends StatelessWidget {
+  final String title;
+  final IconData? icon;
+  final Widget? trailing;
+
+  const SectionHeader({
+    super.key,
+    required this.title,
+    this.icon,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 18, color: AppTheme.textGrey(context)),
+          const SizedBox(width: 8),
+        ],
+        Expanded(
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimary(context),
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+        if (trailing != null) trailing!,
+      ],
+    );
+  }
+}
+
+// =============================================
+// EmptyState — centered empty message
+// =============================================
+class EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final VoidCallback? onRetry;
+
+  const EmptyState({
+    super.key,
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppTheme.textGrey(context).withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 48, color: AppTheme.textGrey(context).withValues(alpha: 0.4)),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textGrey(context),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                subtitle!,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textGrey(context).withValues(alpha: 0.7),
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+            if (onRetry != null) ...[
+              const SizedBox(height: 20),
+              OutlinedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('ลองใหม่'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(120, 44),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }

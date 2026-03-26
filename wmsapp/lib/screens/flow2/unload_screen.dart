@@ -6,6 +6,7 @@ import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import '../../models/wms_models.dart';
+import '../../widgets/part_thumbnail.dart';
 
 class UnloadScreen extends StatefulWidget {
   final String userId;
@@ -368,40 +369,43 @@ class _UnloadScreenState extends State<UnloadScreen>
   Widget _buildReturnAnimation() {
     return Scaffold(
       appBar: WmsAppBar(title: 'Unload', userName: widget.fullName),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedBuilder(
-              animation: _arrowAnimation,
-              builder: (_, __) => Transform.translate(
-                offset: Offset(0, _arrowAnimation.value),
-                child: const Icon(
-                  Icons.arrow_upward,
-                  color: AppTheme.warning,
-                  size: 80,
+      body: SafeArea(
+        top: false,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedBuilder(
+                animation: _arrowAnimation,
+                builder: (_, __) => Transform.translate(
+                  offset: Offset(0, _arrowAnimation.value),
+                  child: const Icon(
+                    Icons.arrow_upward,
+                    color: AppTheme.warning,
+                    size: 80,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 32),
-            const Icon(Icons.forklift, color: AppTheme.textGrey, size: 56),
-            const SizedBox(height: 24),
-            const Text(
-              'โฟล์คลิฟกำลังรับ Pallet...',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
+              const SizedBox(height: 32),
+              Icon(Icons.forklift, color: AppTheme.textGrey(context), size: 56),
+              const SizedBox(height: 24),
+              Text(
+                'โฟล์คลิฟกำลังรับ Pallet...',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary(context),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'กรุณารอสักครู่',
-              style: TextStyle(color: AppTheme.textGrey),
-            ),
-            const SizedBox(height: 32),
-            const _CountdownTimer(seconds: 5),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'กรุณารอสักครู่',
+                style: TextStyle(color: AppTheme.textGrey(context)),
+              ),
+              const SizedBox(height: 32),
+              const _CountdownTimer(seconds: 5),
+            ],
+          ),
         ),
       ),
     );
@@ -426,144 +430,153 @@ class _UnloadScreenState extends State<UnloadScreen>
               ),
           ],
         ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Progress (ถ้ามี session) ──
-              if (_sessionOpen) ...[
-                _buildProgressBar(),
-                const SizedBox(height: 16),
-              ],
+        body: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Progress (ถ้ามี session) ──
+                if (_sessionOpen) ...[
+                  _buildProgressBar(),
+                  const SizedBox(height: 16),
+                ],
 
-              // ── Scan Pallet ───────────────
-              if (!_sessionOpen) ...[
-                const Text(
-                  'สแกน Pallet',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ScanTextField(
-                  controller: _palletController,
-                  label: 'Pallet ID เช่น PAL-001',
-                  hint: 'PAL-001',
-                  onSubmit: _scanPallet,
-                ),
-              ],
-
-              // ── Pallet Info ───────────────
-              if (_pallet != null) ...[
-                WmsCard(
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.inventory_2,
-                        color: AppTheme.primary,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _pallet!.palletId,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
-                              ),
-                            ),
-                            Text(
-                              'Session #$_sessionId · ${_pallet!.items.length} รายการ',
-                              style: const TextStyle(
-                                color: AppTheme.textGrey,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        '$_confirmedCount/$_totalCount',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // ── Scan Part ─────────────────
-              if (_sessionOpen) ...[
-                const Text(
-                  'สแกน Part',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ScanTextField(
-                  controller: _partController,
-                  label: 'Part ID เช่น PT-1122',
-                  hint: 'PT-1122',
-                  onSubmit: _scanPart,
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // ── Items List (with qty editors) ──
-              if (_partStatus.isNotEmpty) _buildItemsList(),
-
-              // ── Confirm Unload button (เมื่อ scan part แล้ว) ──
-              if (_scannedPartId != null) ...[
-                const SizedBox(height: 12),
-                PrimaryButton(
-                  label: 'ยืนยัน Unload: $_scannedPartId',
-                  icon: Icons.check,
-                  onPressed: _confirmScannedPart,
-                ),
-                const SizedBox(height: 8),
-                DangerButton(
-                  label: 'ยกเลิก',
-                  icon: Icons.close,
-                  onPressed: () {
-                    setState(() => _scannedPartId = null);
-                    _partFocus.requestFocus();
-                  },
-                ),
-              ],
-
-              // ── Return Pallet button ──────
-              if (_sessionOpen) ...[
-                const SizedBox(height: 20),
-                OutlinedButton.icon(
-                  onPressed: _returnPallet,
-                  icon: const Icon(Icons.reply, color: AppTheme.danger),
-                  label: const Text(
-                    'คืน Pallet',
-                    style: TextStyle(color: AppTheme.danger, fontWeight: FontWeight.w700),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppTheme.danger, width: 1.5),
-                    minimumSize: const Size(double.infinity, 52),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                // ── Scan Pallet ───────────────
+                if (!_sessionOpen) ...[
+                  Text(
+                    'สแกน Pallet',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary(context),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  ScanTextField(
+                    controller: _palletController,
+                    label: 'Pallet ID เช่น PAL-001',
+                    hint: 'PAL-001',
+                    onSubmit: _scanPallet,
+                  ),
+                ],
+
+                // ── Pallet Info ───────────────
+                if (_pallet != null) ...[
+                  WmsCard(
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.inventory_2,
+                          color: AppTheme.primary,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _pallet!.palletId,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                'Session #$_sessionId · ${_pallet!.items.length} รายการ',
+                                style: TextStyle(
+                                  color: AppTheme.textGrey(context),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          '$_confirmedCount/$_totalCount',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // ── Scan Part ─────────────────
+                if (_sessionOpen) ...[
+                  Text(
+                    'สแกน Part',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary(context),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ScanTextField(
+                    controller: _partController,
+                    label: 'Part ID เช่น PT-1122',
+                    hint: 'PT-1122',
+                    onSubmit: _scanPart,
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // ── Items List (with qty editors) ──
+                if (_partStatus.isNotEmpty) _buildItemsList(),
+
+                // ── Confirm Unload button (เมื่อ scan part แล้ว) ──
+                if (_scannedPartId != null) ...[
+                  const SizedBox(height: 12),
+                  PrimaryButton(
+                    label: 'ยืนยัน Unload: $_scannedPartId',
+                    icon: Icons.check,
+                    onPressed: _confirmScannedPart,
+                  ),
+                  const SizedBox(height: 8),
+                  DangerButton(
+                    label: 'ยกเลิก',
+                    icon: Icons.close,
+                    onPressed: () {
+                      setState(() => _scannedPartId = null);
+                      _partFocus.requestFocus();
+                    },
+                  ),
+                ],
+
+                // ── Return Pallet button ──────
+                if (_sessionOpen) ...[
+                  const SizedBox(height: 20),
+                  OutlinedButton.icon(
+                    onPressed: _returnPallet,
+                    icon: const Icon(Icons.reply, color: AppTheme.danger),
+                    label: const Text(
+                      'คืน Pallet',
+                      style: TextStyle(
+                        color: AppTheme.danger,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(
+                        color: AppTheme.danger,
+                        width: 1.5,
+                      ),
+                      minimumSize: const Size(double.infinity, 52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -620,16 +633,20 @@ class _UnloadScreenState extends State<UnloadScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (pending.isNotEmpty) ...[
-          const Row(
+          Row(
             children: [
-              Icon(Icons.inventory_2, color: AppTheme.textPrimary, size: 18),
-              SizedBox(width: 6),
+              Icon(
+                Icons.inventory_2,
+                color: AppTheme.textPrimary(context),
+                size: 18,
+              ),
+              const SizedBox(width: 6),
               Text(
                 'รอ Unload (ระบุจำนวนที่จะหยิบออก)',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimary,
+                  color: AppTheme.textPrimary(context),
                 ),
               ),
             ],
@@ -665,15 +682,15 @@ class _UnloadScreenState extends State<UnloadScreen>
         color: confirmed
             ? AppTheme.success.withValues(alpha: 0.05)
             : isScanned
-                ? AppTheme.primary.withValues(alpha: 0.08)
-                : Colors.white,
+            ? AppTheme.primary.withValues(alpha: 0.08)
+            : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: confirmed
               ? AppTheme.success.withValues(alpha: 0.3)
               : isScanned
-                  ? AppTheme.primary
-                  : AppTheme.border,
+              ? AppTheme.primary
+              : AppTheme.border(context),
           width: isScanned ? 2 : 1,
         ),
         boxShadow: [
@@ -690,13 +707,15 @@ class _UnloadScreenState extends State<UnloadScreen>
         children: [
           Row(
             children: [
+              PartThumbnail(imageUrl: item.imageUrl, size: 36),
+              const SizedBox(width: 10),
               Icon(
                 confirmed ? Icons.check_circle : Icons.radio_button_unchecked,
                 color: confirmed
                     ? AppTheme.success
                     : isScanned
-                        ? AppTheme.primary
-                        : Colors.grey,
+                    ? AppTheme.primary
+                    : Colors.grey,
                 size: 20,
               ),
               const SizedBox(width: 10),
@@ -713,17 +732,48 @@ class _UnloadScreenState extends State<UnloadScreen>
                     ),
                     Text(
                       item.itemDesc,
-                      style: const TextStyle(
-                        color: AppTheme.textGrey,
+                      style: TextStyle(
+                        color: AppTheme.textGrey(context),
                         fontSize: 12,
                       ),
+                    ),
+                    Row(
+                      children: [
+                        if (item.lotNumber != null &&
+                            item.lotNumber!.isNotEmpty) ...[
+                          Icon(
+                            Icons.label_outline,
+                            size: 12,
+                            color: AppTheme.textGrey(context),
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            'Batch No.: ${item.lotNumber}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textGrey(context),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(
+                          '${item.owner} / ${item.brand}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textGrey(context),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
               if (isScanned)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.primary,
                     borderRadius: BorderRadius.circular(6),
@@ -748,24 +798,27 @@ class _UnloadScreenState extends State<UnloadScreen>
                   children: [
                     Text(
                       'บน Pallet: ${item.qty} ชิ้น',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        color: AppTheme.textGrey,
+                        color: AppTheme.textGrey(context),
                       ),
                     ),
                     Text(
                       '${item.owner} / ${item.brand}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppTheme.textGrey,
+                        color: AppTheme.textGrey(context),
                       ),
                     ),
                   ],
                 ),
                 const Spacer(),
-                const Text(
+                Text(
                   'จำนวน Unload: ',
-                  style: TextStyle(fontSize: 13, color: AppTheme.textGrey),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.textGrey(context),
+                  ),
                 ),
                 SizedBox(
                   width: 72,
@@ -799,9 +852,9 @@ class _UnloadScreenState extends State<UnloadScreen>
               children: [
                 Text(
                   '${item.owner} / ${item.brand}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppTheme.textGrey,
+                    color: AppTheme.textGrey(context),
                   ),
                 ),
                 const Spacer(),

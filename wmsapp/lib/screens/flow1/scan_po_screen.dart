@@ -8,6 +8,7 @@ import '../../services/offline_service.dart';
 import '../../services/connectivity_service.dart';
 import '../../models/wms_models.dart';
 import 'scan_part_screen.dart';
+import '../../widgets/part_thumbnail.dart';
 
 class ScanPoScreen extends StatefulWidget {
   final String userId;
@@ -172,117 +173,123 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: WmsAppBar(title: 'รับสินค้าจาก PO', userName: widget.fullName),
-      body: Column(
-        children: [
-          if (!_isOnline) const OfflineBanner(pendingCount: 0),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            if (!_isOnline) const OfflineBanner(pendingCount: 0),
 
-          Expanded(
-            child: LoadingOverlay(
-              loading: _loadingSession,
-              message: 'กำลังเปิด session...',
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ── Step Indicator ──────────
-                    _buildStepIndicator(),
-                    const SizedBox(height: 20),
+            Expanded(
+              child: LoadingOverlay(
+                loading: _loadingSession,
+                message: 'กำลังเปิด session...',
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── Step Indicator ──────────
+                      _buildStepIndicator(),
+                      const SizedBox(height: 20),
 
-                    // ── Scan PO ─────────────────
-                    WmsCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'สแกน PO Invoice',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          ScanTextField(
-                            label: 'PO ID',
-                            hint: 'เช่น PO-001',
-                            controller: _poController,
-                            onSubmit: _scanPO,
-                          ),
-                          const SizedBox(height: 12),
-                          PrimaryButton(
-                            label: 'ค้นหา PO',
-                            icon: Icons.search,
-                            loading: _loadingPO,
-                            onPressed: _scanPO,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // ── PO Result ───────────────
-                    if (_po != null) ...[
-                      _buildPOInfo(),
-                      const SizedBox(height: 16),
-                      _buildPOItems(),
-                      const SizedBox(height: 16),
-
-                      // ปุ่มเริ่ม/ทำต่อ session
-                      if (_po!.status != 'RECEIVED') ...[
-                        if (_activeSession != null) ...[
-                          PrimaryButton(
-                            label:
-                                'ทำต่อจาก session เดิม (${_activeSession!.sessionId})',
-                            icon: Icons.play_circle,
-                            onPressed: _resumeSession,
-                          ),
-                          const SizedBox(height: 8),
-                          OutlinedButton.icon(
-                            onPressed: _openSession,
-                            icon: const Icon(
-                              Icons.add_circle_outline,
-                              size: 18,
-                            ),
-                            label: const Text('เปิด session ใหม่'),
-                          ),
-                        ] else
-                          PrimaryButton(
-                            label: 'เริ่มรับสินค้า',
-                            icon: Icons.play_arrow,
-                            onPressed: _openSession,
-                          ),
-                      ] else
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppTheme.success.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: AppTheme.success.withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.check_circle, color: AppTheme.success),
-                              SizedBox(width: 8),
-                              Text(
-                                'PO นี้รับสินค้าครบแล้ว',
-                                style: TextStyle(
-                                  color: AppTheme.success,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                      // ── Scan PO ─────────────────
+                      WmsCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'สแกน PO Invoice',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(height: 12),
+                            ScanTextField(
+                              label: 'PO ID',
+                              hint: 'เช่น PO-001',
+                              controller: _poController,
+                              onSubmit: _scanPO,
+                            ),
+                            const SizedBox(height: 12),
+                            PrimaryButton(
+                              label: 'ค้นหา PO',
+                              icon: Icons.search,
+                              loading: _loadingPO,
+                              onPressed: _scanPO,
+                            ),
+                          ],
                         ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // ── PO Result ───────────────
+                      if (_po != null) ...[
+                        _buildPOInfo(),
+                        const SizedBox(height: 16),
+                        _buildPOItems(),
+                        const SizedBox(height: 16),
+
+                        // ปุ่มเริ่ม/ทำต่อ session
+                        if (_po!.status != 'RECEIVED') ...[
+                          if (_activeSession != null) ...[
+                            PrimaryButton(
+                              label:
+                                  'ทำต่อจาก session เดิม (${_activeSession!.sessionId})',
+                              icon: Icons.play_circle,
+                              onPressed: _resumeSession,
+                            ),
+                            const SizedBox(height: 8),
+                            OutlinedButton.icon(
+                              onPressed: _openSession,
+                              icon: const Icon(
+                                Icons.add_circle_outline,
+                                size: 18,
+                              ),
+                              label: const Text('เปิด session ใหม่'),
+                            ),
+                          ] else
+                            PrimaryButton(
+                              label: 'เริ่มรับสินค้า',
+                              icon: Icons.play_arrow,
+                              onPressed: _openSession,
+                            ),
+                        ] else
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppTheme.success.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: AppTheme.success.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.check_circle,
+                                  color: AppTheme.success,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'PO นี้รับสินค้าครบแล้ว',
+                                  style: TextStyle(
+                                    color: AppTheme.success,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -336,7 +343,7 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.background,
+                color: AppTheme.background(context),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: item.status == 'RECEIVED'
@@ -346,20 +353,8 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
               ),
               child: Row(
                 children: [
-                  // Check icon
-                  Icon(
-                    item.status == 'RECEIVED'
-                        ? Icons.check_circle
-                        : item.status == 'PARTIAL'
-                        ? Icons.incomplete_circle
-                        : Icons.radio_button_unchecked,
-                    color: item.status == 'RECEIVED'
-                        ? AppTheme.success
-                        : item.status == 'PARTIAL'
-                        ? AppTheme.warning
-                        : Colors.grey,
-                    size: 20,
-                  ),
+                  // Product thumbnail
+                  PartThumbnail(imageUrl: item.imageUrl),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -374,9 +369,41 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
                         ),
                         Text(
                           item.itemDesc,
-                          style: const TextStyle(
-                            color: AppTheme.textGrey,
+                          style: TextStyle(
+                            color: AppTheme.textGrey(context),
                             fontSize: 12,
+                          ),
+                        ),
+                        // ── Batch No + Condition ──
+                        Row(
+                          children: [
+                            if (item.lotNumber != null &&
+                                item.lotNumber!.isNotEmpty) ...[
+                              Icon(
+                                Icons.label_outline,
+                                size: 12,
+                                color: AppTheme.textGrey(context),
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                "Batch No.: ${item.lotNumber!}",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.textGrey(context),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            StatusBadge(item.condition),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        // ── Owner / Brand ──
+                        Text(
+                          '${item.owner} / ${item.brand}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textGrey(context),
                           ),
                         ),
                       ],
@@ -394,8 +421,8 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
                       ),
                       Text(
                         'ชิ้น',
-                        style: const TextStyle(
-                          color: AppTheme.textGrey,
+                        style: TextStyle(
+                          color: AppTheme.textGrey(context),
                           fontSize: 12,
                         ),
                       ),

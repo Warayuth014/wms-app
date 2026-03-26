@@ -5,6 +5,7 @@ import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import '../../models/wms_models.dart';
+import '../../widgets/part_thumbnail.dart';
 import 'load_basket_detail_screen.dart';
 
 class LoadBasketScreen extends StatefulWidget {
@@ -87,84 +88,85 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // ── Search Bar ───────────────────
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _filterController,
-              onChanged: _filter,
-              decoration: InputDecoration(
-                hintText: 'ค้นหา Part ID หรือชื่อสินค้า...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _filterController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _filterController.clear();
-                          _filter('');
-                        },
-                      )
-                    : null,
-                filled: true,
-                fillColor: AppTheme.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            // ── Search Bar ───────────────────
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _filterController,
+                onChanged: _filter,
+                decoration: InputDecoration(
+                  hintText: 'ค้นหา Part ID หรือชื่อสินค้า...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _filterController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _filterController.clear();
+                            _filter('');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: AppTheme.surface(context),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
             ),
-          ),
 
-          // ── Count ────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Text(
-                  'พบ ${_filtered.length} รายการ',
-                  style: const TextStyle(
-                    color: AppTheme.textGrey,
-                    fontSize: 13,
-                  ),
-                ),
-                if (_allItems.isNotEmpty) ...[
-                  const Spacer(),
+            // ── Count ────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
                   Text(
-                    'รวม ${_allItems.fold<int>(0, (s, i) => s + i.totalQty)} ชิ้นรอ load',
-                    style: const TextStyle(
-                      color: AppTheme.warning,
+                    'พบ ${_filtered.length} รายการ',
+                    style: TextStyle(
+                      color: AppTheme.textGrey(context),
                       fontSize: 13,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                ],
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          // ── List ─────────────────────────
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _filtered.isEmpty
-                    ? _buildEmpty()
-                    : RefreshIndicator(
-                        onRefresh: _loadItems,
-                        child: ListView.separated(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _filtered.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 8),
-                          itemBuilder: (_, i) =>
-                              _buildItemCard(_filtered[i]),
-                        ),
+                  if (_allItems.isNotEmpty) ...[
+                    const Spacer(),
+                    Text(
+                      'รวม ${_allItems.fold<int>(0, (s, i) => s + i.totalQty)} ชิ้นรอ load',
+                      style: const TextStyle(
+                        color: AppTheme.warning,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                       ),
-          ),
-        ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // ── List ─────────────────────────
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _filtered.isEmpty
+                  ? _buildEmpty()
+                  : RefreshIndicator(
+                      onRefresh: _loadItems,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _filtered.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (_, i) => _buildItemCard(_filtered[i]),
+                      ),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -184,13 +186,13 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
             _allItems.isEmpty
                 ? 'ยังไม่มีสินค้ารอ Load Basket'
                 : 'ไม่พบสินค้าที่ค้นหา',
-            style: const TextStyle(color: AppTheme.textGrey, fontSize: 15),
+            style: TextStyle(color: AppTheme.textGrey(context), fontSize: 15),
           ),
           if (_allItems.isEmpty) ...[
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'กรุณา Unload สินค้าก่อน',
-              style: TextStyle(color: AppTheme.textGrey, fontSize: 13),
+              style: TextStyle(color: AppTheme.textGrey(context), fontSize: 13),
             ),
           ],
         ],
@@ -216,25 +218,13 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppTheme.surface,
+          color: AppTheme.surface(context),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.grey.shade200),
         ),
         child: Row(
           children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.category,
-                color: AppTheme.primary,
-                size: 24,
-              ),
-            ),
+            PartThumbnail(imageUrl: item.imageUrl, size: 48),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -249,16 +239,38 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
                   ),
                   Text(
                     item.itemDesc,
-                    style: const TextStyle(
-                      color: AppTheme.textGrey,
+                    style: TextStyle(
+                      color: AppTheme.textGrey(context),
                       fontSize: 13,
                     ),
                   ),
+                  if (item.lotNumber != null && item.lotNumber!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.label_outline,
+                          size: 14,
+                          color: AppTheme.textGrey(context),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            'Batch No.: ${item.lotNumber}',
+                            style: TextStyle(
+                              color: AppTheme.textGrey(context),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Text(
                     '${item.owner} / ${item.brand}',
-                    style: const TextStyle(
-                      color: AppTheme.textGrey,
+                    style: TextStyle(
+                      color: AppTheme.textGrey(context),
                       fontSize: 12,
                     ),
                   ),
@@ -281,7 +293,7 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            const Icon(Icons.chevron_right, color: AppTheme.textGrey),
+            Icon(Icons.chevron_right, color: AppTheme.textGrey(context)),
           ],
         ),
       ),
