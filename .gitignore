@@ -1,3 +1,5 @@
 /wmsapp/linux/flutter
 /wmsapp/macos/Flutter
 /wmsapp/windows/flutter
+wmsapp/.claude/settings.local.json
+wmsapp/.vscode/launch.json
