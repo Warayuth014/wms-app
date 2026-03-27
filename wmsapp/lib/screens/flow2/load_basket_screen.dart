@@ -255,11 +255,21 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
                         ),
                         const SizedBox(width: 4),
                         Expanded(
-                          child: Text(
-                            'Batch No : ${item.lotNumber}',
-                            style: TextStyle(
-                              color: AppTheme.textGrey(context),
-                              fontSize: 12,
+                          child: Text.rich(
+                            TextSpan(
+                              style: TextStyle(
+                                color: AppTheme.textGrey(context),
+                                fontSize: 12,
+                              ),
+                              children: [
+                                const TextSpan(
+                                  text: "Batch No.",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                TextSpan(text: " : ${item.lotNumber}"),
+                              ],
                             ),
                           ),
                         ),

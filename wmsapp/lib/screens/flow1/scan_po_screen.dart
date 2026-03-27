@@ -385,11 +385,21 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
                                 color: AppTheme.textGrey(context),
                               ),
                               const SizedBox(width: 2),
-                              Text(
-                                "Batch No.: ${item.lotNumber!}",
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppTheme.textGrey(context),
+                              RichText(
+                                text: TextSpan(
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppTheme.textGrey(context),
+                                  ),
+                                  children: [
+                                    const TextSpan(
+                                      text: "Batch No",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    TextSpan(text: " : ${item.lotNumber!}"),
+                                  ],
                                 ),
                               ),
                               const SizedBox(width: 8),

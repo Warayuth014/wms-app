@@ -512,11 +512,21 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
                                   color: AppTheme.textGrey(context),
                                 ),
                                 const SizedBox(width: 2),
-                                Text(
-                                  'Batch No.: ${line.lotNumber}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: AppTheme.textGrey(context),
+                                Text.rich(
+                                  TextSpan(
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppTheme.textGrey(context),
+                                    ),
+                                    children: [
+                                      const TextSpan(
+                                        text: "Batch No.",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      TextSpan(text: " : ${line.lotNumber}"),
+                                    ],
                                   ),
                                 ),
                                 const SizedBox(width: 8),
