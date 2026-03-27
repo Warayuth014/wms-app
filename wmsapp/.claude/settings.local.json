@@ -53,7 +53,12 @@
       "Bash(flutter pub:*)",
       "Bash(flutter clean:*)",
       "Bash(dart format:*)",
-      "Bash(dart analyze:*)"
+      "Bash(dart analyze:*)",
+      "Bash(xargs grep:*)",
+      "Bash(ls -la \"C:\\\\Users\\\\Admin\\\\Documents\\\\GitHub\\\\wms-api\\\\WmsApi\\\\WmsApi\"\" | grep -E \"Services)",
+      "Bash(Integration)",
+      "Bash(Webhooks \")",
+      "Bash(grep -ri ship /c/Users/Admin/Documents/GitHub/wms-app --include=*.dart --include=*.json)"
     ]
   }
 }
