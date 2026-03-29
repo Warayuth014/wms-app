@@ -4,7 +4,7 @@
 wmsapp/.claude/settings.local.json
 wmsapp/.vscode/launch.json
 
-# Generated plugin registrants
+# Generated plugin registrants only
 linux/flutter/generated_plugin_registrant.cc
 linux/flutter/generated_plugin_registrant.h
 linux/flutter/generated_plugins.cmake
