@@ -385,6 +385,7 @@ class ApiService {
     required String palletId,
     required String destination,
     required String operatorId,
+    bool wrappingRequired = false,
     bool convertToFG = true,
   }) async {
     final r = await _post('/putaway/confirm', {
@@ -392,6 +393,7 @@ class ApiService {
       'palletId': palletId,
       'destination': destination,
       'operatorId': operatorId,
+      'wrappingRequired': wrappingRequired,
       'convertToFG': convertToFG,
     });
     if (!r.success) return ApiResult.error(r.error);
