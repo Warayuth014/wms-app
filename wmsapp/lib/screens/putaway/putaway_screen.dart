@@ -165,15 +165,12 @@ class _PutawayScreenState extends State<PutawayScreen> {
                   for (int i = 0; i < _kStations.length; i++) ...[
                     if (i > 0) const SizedBox(width: 10),
                     Expanded(
-                      child: SizedBox(
-                        height: 140,
-                        child: StationCard(
-                          station: _kStations[i],
-                          isDispatching: _dispatchingStations.contains(
-                            _kStations[i].id,
-                          ),
-                          onTap: () => _openStationPopup(_kStations[i]),
+                      child: StationCard(
+                        station: _kStations[i],
+                        isDispatching: _dispatchingStations.contains(
+                          _kStations[i].id,
                         ),
+                        onTap: () => _openStationPopup(_kStations[i]),
                       ),
                     ),
                   ],

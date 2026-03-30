@@ -89,16 +89,15 @@ class _StationCardState extends State<StationCard>
         duration: const Duration(milliseconds: 300),
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
         decoration: BoxDecoration(
-          color: widget.isDispatching
-              ? AppTheme.danger
-              : widget.station.color,
+          color: widget.isDispatching ? AppTheme.danger : widget.station.color,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: (widget.isDispatching
-                      ? AppTheme.danger
-                      : widget.station.color)
-                  .withValues(alpha: 0.4),
+              color:
+                  (widget.isDispatching
+                          ? AppTheme.danger
+                          : widget.station.color)
+                      .withValues(alpha: 0.4),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -151,8 +150,8 @@ class _StationCardState extends State<StationCard>
         ),
         Text(
           widget.station.pwRole == PWRole.receive
-              ? 'AGV กำลังนำ Pallet มา...'
-              : 'AGV กำลังมารับ...',
+              ? 'AMR กำลังนำ Pallet มา...'
+              : 'AMR กำลังมารับ...',
           style: const TextStyle(color: Colors.white70, fontSize: 11),
         ),
       ],
@@ -225,14 +224,14 @@ class _StationCardState extends State<StationCard>
   }
 
   Widget _agvWheel() => Container(
-        width: 10,
-        height: 10,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.5),
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 1.5),
-        ),
-      );
+    width: 10,
+    height: 10,
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.5),
+      shape: BoxShape.circle,
+      border: Border.all(color: Colors.white, width: 1.5),
+    ),
+  );
 }
 
 // =============================================
@@ -334,7 +333,7 @@ class _StationSheetState extends State<StationSheet> {
       message:
           'เรียก $palletId จาก ASRS\n'
           'มาที่ ${widget.station.id}\n\n'
-          'AGV จะนำ Pallet มาส่งทันที',
+          'AMR จะนำ Pallet มาส่งทันที',
       confirmLabel: 'เรียก Pallet',
     );
     if (!confirm || !mounted) return;
@@ -376,16 +375,18 @@ class _StationSheetState extends State<StationSheet> {
     String message;
     if (isConvert) {
       title = 'ยืนยัน Convert & Putaway';
-      final wrappingNote =
-          _wrappingRequired ? '\nผ่าน Wrapping Machine ก่อน' : '';
+      final wrappingNote = _wrappingRequired
+          ? '\nผ่าน Wrapping Machine ก่อน'
+          : '';
       message =
           'เปลี่ยน ${_pallet!.palletId} (PW → FG)\n'
           'แล้วส่งเข้า ASRS$wrappingNote\n\n'
           '${_wrappingRequired ? 'จะส่งเข้า Wrapping Machine ก่อน' : 'AMR จะมารับทันที'}';
     } else if (isSendAsrsAsPW) {
       title = 'ยืนยันส่งไป ASRS (ยังเป็น PW)';
-      final wrappingNote =
-          _wrappingRequired ? '\nผ่าน Wrapping Machine ก่อน' : '';
+      final wrappingNote = _wrappingRequired
+          ? '\nผ่าน Wrapping Machine ก่อน'
+          : '';
       message =
           'ส่ง ${_pallet!.palletId} ไปเก็บที่ ASRS\n'
           'โดยยังคงสถานะเป็น PW (ไม่ convert)$wrappingNote\n\n'
@@ -398,8 +399,9 @@ class _StationSheetState extends State<StationSheet> {
           'AMR จะรับ Pallet ไปเติมสต็อก Rack';
     } else {
       title = 'ยืนยัน Putaway';
-      final wrappingNote =
-          _wrappingRequired ? '\nผ่าน Wrapping Machine ก่อน' : '';
+      final wrappingNote = _wrappingRequired
+          ? '\nผ่าน Wrapping Machine ก่อน'
+          : '';
       message =
           'เก็บ Pallet ${_pallet!.palletId}\n'
           'ที่ ${widget.station.id} → $destLabel$wrappingNote\n\n'
@@ -513,7 +515,7 @@ class _StationSheetState extends State<StationSheet> {
                     ),
                     const SizedBox(width: 4),
                     const Text(
-                      'AGV Ready',
+                      'AMR Ready',
                       style: TextStyle(color: Colors.white70, fontSize: 11),
                     ),
                   ],
@@ -573,7 +575,7 @@ class _StationSheetState extends State<StationSheet> {
                 const SizedBox(height: 16),
                 PrimaryButton(
                   label: widget.station.fixedDestination != null
-                      ? 'Convert PW→FG & ส่ง ASRS'
+                      ? 'ติดสติ๊กเกอร์ ส่ง ASRS'
                       : 'เก็บ Pallet',
                   icon: widget.station.fixedDestination != null
                       ? Icons.swap_horiz
@@ -657,8 +659,7 @@ class _StationSheetState extends State<StationSheet> {
             const SizedBox(height: 4),
             Text(
               _pallet!.message,
-              style:
-                  TextStyle(color: AppTheme.textGrey(context), fontSize: 12),
+              style: TextStyle(color: AppTheme.textGrey(context), fontSize: 12),
             ),
           ],
         ],
@@ -851,8 +852,7 @@ class DestButton extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color:
-                    selected ? Colors.white : AppTheme.textPrimary(context),
+                color: selected ? Colors.white : AppTheme.textPrimary(context),
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
               ),

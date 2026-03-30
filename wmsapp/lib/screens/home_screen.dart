@@ -243,35 +243,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     const SizedBox(height: 12),
 
-                    const SizedBox(height: 12),
-
-                    _FlowCard(
-                      icon: Icons.build_circle_rounded,
-                      title: 'Putaway Prework',
-                      subtitle: 'PW → แปลงสินค้าก่อนเก็บเข้า ASRS',
-                      gradient: const [
-                        Color(0xFF004D40),
-                        Color(0xFF00897B),
-                      ],
-                      onTap: () async {
-                        if (!await _requireLogin()) return;
-                        if (!context.mounted) return;
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => PutawayPreworkScreen(
-                              userId: _userId!,
-                              fullName: _fullName!,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: 12),
-
                     Row(
                       children: [
+                        Expanded(
+                          child: _FlowCard(
+                            icon: Icons.build_circle_rounded,
+                            title: 'Putaway Prework',
+                            subtitle: 'Prework Station',
+                            gradient: const [
+                              Color(0xFF004D40),
+                              Color(0xFF00897B),
+                            ],
+                            onTap: () async {
+                              if (!await _requireLogin()) return;
+                              if (!context.mounted) return;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PutawayPreworkScreen(
+                                    userId: _userId!,
+                                    fullName: _fullName!,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: _FlowCard(
                             icon: Icons.inventory_2_rounded,
@@ -296,7 +294,13 @@ class _HomeScreenState extends State<HomeScreen> {
                             },
                           ),
                         ),
-                        const SizedBox(width: 12),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Row(
+                      children: [
                         Expanded(
                           child: _FlowCard(
                             icon: Icons.content_cut_rounded,
@@ -321,6 +325,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             },
                           ),
                         ),
+                        const SizedBox(width: 12),
+                        const Expanded(child: SizedBox()),
                       ],
                     ),
 

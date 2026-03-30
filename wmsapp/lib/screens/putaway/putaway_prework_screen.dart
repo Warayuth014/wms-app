@@ -148,10 +148,7 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
         .toList();
 
     return Scaffold(
-      appBar: WmsAppBar(
-        title: 'Putaway Prework',
-        userName: widget.fullName,
-      ),
+      appBar: WmsAppBar(title: 'Putaway Prework', userName: widget.fullName),
       body: SafeArea(
         top: false,
         child: SingleChildScrollView(
@@ -217,15 +214,10 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
                         ),
                         const SizedBox(height: 10),
                         for (final s in receiveStations) ...[
-                          SizedBox(
-                            height: 130,
-                            child: StationCard(
-                              station: s,
-                              isDispatching: _dispatchingStations.contains(
-                                s.id,
-                              ),
-                              onTap: () => _openStationPopup(s),
-                            ),
+                          StationCard(
+                            station: s,
+                            isDispatching: _dispatchingStations.contains(s.id),
+                            onTap: () => _openStationPopup(s),
                           ),
                           const SizedBox(height: 10),
                         ],
@@ -246,15 +238,10 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
                         ),
                         const SizedBox(height: 10),
                         for (final s in sendStations) ...[
-                          SizedBox(
-                            height: 130,
-                            child: StationCard(
-                              station: s,
-                              isDispatching: _dispatchingStations.contains(
-                                s.id,
-                              ),
-                              onTap: () => _openStationPopup(s),
-                            ),
+                          StationCard(
+                            station: s,
+                            isDispatching: _dispatchingStations.contains(s.id),
+                            onTap: () => _openStationPopup(s),
                           ),
                           const SizedBox(height: 10),
                         ],
@@ -281,13 +268,14 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
                     _LegendRow(
                       icon: Icons.download,
                       color: _kColorReceive,
-                      text: 'รับ Pallet — เรียก PW Pallet จาก ASRS มาที่ Prework',
+                      text:
+                          'รับ Pallet — เรียก PW Pallet จาก ASRS มาที่ Prework',
                     ),
                     const SizedBox(height: 6),
                     _LegendRow(
                       icon: Icons.upload,
                       color: _kColorSend,
-                      text: 'ส่ง Pallet — Convert PW→FG แล้วส่งเข้า ASRS',
+                      text: 'ส่ง Pallet — ติดสติ๊กเกอร์ แล้วส่งเข้า ASRS',
                     ),
                   ],
                 ),
@@ -360,10 +348,7 @@ class _LegendRow extends StatelessWidget {
         Expanded(
           child: Text(
             text,
-            style: TextStyle(
-              fontSize: 12,
-              color: AppTheme.textGrey(context),
-            ),
+            style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
           ),
         ),
       ],
