@@ -9,7 +9,6 @@ import '../services/connectivity_service.dart';
 import '../services/offline_service.dart';
 import 'login_screen.dart';
 import 'package:wmsapp/screens/flow1/flow1_menu_screen.dart';
-import 'package:wmsapp/screens/supervisor/cancel_screen.dart';
 import 'package:wmsapp/screens/supervisor/part_image_screen.dart';
 import 'package:wmsapp/screens/putaway/putaway_screen.dart';
 import 'package:wmsapp/screens/putaway/putaway_prework_screen.dart';
@@ -338,19 +337,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         icon: Icons.shield_rounded,
                       ),
                       const SizedBox(height: 14),
-                      _ActionCard(
-                        icon: Icons.approval_rounded,
-                        iconColor: AppTheme.warning,
-                        title: 'Cancel Approval',
-                        subtitle: 'อนุมัติคำขอยกเลิกรายการ',
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => CancelScreen(userId: _userId!),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
                       _ActionCard(
                         icon: Icons.add_photo_alternate_rounded,
                         iconColor: AppTheme.primary,

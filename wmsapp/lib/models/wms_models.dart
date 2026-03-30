@@ -341,38 +341,6 @@ class BasketScanResponse {
 }
 
 // =============================================
-// Cancel Log
-// =============================================
-class CancelLog {
-  final int cancelId;
-  final String refType;
-  final int refId;
-  final String reason;
-  final String requestBy;
-  final String? approvedBy;
-  final String status;
-
-  CancelLog({
-    required this.cancelId,
-    required this.refType,
-    required this.refId,
-    required this.reason,
-    required this.requestBy,
-    this.approvedBy,
-    required this.status,
-  });
-
-  factory CancelLog.fromJson(Map<String, dynamic> json) => CancelLog(
-    cancelId: json['cancelId'],
-    refType: json['refType'],
-    refId: json['refId'],
-    reason: json['reason'],
-    requestBy: json['requestBy'],
-    approvedBy: json['approvedBy'],
-    status: json['status'],
-  );
-}
-
 // ── Return Models ─────────────────────────
 
 class OrderResponse {

@@ -414,57 +414,6 @@ class ApiService {
     return ApiResult.success(PutawayResult.fromJson(r.data!));
   }
 
-  // =============================================
-  // Cancel
-  // =============================================
-
-  Future<ApiResult<CancelLog>> requestCancel({
-    required String refType,
-    required int refId,
-    required String reason,
-    required String requestBy,
-  }) async {
-    final r = await _post('/cancel/request', {
-      'refType': refType,
-      'refId': refId,
-      'reason': reason,
-      'requestBy': requestBy,
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(CancelLog.fromJson(r.data!));
-  }
-
-  Future<ApiResult<Map<String, dynamic>>> approveCancel({
-    required int cancelId,
-    required String approvedBy,
-  }) async {
-    final r = await _post('/cancel/approve', {
-      'cancelId': cancelId,
-      'approvedBy': approvedBy,
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(r.data!);
-  }
-
-  Future<ApiResult<Map<String, dynamic>>> rejectCancel({
-    required int cancelId,
-    required String supervisorId,
-  }) async {
-    final r = await _post(
-      '/cancel/reject/$cancelId?supervisorId=$supervisorId',
-      {},
-    );
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(r.data!);
-  }
-
-  Future<ApiResult<List<CancelLog>>> getPendingCancels() async {
-    final r = await _get('/cancel/pending');
-    if (!r.success) return ApiResult.error(r.error);
-    final list = r.data!['items'] as List;
-    return ApiResult.success(list.map((i) => CancelLog.fromJson(i)).toList());
-  }
-
   // ── Return ────────────────────────────────
 
   Future<ApiResult<OrderResponse>> getReturnOrder(String orderId) async {
