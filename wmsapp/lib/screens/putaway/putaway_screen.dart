@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../services/api_service.dart';
 import 'putaway_widgets.dart';
 
 // ── Station constants (STN only) ─────────────
@@ -47,25 +48,33 @@ class PutawayScreen extends StatefulWidget {
 
 class _PutawayScreenState extends State<PutawayScreen> {
   final _stationController = TextEditingController();
-  final Set<String> _dispatchingStations = {};
-  final Map<String, Timer> _dispatchTimers = {};
+  final _api = ApiService();
+
+  // stationId → { palletId, destination, items }
+  Map<String, Map<String, dynamic>> _stationStatus = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStationStatus();
+  }
 
   @override
   void dispose() {
     _stationController.dispose();
-    for (final t in _dispatchTimers.values) {
-      t.cancel();
-    }
     super.dispose();
   }
 
-  void _onPutawayConfirmed(String stationId) {
-    setState(() => _dispatchingStations.add(stationId));
-    _dispatchTimers[stationId]?.cancel();
-    _dispatchTimers[stationId] = Timer(const Duration(seconds: 5), () {
-      if (mounted) setState(() => _dispatchingStations.remove(stationId));
-      _dispatchTimers.remove(stationId);
-    });
+  Future<void> _loadStationStatus() async {
+    final result = await _api.getStationStatus();
+    if (!mounted) return;
+    if (result.success) {
+      final map = <String, Map<String, dynamic>>{};
+      for (final s in result.data!) {
+        map[s['stationId'] as String] = s;
+      }
+      setState(() => _stationStatus = map);
+    }
   }
 
   void _onStationBarcodeScan() {
@@ -86,6 +95,12 @@ class _PutawayScreenState extends State<PutawayScreen> {
   }
 
   void _openStationPopup(StationInfo station) {
+    final busy = _stationStatus[station.id];
+    if (busy != null) {
+      _showBusyDialog(station, busy);
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -94,7 +109,100 @@ class _PutawayScreenState extends State<PutawayScreen> {
       builder: (_) => StationSheet(
         station: station,
         userId: widget.userId,
-        onConfirmed: () => _onPutawayConfirmed(station.id),
+        onConfirmed: () {
+          _loadStationStatus();
+        },
+      ),
+    );
+  }
+
+  void _showBusyDialog(StationInfo station, Map<String, dynamic> busy) {
+    final palletId = busy['palletId'] as String;
+    final dest = busy['destination'] as String;
+    final items = busy['items'] as List? ?? [];
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppTheme.warning),
+            const SizedBox(width: 8),
+            Text(
+              '${station.id} ไม่ว่าง',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.warning.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppTheme.warning.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  InfoRow(label: 'Pallet', value: palletId),
+                  InfoRow(label: 'ปลายทาง', value: dest),
+                  InfoRow(label: 'สถานะ', value: 'AGV กำลังมารับ'),
+                ],
+              ),
+            ),
+            if (items.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                'สินค้าบน Pallet:',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: AppTheme.textPrimary(context),
+                ),
+              ),
+              const SizedBox(height: 6),
+              for (final item in items)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.inventory_2, size: 14, color: Colors.grey),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '${item['partId']} — ${item['itemDesc']}',
+                          style: const TextStyle(fontSize: 12),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        'x${item['qty']}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _loadStationStatus();
+            },
+            child: const Text('ปิด'),
+          ),
+        ],
       ),
     );
   }
@@ -167,9 +275,13 @@ class _PutawayScreenState extends State<PutawayScreen> {
                     Expanded(
                       child: StationCard(
                         station: _kStations[i],
-                        isDispatching: _dispatchingStations.contains(
+                        isDispatching: _stationStatus.containsKey(
                           _kStations[i].id,
                         ),
+                        busyPalletId: _stationStatus[_kStations[i].id]
+                            ?['palletId'] as String?,
+                        busyDestination: _stationStatus[_kStations[i].id]
+                            ?['destination'] as String?,
                         onTap: () => _openStationPopup(_kStations[i]),
                       ),
                     ),

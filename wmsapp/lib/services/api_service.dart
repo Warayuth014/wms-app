@@ -370,6 +370,14 @@ class ApiService {
   // PUTAWAY
   // =============================================
 
+  /// ดึงสถานะ Station ทั้งหมด (station ไหนมี pallet อยู่)
+  Future<ApiResult<List<Map<String, dynamic>>>> getStationStatus() async {
+    final r = await _get('/putaway/station-status');
+    if (!r.success) return ApiResult.error(r.error);
+    final items = r.data!['items'] as List;
+    return ApiResult.success(items.cast<Map<String, dynamic>>());
+  }
+
   Future<ApiResult<PutawayPalletInfo>> scanPalletForPutaway(
     String palletId, {
     String? stationId,
@@ -472,14 +480,6 @@ class ApiService {
     return ApiResult.success(list);
   }
 
-  Future<ApiResult<List<LoadedBasketItem>>> getLoadedBasketItems() async {
-    final r = await _get('/unload/loaded-items');
-    if (!r.success) return ApiResult.error(r.error);
-    final list = (r.data!['items'] as List)
-        .map((i) => LoadedBasketItem.fromJson(i))
-        .toList();
-    return ApiResult.success(list);
-  }
 
   Future<ApiResult<Map<String, dynamic>>> returnPalletToAsis({
     required String palletId,
@@ -511,18 +511,6 @@ class ApiService {
   // PICKING
   // =============================================
 
-  Future<ApiResult<PickingSession>> openPickingSession({
-    required String packPalletId,
-    required String operatorId,
-  }) async {
-    final r = await _post('/picking/open-session', {
-      'packPalletId': packPalletId,
-      'operatorId': operatorId,
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(PickingSession.fromJson(r.data!));
-  }
-
   Future<PickingSession?> getActivePickingSession(String packPalletId) async {
     try {
       final base = await ApiService._resolveBase();
@@ -540,66 +528,6 @@ class ApiService {
     } catch (_) {
       return null;
     }
-  }
-
-  Future<ApiResult<ScanSourceResponse>> scanSource(String sourceId) async {
-    final r = await _get('/picking/scan-source/$sourceId');
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(ScanSourceResponse.fromJson(r.data!));
-  }
-
-  Future<ApiResult<PickItemResult>> pickItem({
-    required int sessionId,
-    required String sourceId,
-    required String sourceType,
-    required String partId,
-    required int qtyPicked,
-    required String operatorId,
-  }) async {
-    final r = await _post('/picking/pick-item', {
-      'sessionId': sessionId,
-      'sourceId': sourceId,
-      'sourceType': sourceType,
-      'partId': partId,
-      'qtyPicked': qtyPicked,
-      'operatorId': operatorId,
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(PickItemResult.fromJson(r.data!));
-  }
-
-  Future<ApiResult<Map<String, dynamic>>> returnSource({
-    required String sourceId,
-    required String sourceType,
-    required String operatorId,
-    required String destination,
-  }) async {
-    final r = await _post('/picking/return-source', {
-      'sourceId': sourceId,
-      'sourceType': sourceType,
-      'operatorId': operatorId,
-      'destination': destination,
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(r.data!);
-  }
-
-  // =============================================
-  // PICKING v2 — Pick Order flow
-  // =============================================
-
-  Future<ApiResult<List<PickOrder>>> getPickOrders() async {
-    final r = await _get('/picking/orders');
-    if (!r.success) return ApiResult.error(r.error);
-    // server returns JSON array → _handle wraps as {"items": [...]}
-    final list = r.data!['items'] as List;
-    return ApiResult.success(list.map((j) => PickOrder.fromJson(j)).toList());
-  }
-
-  Future<ApiResult<PickOrder>> getPickOrder(String pickOrderId) async {
-    final r = await _get('/picking/order/$pickOrderId');
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(PickOrder.fromJson(r.data!));
   }
 
   Future<ApiResult<AssignPickStationResponse>> assignPickStation({

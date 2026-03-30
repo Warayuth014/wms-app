@@ -38,12 +38,16 @@ class StationCard extends StatefulWidget {
   final StationInfo station;
   final VoidCallback onTap;
   final bool isDispatching;
+  final String? busyPalletId;
+  final String? busyDestination;
 
   const StationCard({
     super.key,
     required this.station,
     required this.onTap,
     this.isDispatching = false,
+    this.busyPalletId,
+    this.busyDestination,
   });
 
   @override
@@ -84,7 +88,7 @@ class _StationCardState extends State<StationCard>
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: widget.isDispatching ? null : widget.onTap,
+      onTap: widget.onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
@@ -115,15 +119,15 @@ class _StationCardState extends State<StationCard>
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Container(
-          width: 56,
-          height: 56,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.15),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.smart_toy, color: Colors.white70, size: 28),
+          child: const Icon(Icons.smart_toy, color: Colors.white70, size: 22),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 6),
         AnimatedBuilder(
           animation: _ctrl,
           builder: (_, __) {
@@ -139,7 +143,7 @@ class _StationCardState extends State<StationCard>
             );
           },
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Text(
           widget.station.id,
           style: const TextStyle(
@@ -151,8 +155,57 @@ class _StationCardState extends State<StationCard>
         Text(
           widget.station.pwRole == PWRole.receive
               ? 'AMR กำลังนำ Pallet มา...'
-              : 'AMR กำลังมารับ...',
+              : 'AGV กำลังมารับ...',
           style: const TextStyle(color: Colors.white70, fontSize: 11),
+        ),
+        if (widget.busyPalletId != null) ...[
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  widget.busyPalletId!,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (widget.busyDestination != null)
+                  Text(
+                    '→ ${widget.busyDestination}',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 10,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.25),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.info_outline, color: Colors.white, size: 11),
+              SizedBox(width: 3),
+              Text(
+                'กดดูรายละเอียด',
+                style: TextStyle(color: Colors.white, fontSize: 10),
+              ),
+            ],
+          ),
         ),
       ],
     );

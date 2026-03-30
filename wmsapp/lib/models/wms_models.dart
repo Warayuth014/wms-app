@@ -494,45 +494,6 @@ class CloseReturnResponse {
       );
 }
 
-class LoadedBasketItem {
-  final int lineId;
-  final String partId;
-  final String palletId;
-  final String owner;
-  final String itemDesc;
-  final int qtyLoaded;
-  final String? lotNumber;
-  final String basketId;
-  final String basketLabel;
-  final String? basketDestination;
-
-  LoadedBasketItem({
-    required this.lineId,
-    required this.partId,
-    required this.palletId,
-    required this.owner,
-    required this.itemDesc,
-    required this.qtyLoaded,
-    this.lotNumber,
-    required this.basketId,
-    required this.basketLabel,
-    this.basketDestination,
-  });
-
-  factory LoadedBasketItem.fromJson(Map<String, dynamic> j) => LoadedBasketItem(
-    lineId: j['lineId'],
-    partId: j['partId'],
-    palletId: j['palletId'],
-    owner: j['owner'],
-    itemDesc: j['itemDesc'],
-    qtyLoaded: j['qtyLoaded'],
-    lotNumber: j['lotNumber'],
-    basketId: j['basketId'],
-    basketLabel: j['basketLabel'],
-    basketDestination: j['basketDestination'],
-  );
-}
-
 // =============================================
 // Putaway
 // =============================================
@@ -659,36 +620,6 @@ class PickingLineItem {
       );
 }
 
-class ScanSourceResponse {
-  final String sourceId;
-  final String sourceType;   // PALLET | BASKET
-  final String type;
-  final String status;
-  final List<SourceItem> items;
-  final String message;
-
-  ScanSourceResponse({
-    required this.sourceId,
-    required this.sourceType,
-    required this.type,
-    required this.status,
-    required this.items,
-    required this.message,
-  });
-
-  factory ScanSourceResponse.fromJson(Map<String, dynamic> json) =>
-      ScanSourceResponse(
-        sourceId: json['sourceId'],
-        sourceType: json['sourceType'],
-        type: json['type'],
-        status: json['status'],
-        items: (json['items'] as List)
-            .map((i) => SourceItem.fromJson(i))
-            .toList(),
-        message: json['message'],
-      );
-}
-
 class SourceItem {
   final String partId;
   final String owner;
@@ -722,33 +653,6 @@ class SourceItem {
     expiredDate: json['expiredDate'],
     qty: json['qty'],
     condition: json['condition'],
-  );
-}
-
-class PickItemResult {
-  final bool success;
-  final int lineId;
-  final String partId;
-  final int qtyPicked;
-  final int remainingOnSource;
-  final String message;
-
-  PickItemResult({
-    required this.success,
-    required this.lineId,
-    required this.partId,
-    required this.qtyPicked,
-    required this.remainingOnSource,
-    required this.message,
-  });
-
-  factory PickItemResult.fromJson(Map<String, dynamic> json) => PickItemResult(
-    success: json['success'],
-    lineId: json['lineId'],
-    partId: json['partId'],
-    qtyPicked: json['qtyPicked'],
-    remainingOnSource: json['remainingOnSource'],
-    message: json['message'],
   );
 }
 
