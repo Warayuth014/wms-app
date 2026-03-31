@@ -694,4 +694,87 @@ class ApiService {
     if (!r.success) return ApiResult.error(r.error);
     return ApiResult.success(r.data!);
   }
+
+  // =============================================
+  // REPLENISHMENT
+  // =============================================
+
+  Future<ApiResult<CheckTriggerResponse>> checkReplenishTrigger() async {
+    final r = await _get('/replenish/check-trigger');
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(CheckTriggerResponse.fromJson(r.data!));
+  }
+
+  Future<ApiResult<ReplenishOrderResponse>> createReplenishOrder({
+    required String triggeredBy,
+    required List<Map<String, dynamic>> lines,
+  }) async {
+    final r = await _post('/replenish/create-order', {
+      'triggeredBy': triggeredBy,
+      'lines': lines,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(ReplenishOrderResponse.fromJson(r.data!));
+  }
+
+  Future<ApiResult<List<ReplenishOrderResponse>>> getReplenishOrders() async {
+    final r = await _get('/replenish/orders');
+    if (!r.success) return ApiResult.error(r.error);
+    final items = r.data!['items'] as List;
+    return ApiResult.success(
+      items.map((e) => ReplenishOrderResponse.fromJson(e)).toList(),
+    );
+  }
+
+  Future<ApiResult<ToteScanResponse>> scanTote(String toteId) async {
+    final r = await _get('/replenish/scan-tote/$toteId');
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(ToteScanResponse.fromJson(r.data!));
+  }
+
+  Future<ApiResult<ReplenishSessionResponse>> openReplenishSession({
+    required int orderId,
+    required String toteId,
+    required String palletId,
+    required String operatorId,
+  }) async {
+    final r = await _post('/replenish/open-session', {
+      'orderId': orderId,
+      'toteId': toteId,
+      'palletId': palletId,
+      'operatorId': operatorId,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(ReplenishSessionResponse.fromJson(r.data!));
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> confirmReplenishLine({
+    required int sessionId,
+    required int sessionLineId,
+    required int qtyFilled,
+  }) async {
+    final r = await _post('/replenish/confirm-line', {
+      'sessionId': sessionId,
+      'sessionLineId': sessionLineId,
+      'qtyFilled': qtyFilled,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(r.data!);
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> completeReplenishSession(
+      int sessionId) async {
+    final r = await _post('/replenish/complete-session', {
+      'sessionId': sessionId,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(r.data!);
+  }
+
+  // ── Haipick ──────────────────────────────────
+  Future<ApiResult<Map<String, dynamic>>> getHaipickInventory() async {
+    final r = await _get('/haipick/inventory');
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(r.data!);
+  }
 }

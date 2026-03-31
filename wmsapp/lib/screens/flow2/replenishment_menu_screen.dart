@@ -5,6 +5,7 @@ import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import 'unload_screen.dart';
 import 'load_basket_screen.dart';
+import 'replenish_order_screen.dart';
 
 class ReplenishmentMenuScreen extends StatelessWidget {
   final String userId;
@@ -39,6 +40,23 @@ class ReplenishmentMenuScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
+
+              // ── Replenish Orders ──────────────
+              _MenuCard(
+                icon: Icons.assignment,
+                title: 'Replenish Orders',
+                subtitle: 'ดู Order และเติมสินค้าลง Tote (Tote-first workflow)',
+                color: const Color(0xFF7B1FA2),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        ReplenishOrderScreen(userId: userId, fullName: fullName),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
 
               // ── Unload ────────────────────────
               _MenuCard(

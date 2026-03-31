@@ -985,3 +985,245 @@ class GroupedUnloadItem {
         totalQty: j['totalQty'],
       );
 }
+
+// =============================================
+// Replenishment Models
+// =============================================
+
+class ReplenishTriggerItem {
+  final String partId;
+  final String owner;
+  final String brand;
+  final String itemDesc;
+  final String? imageUrl;
+  final int qtyOnHand;
+  final int minStock;
+  final int maxStock;
+  final int qtyRequired;
+
+  ReplenishTriggerItem({
+    required this.partId,
+    required this.owner,
+    required this.brand,
+    required this.itemDesc,
+    this.imageUrl,
+    required this.qtyOnHand,
+    required this.minStock,
+    required this.maxStock,
+    required this.qtyRequired,
+  });
+
+  factory ReplenishTriggerItem.fromJson(Map<String, dynamic> j) =>
+      ReplenishTriggerItem(
+        partId: j['partId'],
+        owner: j['owner'],
+        brand: j['brand'],
+        itemDesc: j['itemDesc'],
+        imageUrl: j['imageUrl'],
+        qtyOnHand: j['qtyOnHand'],
+        minStock: j['minStock'],
+        maxStock: j['maxStock'],
+        qtyRequired: j['qtyRequired'],
+      );
+}
+
+class CheckTriggerResponse {
+  final int partsNeedingReplenishment;
+  final List<ReplenishTriggerItem> items;
+
+  CheckTriggerResponse({
+    required this.partsNeedingReplenishment,
+    required this.items,
+  });
+
+  factory CheckTriggerResponse.fromJson(Map<String, dynamic> j) =>
+      CheckTriggerResponse(
+        partsNeedingReplenishment: j['partsNeedingReplenishment'],
+        items: (j['items'] as List)
+            .map((e) => ReplenishTriggerItem.fromJson(e))
+            .toList(),
+      );
+}
+
+class ReplenishOrderLineDto {
+  final int lineId;
+  final String partId;
+  final String owner;
+  final String brand;
+  final String itemDesc;
+  final String? imageUrl;
+  final int qtyRequired;
+  final int qtyFilled;
+  final String status;
+
+  ReplenishOrderLineDto({
+    required this.lineId,
+    required this.partId,
+    required this.owner,
+    required this.brand,
+    required this.itemDesc,
+    this.imageUrl,
+    required this.qtyRequired,
+    required this.qtyFilled,
+    required this.status,
+  });
+
+  factory ReplenishOrderLineDto.fromJson(Map<String, dynamic> j) =>
+      ReplenishOrderLineDto(
+        lineId: j['lineId'],
+        partId: j['partId'],
+        owner: j['owner'],
+        brand: j['brand'],
+        itemDesc: j['itemDesc'],
+        imageUrl: j['imageUrl'],
+        qtyRequired: j['qtyRequired'],
+        qtyFilled: j['qtyFilled'],
+        status: j['status'],
+      );
+}
+
+class ReplenishOrderResponse {
+  final int orderId;
+  final String status;
+  final String triggeredBy;
+  final DateTime createdAt;
+  final List<ReplenishOrderLineDto> lines;
+
+  ReplenishOrderResponse({
+    required this.orderId,
+    required this.status,
+    required this.triggeredBy,
+    required this.createdAt,
+    required this.lines,
+  });
+
+  factory ReplenishOrderResponse.fromJson(Map<String, dynamic> j) =>
+      ReplenishOrderResponse(
+        orderId: j['orderId'],
+        status: j['status'],
+        triggeredBy: j['triggeredBy'],
+        createdAt: DateTime.parse(j['createdAt']),
+        lines: (j['lines'] as List)
+            .map((e) => ReplenishOrderLineDto.fromJson(e))
+            .toList(),
+      );
+}
+
+class ToteInventoryItemDto {
+  final String partId;
+  final String itemDesc;
+  final int qtyOnHand;
+
+  ToteInventoryItemDto({
+    required this.partId,
+    required this.itemDesc,
+    required this.qtyOnHand,
+  });
+
+  factory ToteInventoryItemDto.fromJson(Map<String, dynamic> j) =>
+      ToteInventoryItemDto(
+        partId: j['partId'],
+        itemDesc: j['itemDesc'],
+        qtyOnHand: j['qtyOnHand'],
+      );
+}
+
+class ToteScanResponse {
+  final String toteId;
+  final String label;
+  final String status;
+  final String location;
+  final List<ToteInventoryItemDto> currentInventory;
+
+  ToteScanResponse({
+    required this.toteId,
+    required this.label,
+    required this.status,
+    required this.location,
+    required this.currentInventory,
+  });
+
+  factory ToteScanResponse.fromJson(Map<String, dynamic> j) =>
+      ToteScanResponse(
+        toteId: j['toteId'],
+        label: j['label'],
+        status: j['status'],
+        location: j['location'],
+        currentInventory: (j['currentInventory'] as List)
+            .map((e) => ToteInventoryItemDto.fromJson(e))
+            .toList(),
+      );
+}
+
+class ReplenishSessionLineDto {
+  final int lineId;
+  final String partId;
+  final String owner;
+  final String brand;
+  final String itemDesc;
+  final String? imageUrl;
+  final int orderLineId;
+  final int qtyRequired;
+  int qtyFilled;
+  String sessionLineStatus;
+  final String orderLineStatus;
+
+  ReplenishSessionLineDto({
+    required this.lineId,
+    required this.partId,
+    required this.owner,
+    required this.brand,
+    required this.itemDesc,
+    this.imageUrl,
+    required this.orderLineId,
+    required this.qtyRequired,
+    required this.qtyFilled,
+    required this.sessionLineStatus,
+    required this.orderLineStatus,
+  });
+
+  factory ReplenishSessionLineDto.fromJson(Map<String, dynamic> j) =>
+      ReplenishSessionLineDto(
+        lineId: j['lineId'],
+        partId: j['partId'],
+        owner: j['owner'],
+        brand: j['brand'],
+        itemDesc: j['itemDesc'],
+        imageUrl: j['imageUrl'],
+        orderLineId: j['orderLineId'],
+        qtyRequired: j['qtyRequired'],
+        qtyFilled: j['qtyFilled'],
+        sessionLineStatus: j['sessionLineStatus'],
+        orderLineStatus: j['orderLineStatus'],
+      );
+}
+
+class ReplenishSessionResponse {
+  final int sessionId;
+  final int orderId;
+  final String toteId;
+  final String palletId;
+  final String status;
+  final List<ReplenishSessionLineDto> lines;
+
+  ReplenishSessionResponse({
+    required this.sessionId,
+    required this.orderId,
+    required this.toteId,
+    required this.palletId,
+    required this.status,
+    required this.lines,
+  });
+
+  factory ReplenishSessionResponse.fromJson(Map<String, dynamic> j) =>
+      ReplenishSessionResponse(
+        sessionId: j['sessionId'],
+        orderId: j['orderId'],
+        toteId: j['toteId'],
+        palletId: j['palletId'],
+        status: j['status'],
+        lines: (j['lines'] as List)
+            .map((e) => ReplenishSessionLineDto.fromJson(e))
+            .toList(),
+      );
+}
