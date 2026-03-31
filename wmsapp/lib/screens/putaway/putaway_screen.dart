@@ -171,7 +171,11 @@ class _PutawayScreenState extends State<PutawayScreen> {
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Row(
                     children: [
-                      const Icon(Icons.inventory_2, size: 14, color: Colors.grey),
+                      const Icon(
+                        Icons.inventory_2,
+                        size: 14,
+                        color: Colors.grey,
+                      ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
@@ -277,10 +281,12 @@ class _PutawayScreenState extends State<PutawayScreen> {
                         isDispatching: _stationStatus.containsKey(
                           _kStations[i].id,
                         ),
-                        busyPalletId: _stationStatus[_kStations[i].id]
-                            ?['palletId'] as String?,
-                        busyDestination: _stationStatus[_kStations[i].id]
-                            ?['destination'] as String?,
+                        busyPalletId:
+                            _stationStatus[_kStations[i].id]?['palletId']
+                                as String?,
+                        busyDestination:
+                            _stationStatus[_kStations[i].id]?['destination']
+                                as String?,
                         onTap: () => _openStationPopup(_kStations[i]),
                       ),
                     ),
@@ -290,40 +296,40 @@ class _PutawayScreenState extends State<PutawayScreen> {
 
               const SizedBox(height: 20),
 
-              // ── Legend ────────────────────────
-              WmsCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'การทำงาน',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        color: AppTheme.textPrimary(context),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _LegendRow(
-                      icon: Icons.domain,
-                      color: AppTheme.primary,
-                      text: 'FG → เก็บเข้า ASRS หรือ Replenish Rack',
-                    ),
-                    const SizedBox(height: 6),
-                    _LegendRow(
-                      icon: Icons.build_circle,
-                      color: AppTheme.warning,
-                      text: 'PW → ส่งจุด Prework หรือเก็บ ASRS',
-                    ),
-                    const SizedBox(height: 6),
-                    _LegendRow(
-                      icon: Icons.wrap_text,
-                      color: AppTheme.secondary,
-                      text: 'เลือกพัน Pallet ผ่าน Wrapping Machine ก่อนเข้า ASRS',
-                    ),
-                  ],
-                ),
-              ),
+              // // ── Legend ────────────────────────
+              // WmsCard(
+              //   child: Column(
+              //     crossAxisAlignment: CrossAxisAlignment.start,
+              //     children: [
+              //       Text(
+              //         'การทำงาน',
+              //         style: TextStyle(
+              //           fontWeight: FontWeight.w700,
+              //           fontSize: 13,
+              //           color: AppTheme.textPrimary(context),
+              //         ),
+              //       ),
+              //       const SizedBox(height: 8),
+              //       _LegendRow(
+              //         icon: Icons.domain,
+              //         color: AppTheme.primary,
+              //         text: 'FG → เก็บเข้า ASRS หรือ Replenish Rack',
+              //       ),
+              //       const SizedBox(height: 6),
+              //       _LegendRow(
+              //         icon: Icons.build_circle,
+              //         color: AppTheme.warning,
+              //         text: 'PW → ส่งจุด Prework หรือเก็บ ASRS',
+              //       ),
+              //       const SizedBox(height: 6),
+              //       _LegendRow(
+              //         icon: Icons.wrap_text,
+              //         color: AppTheme.secondary,
+              //         text: 'เลือกพัน Pallet ผ่าน Wrapping Machine ก่อนเข้า ASRS',
+              //       ),
+              //     ],
+              //   ),
+              // ),
             ],
           ),
         ),
@@ -352,10 +358,7 @@ class _LegendRow extends StatelessWidget {
         Expanded(
           child: Text(
             text,
-            style: TextStyle(
-              fontSize: 12,
-              color: AppTheme.textGrey(context),
-            ),
+            style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
           ),
         ),
       ],

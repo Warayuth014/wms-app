@@ -132,6 +132,22 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
   }
 
   void _openStationPopup(StationInfo station) {
+    // ฝั่งรับ → ไปหน้า PreworkReceivePage (เลือก pallet PREWORK + ตัดยอด + คืน)
+    if (station.pwRole == PWRole.receive) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PreworkReceivePage(
+            station: station,
+            userId: widget.userId,
+            onCompleted: () => _loadStationStatus(),
+          ),
+        ),
+      );
+      return;
+    }
+
+    // ฝั่งส่ง → ยังใช้ StationSheet เดิม
     final busy = _stationStatus[station.id];
     if (busy != null) {
       _showBusyDialog(station, busy);
@@ -214,7 +230,11 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Row(
                     children: [
-                      const Icon(Icons.inventory_2, size: 14, color: Colors.grey),
+                      const Icon(
+                        Icons.inventory_2,
+                        size: 14,
+                        color: Colors.grey,
+                      ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
@@ -329,10 +349,10 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
                           StationCard(
                             station: s,
                             isDispatching: _stationStatus.containsKey(s.id),
-                            busyPalletId: _stationStatus[s.id]
-                                ?['palletId'] as String?,
-                            busyDestination: _stationStatus[s.id]
-                                ?['destination'] as String?,
+                            busyPalletId:
+                                _stationStatus[s.id]?['palletId'] as String?,
+                            busyDestination:
+                                _stationStatus[s.id]?['destination'] as String?,
                             onTap: () => _openStationPopup(s),
                           ),
                           const SizedBox(height: 10),
@@ -357,10 +377,10 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
                           StationCard(
                             station: s,
                             isDispatching: _stationStatus.containsKey(s.id),
-                            busyPalletId: _stationStatus[s.id]
-                                ?['palletId'] as String?,
-                            busyDestination: _stationStatus[s.id]
-                                ?['destination'] as String?,
+                            busyPalletId:
+                                _stationStatus[s.id]?['palletId'] as String?,
+                            busyDestination:
+                                _stationStatus[s.id]?['destination'] as String?,
                             onTap: () => _openStationPopup(s),
                           ),
                           const SizedBox(height: 10),
@@ -372,34 +392,34 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
               ),
 
               // ── Legend ────────────────────────
-              WmsCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'การทำงาน',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        color: AppTheme.textPrimary(context),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _LegendRow(
-                      icon: Icons.download,
-                      color: _kColorReceive,
-                      text:
-                          'รับ Pallet — เรียก PW Pallet จาก ASRS มาที่ Prework',
-                    ),
-                    const SizedBox(height: 6),
-                    _LegendRow(
-                      icon: Icons.upload,
-                      color: _kColorSend,
-                      text: 'ส่ง Pallet — ติดสติ๊กเกอร์ แล้วส่งเข้า ASRS',
-                    ),
-                  ],
-                ),
-              ),
+              // WmsCard(
+              //   child: Column(
+              //     crossAxisAlignment: CrossAxisAlignment.start,
+              //     children: [
+              //       Text(
+              //         'การทำงาน',
+              //         style: TextStyle(
+              //           fontWeight: FontWeight.w700,
+              //           fontSize: 13,
+              //           color: AppTheme.textPrimary(context),
+              //         ),
+              //       ),
+              //       const SizedBox(height: 8),
+              //       _LegendRow(
+              //         icon: Icons.download,
+              //         color: _kColorReceive,
+              //         text:
+              //             'รับ Pallet — เรียก PW Pallet จาก ASRS มาที่ Prework',
+              //       ),
+              //       const SizedBox(height: 6),
+              //       _LegendRow(
+              //         icon: Icons.upload,
+              //         color: _kColorSend,
+              //         text: 'ส่ง Pallet — ติดสติ๊กเกอร์ แล้วส่งเข้า ASRS',
+              //       ),
+              //     ],
+              //   ),
+              // ),
             ],
           ),
         ),

@@ -7,6 +7,7 @@ import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import '../../models/wms_models.dart';
+import '../../widgets/part_thumbnail.dart';
 
 // ── Station definition ───────────────────────
 enum PWRole { none, receive, send }
@@ -336,7 +337,19 @@ class _StationSheetState extends State<StationSheet> {
     }
 
     if (_isReceive) {
-      await _recallPallet(palletId);
+      // ปิด bottom sheet แล้วไปหน้า Prework Receive
+      Navigator.pop(context);
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PreworkReceivePage(
+            palletId: palletId,
+            station: widget.station,
+            userId: widget.userId,
+            onCompleted: widget.onConfirmed,
+          ),
+        ),
+      );
       return;
     }
 
@@ -377,38 +390,6 @@ class _StationSheetState extends State<StationSheet> {
       _selectedDestination =
           widget.station.fixedDestination ?? pallet.suggestedDestination;
     });
-  }
-
-  Future<void> _recallPallet(String palletId) async {
-    final confirm = await showConfirmDialog(
-      context,
-      title: 'เรียก Pallet จาก ASRS',
-      message:
-          'เรียก $palletId จาก ASRS\n'
-          'มาที่ ${widget.station.id}\n\n'
-          'AMR จะนำ Pallet มาส่งทันที',
-      confirmLabel: 'เรียก Pallet',
-    );
-    if (!confirm || !mounted) return;
-
-    setState(() => _loadingConfirm = true);
-
-    final result = await _api.recallToPrework(
-      palletId: palletId,
-      stationId: widget.station.id,
-      operatorId: widget.userId,
-    );
-
-    setState(() => _loadingConfirm = false);
-    if (!mounted) return;
-
-    if (!result.success) {
-      showErrorDialog(context, message: result.error!);
-      return;
-    }
-
-    Navigator.pop(context);
-    widget.onConfirmed();
   }
 
   Future<void> _confirmPutaway({bool convertToFG = true}) async {
@@ -715,7 +696,37 @@ class _StationSheetState extends State<StationSheet> {
               style: TextStyle(color: AppTheme.textGrey(context), fontSize: 12),
             ),
           ],
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _showItemsDetail(context),
+              icon: const Icon(Icons.visibility, size: 18),
+              label: Text('ดูสินค้าใน Pallet (${_pallet!.items.length})'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.primary,
+                side: const BorderSide(color: AppTheme.primary),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  void _showItemsDetail(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PalletItemsPage(
+          palletId: _pallet!.palletId,
+          type: _pallet!.type,
+          items: _pallet!.items,
+        ),
       ),
     );
   }
@@ -921,6 +932,790 @@ class DestButton extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// =============================================
+// PalletItemsPage — หน้าแสดงสินค้าใน Pallet
+// =============================================
+class PalletItemsPage extends StatelessWidget {
+  final String palletId;
+  final String type;
+  final List<UnloadItem> items;
+
+  const PalletItemsPage({
+    super.key,
+    required this.palletId,
+    required this.type,
+    required this.items,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isFG = type == 'FG';
+    final typeColor = isFG ? AppTheme.success : AppTheme.warning;
+
+    return Scaffold(
+      appBar: WmsAppBar(title: '$palletId — สินค้า'),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            // Summary header
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: typeColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: typeColor.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.inventory_2, color: typeColor, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          palletId,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.textPrimary(context),
+                          ),
+                        ),
+                        Text(
+                          'ประเภท $type · ${items.length} รายการ · รวม ${items.fold<int>(0, (sum, i) => sum + i.qty)} ชิ้น',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.textGrey(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: typeColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      type,
+                      style: TextStyle(
+                        color: typeColor,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Items list
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                itemCount: items.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        PartThumbnail(imageUrl: item.imageUrl, size: 56),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.partId,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                item.itemDesc,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.textGrey(context),
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Text(
+                                    '${item.owner} / ${item.brand}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppTheme.textGrey(context),
+                                    ),
+                                  ),
+                                  if (item.lotNumber != null &&
+                                      item.lotNumber!.isNotEmpty) ...[
+                                    const SizedBox(width: 8),
+                                    Icon(Icons.label_outline,
+                                        size: 12,
+                                        color: AppTheme.textGrey(context)),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      item.lotNumber!,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: AppTheme.textGrey(context),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Column(
+                          children: [
+                            Text(
+                              '${item.qty}',
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: AppTheme.primary,
+                              ),
+                            ),
+                            Text(
+                              'ชิ้น',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.textGrey(context),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================
+// PreworkReceivePage — รับ Pallet ที่ Prework Station
+// เลือก Pallet (Status=PREWORK) → ตัดยอด → แสดง items → คืน pallet เปล่า
+// =============================================
+class PreworkReceivePage extends StatefulWidget {
+  final StationInfo station;
+  final String userId;
+  final VoidCallback onCompleted;
+
+  const PreworkReceivePage({
+    super.key,
+    required this.station,
+    required this.userId,
+    required this.onCompleted,
+  });
+
+  @override
+  State<PreworkReceivePage> createState() => _PreworkReceivePageState();
+}
+
+enum _PageState { loading, selectPallet, received, error }
+
+class _PreworkReceivePageState extends State<PreworkReceivePage> {
+  final _api = ApiService();
+
+  _PageState _state = _PageState.loading;
+  bool _actionLoading = false;
+
+  // เลือก pallet
+  List<Map<String, dynamic>> _preworkPallets = [];
+
+  // หลังตัดยอด
+  String? _selectedPalletId;
+  List<UnloadItem> _receivedItems = [];
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreworkPallets();
+  }
+
+  Future<void> _loadPreworkPallets() async {
+    setState(() => _state = _PageState.loading);
+
+    final result = await _api.getPreworkPallets();
+    if (!mounted) return;
+
+    if (!result.success) {
+      setState(() {
+        _state = _PageState.error;
+        _error = result.error;
+      });
+      return;
+    }
+
+    setState(() {
+      _preworkPallets = result.data!;
+      _state = _PageState.selectPallet;
+    });
+  }
+
+  Future<void> _receivePallet(Map<String, dynamic> pallet) async {
+    final palletId = pallet['palletId'] as String;
+    final itemCount = pallet['itemCount'] as int;
+    final totalQty = pallet['totalQty'] as int;
+
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'รับ Pallet $palletId',
+      message:
+          'แมพ $palletId เข้า ${widget.station.id}\n'
+          'สินค้า $itemCount รายการ ($totalQty ชิ้น)\n\n'
+          'ตัดยอดออกจาก Pallet ทันที?',
+      confirmLabel: 'รับ & ตัดยอด',
+    );
+    if (!confirm || !mounted) return;
+
+    setState(() => _actionLoading = true);
+
+    final result = await _api.preworkReceive(
+      palletId: palletId,
+      stationId: widget.station.id,
+      operatorId: widget.userId,
+    );
+
+    if (!mounted) return;
+    setState(() => _actionLoading = false);
+
+    if (!result.success) {
+      showErrorDialog(context, message: result.error ?? 'เกิดข้อผิดพลาด');
+      return;
+    }
+
+    setState(() {
+      _selectedPalletId = palletId;
+      _receivedItems = result.data!.items;
+      _state = _PageState.received;
+    });
+  }
+
+  Future<void> _returnPallet() async {
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'คืน Pallet เปล่า',
+      message:
+          'คืน $_selectedPalletId\n'
+          'Pallet จะถูกเปลี่ยนเป็นสถานะ AVAILABLE\n\n'
+          'ยืนยันคืน Pallet?',
+      confirmLabel: 'คืน Pallet',
+    );
+    if (!confirm || !mounted) return;
+
+    setState(() => _actionLoading = true);
+
+    final result = await _api.preworkReturnPallet(
+      palletId: _selectedPalletId!,
+      stationId: widget.station.id,
+      operatorId: widget.userId,
+    );
+
+    if (!mounted) return;
+    setState(() => _actionLoading = false);
+
+    if (!result.success) {
+      showErrorDialog(context, message: result.error ?? 'เกิดข้อผิดพลาด');
+      return;
+    }
+
+    showSuccessSnackbar(context, '$_selectedPalletId คืนแล้ว (AVAILABLE)');
+    widget.onCompleted();
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LoadingOverlay(
+      loading: _actionLoading,
+      message: _state == _PageState.received ? 'กำลังคืน Pallet...' : 'กำลังตัดยอด...',
+      child: Scaffold(
+        appBar: WmsAppBar(
+          title: 'รับ Pallet — ${widget.station.id}',
+        ),
+        body: SafeArea(
+          top: false,
+          child: switch (_state) {
+            _PageState.loading => const Center(child: CircularProgressIndicator()),
+            _PageState.error => _buildError(),
+            _PageState.selectPallet => _buildSelectPallet(),
+            _PageState.received => _buildReceived(),
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, color: AppTheme.danger, size: 56),
+            const SizedBox(height: 16),
+            Text(_error ?? 'เกิดข้อผิดพลาด',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 15)),
+            const SizedBox(height: 24),
+            PrimaryButton(
+              label: 'ลองใหม่',
+              icon: Icons.refresh,
+              onPressed: _loadPreworkPallets,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── หน้าเลือก Pallet ──────────────────────
+  Widget _buildSelectPallet() {
+    if (_preworkPallets.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.inbox, size: 64, color: Colors.grey.shade300),
+              const SizedBox(height: 16),
+              Text(
+                'ไม่มี Pallet ที่รอ Prework',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textGrey(context),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'ส่ง Pallet PW มาจาก Putaway for Receive ก่อน',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textGrey(context),
+                ),
+              ),
+              const SizedBox(height: 24),
+              PrimaryButton(
+                label: 'รีเฟรช',
+                icon: Icons.refresh,
+                onPressed: _loadPreworkPallets,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          child: Row(
+            children: [
+              Icon(Icons.inventory_2, size: 18, color: AppTheme.textPrimary(context)),
+              const SizedBox(width: 6),
+              Text(
+                'เลือก Pallet ที่จะรับ (${_preworkPallets.length})',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary(context),
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 20),
+                onPressed: _loadPreworkPallets,
+                tooltip: 'รีเฟรช',
+              ),
+            ],
+          ),
+        ),
+
+        // Pallet list
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            itemCount: _preworkPallets.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (context, index) {
+              final p = _preworkPallets[index];
+              final palletId = p['palletId'] as String;
+              final type = p['type'] as String? ?? '-';
+              final itemCount = p['itemCount'] as int;
+              final totalQty = p['totalQty'] as int;
+              final items = p['items'] as List? ?? [];
+
+              return GestureDetector(
+                onTap: () => _receivePallet(p),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.warning.withValues(alpha: 0.4)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Pallet header
+                      Row(
+                        children: [
+                          const Icon(Icons.inventory_2, color: AppTheme.warning, size: 22),
+                          const SizedBox(width: 10),
+                          Text(
+                            palletId,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.warning.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              type,
+                              style: const TextStyle(
+                                color: AppTheme.warning,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '$itemCount รายการ · $totalQty ชิ้น',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textGrey(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                      // Items preview
+                      if (items.isNotEmpty) ...[
+                        const Divider(height: 16),
+                        for (final item in items.take(3))
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Row(
+                              children: [
+                                PartThumbnail(
+                                  imageUrl: item['imageUrl'] as String?,
+                                  size: 28,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '${item['partId']} — ${item['itemDesc']}',
+                                    style: const TextStyle(fontSize: 12),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Text(
+                                  'x${item['qty']}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (items.length > 3)
+                          Text(
+                            '... อีก ${items.length - 3} รายการ',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textGrey(context),
+                            ),
+                          ),
+                      ],
+                      // Tap hint
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.touch_app, size: 16, color: AppTheme.primary),
+                            SizedBox(width: 6),
+                            Text(
+                              'กดเพื่อรับ & ตัดยอด',
+                              style: TextStyle(
+                                color: AppTheme.primary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── หลังตัดยอดแล้ว ─────────────────────────
+  Widget _buildReceived() {
+    final totalQty = _receivedItems.fold<int>(0, (sum, i) => sum + i.qty);
+
+    return Column(
+      children: [
+        // Header
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppTheme.success.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.success.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.check_circle, color: AppTheme.success, size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ตัดยอดจาก $_selectedPalletId แล้ว',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimary(context),
+                      ),
+                    ),
+                    Text(
+                      '${_receivedItems.length} รายการ · รวม $totalQty ชิ้น',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.textGrey(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Section label
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Row(
+            children: [
+              Icon(Icons.inventory_2, size: 18, color: AppTheme.textPrimary(context)),
+              const SizedBox(width: 6),
+              Text(
+                'สินค้าที่ตัดยอด',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary(context),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Items table
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            itemCount: _receivedItems.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (context, index) {
+              final item = _receivedItems[index];
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    PartThumbnail(imageUrl: item.imageUrl, size: 52),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.partId,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            item.itemDesc,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textGrey(context),
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Text(
+                                '${item.owner} / ${item.brand}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.textGrey(context),
+                                ),
+                              ),
+                              if (item.lotNumber != null &&
+                                  item.lotNumber!.isNotEmpty) ...[
+                                const SizedBox(width: 8),
+                                Icon(Icons.label_outline,
+                                    size: 12,
+                                    color: AppTheme.textGrey(context)),
+                                const SizedBox(width: 2),
+                                Text(
+                                  item.lotNumber!,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppTheme.textGrey(context),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      children: [
+                        Text(
+                          '${item.qty}',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                        Text(
+                          'ชิ้น',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textGrey(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+
+        // Return pallet button
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _returnPallet,
+              icon: const Icon(Icons.replay, color: Colors.white),
+              label: const Text(
+                'คืน Pallet เปล่า',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                  color: Colors.white,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.danger,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

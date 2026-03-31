@@ -186,7 +186,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    Row(
+                    IntrinsicHeight(
+                      child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Expanded(
                           child: _FlowCard(
@@ -216,7 +218,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Expanded(
                           child: _FlowCard(
                             icon: Icons.warehouse_rounded,
-                            title: 'Putaway',
+                            title: 'Putaway for Receive',
                             subtitle: 'เก็บ Pallet เข้าคลัง',
                             gradient: const [
                               Color(0xFF0D47A1),
@@ -238,16 +240,18 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ],
-                    ),
+                    )),
 
                     const SizedBox(height: 12),
 
-                    Row(
+                    IntrinsicHeight(
+                      child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Expanded(
                           child: _FlowCard(
                             icon: Icons.build_circle_rounded,
-                            title: 'Putaway Prework',
+                            title: 'Putaway for Prework',
                             subtitle: 'Prework Station',
                             gradient: const [
                               Color(0xFF004D40),
@@ -294,11 +298,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ],
-                    ),
+                    )),
 
                     const SizedBox(height: 12),
 
-                    Row(
+                    IntrinsicHeight(
+                      child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Expanded(
                           child: _FlowCard(
@@ -327,7 +333,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 12),
                         const Expanded(child: SizedBox()),
                       ],
-                    ),
+                    )),
 
                     // ── Supervisor Section ──────
                     if (_role == 'SUPERVISOR') ...[
