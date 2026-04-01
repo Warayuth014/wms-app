@@ -1,8 +1,8 @@
 # WMS Project Context
 
 ## Stack
-- Backend: ASP.NET Core 8 + EF Core (WmsApi)
-- Frontend: Flutter mobile app (wmsapp)
+- Backend: C:\Users\Admin\Documents\GitHub\wms-api
+- Frontend: C:\Users\Admin\Documents\GitHub\wms-app
 
 ## Branch
 - Flutter ปัจจุบัน: WMS-V2
