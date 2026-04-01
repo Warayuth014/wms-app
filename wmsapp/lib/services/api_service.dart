@@ -422,6 +422,14 @@ class ApiService {
     return ApiResult.success(PutawayResult.fromJson(r.data!));
   }
 
+  /// ดึงสถานะ PW-STN-1,3,5 — pallet ที่แมพ + items ที่ตัดยอดแล้ว
+  Future<ApiResult<List<Map<String, dynamic>>>> getPreworkStationStatus() async {
+    final r = await _get('/putaway/prework-station-status');
+    if (!r.success) return ApiResult.error(r.error);
+    final stations = (r.data!['stations'] as List).cast<Map<String, dynamic>>();
+    return ApiResult.success(stations);
+  }
+
   Future<ApiResult<List<Map<String, dynamic>>>> getPreworkPallets() async {
     final r = await _get('/putaway/prework-pallets');
     if (!r.success) return ApiResult.error(r.error);

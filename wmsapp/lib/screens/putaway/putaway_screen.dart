@@ -95,10 +95,7 @@ class _PutawayScreenState extends State<PutawayScreen> {
 
   void _openStationPopup(StationInfo station) {
     final busy = _stationStatus[station.id];
-    if (busy != null) {
-      _showBusyDialog(station, busy);
-      return;
-    }
+    if (busy != null) return;
 
     showModalBottomSheet(
       context: context,
@@ -111,101 +108,6 @@ class _PutawayScreenState extends State<PutawayScreen> {
         onConfirmed: () {
           _loadStationStatus();
         },
-      ),
-    );
-  }
-
-  void _showBusyDialog(StationInfo station, Map<String, dynamic> busy) {
-    final palletId = busy['palletId'] as String;
-    final dest = busy['destination'] as String;
-    final items = busy['items'] as List? ?? [];
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: AppTheme.warning),
-            const SizedBox(width: 8),
-            Text(
-              '${station.id} ไม่ว่าง',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.warning.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: AppTheme.warning.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  InfoRow(label: 'Pallet', value: palletId),
-                  InfoRow(label: 'ปลายทาง', value: dest),
-                  InfoRow(label: 'สถานะ', value: 'AGV กำลังมารับ'),
-                ],
-              ),
-            ),
-            if (items.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                'สินค้าบน Pallet:',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                  color: AppTheme.textPrimary(context),
-                ),
-              ),
-              const SizedBox(height: 6),
-              for (final item in items)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.inventory_2,
-                        size: 14,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          '${item['partId']} — ${item['itemDesc']}',
-                          style: const TextStyle(fontSize: 12),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Text(
-                        'x${item['qty']}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _loadStationStatus();
-            },
-            child: const Text('ปิด'),
-          ),
-        ],
       ),
     );
   }
@@ -338,30 +240,30 @@ class _PutawayScreenState extends State<PutawayScreen> {
   }
 }
 
-class _LegendRow extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String text;
+// class _LegendRow extends StatelessWidget {
+//   final IconData icon;
+//   final Color color;
+//   final String text;
 
-  const _LegendRow({
-    required this.icon,
-    required this.color,
-    required this.text,
-  });
+//   const _LegendRow({
+//     required this.icon,
+//     required this.color,
+//     required this.text,
+//   });
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 16),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
-          ),
-        ),
-      ],
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return Row(
+//       children: [
+//         Icon(icon, color: color, size: 16),
+//         const SizedBox(width: 8),
+//         Expanded(
+//           child: Text(
+//             text,
+//             style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+// }

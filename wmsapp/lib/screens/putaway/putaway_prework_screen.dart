@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/part_thumbnail.dart';
 import '../../services/api_service.dart';
 import 'putaway_widgets.dart';
 
@@ -85,19 +86,26 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
   final _stationController = TextEditingController();
   final _api = ApiService();
 
-  // stationId → { palletId, destination, items }
+  // stationId → { palletId, destination, items } (สำหรับฝั่งส่ง)
   Map<String, Map<String, dynamic>> _stationStatus = {};
+
+  // stationId → { palletId, palletStatus, cutItems } (สำหรับฝั่งรับ)
+  Map<String, Map<String, dynamic>> _receiveStatus = {};
 
   @override
   void initState() {
     super.initState();
-    _loadStationStatus();
+    _loadAllStatus();
   }
 
   @override
   void dispose() {
     _stationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadAllStatus() async {
+    await Future.wait([_loadStationStatus(), _loadPreworkStationStatus()]);
   }
 
   Future<void> _loadStationStatus() async {
@@ -109,6 +117,18 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
         map[s['stationId'] as String] = s;
       }
       setState(() => _stationStatus = map);
+    }
+  }
+
+  Future<void> _loadPreworkStationStatus() async {
+    final result = await _api.getPreworkStationStatus();
+    if (!mounted) return;
+    if (result.success) {
+      final map = <String, Map<String, dynamic>>{};
+      for (final s in result.data!) {
+        map[s['stationId'] as String] = s;
+      }
+      setState(() => _receiveStatus = map);
     }
   }
 
@@ -132,27 +152,38 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
   }
 
   void _openStationPopup(StationInfo station) {
-    // ฝั่งรับ → ไปหน้า PreworkReceivePage (เลือก pallet PREWORK + ตัดยอด + คืน)
+    // ฝั่งรับ → popup แสดง cut items + ปุ่มคืน pallet
     if (station.pwRole == PWRole.receive) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PreworkReceivePage(
-            station: station,
-            userId: widget.userId,
-            onCompleted: () => _loadStationStatus(),
-          ),
+      final info = _receiveStatus[station.id];
+      final palletId = info?['palletId'] as String?;
+      final palletStatus = info?['palletStatus'] as String?;
+
+      // AMR กำลังนำ Pallet มา → ไม่ต้องเปิด popup
+      if (palletStatus == 'IN_TRANSIT') return;
+
+      final cutItems =
+          (info?['cutItems'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _PreworkReceiveSheet(
+          station: station,
+          userId: widget.userId,
+          palletId: palletId,
+          palletStatus: palletStatus,
+          cutItems: cutItems,
+          onCompleted: () => _loadAllStatus(),
         ),
       );
       return;
     }
 
-    // ฝั่งส่ง → ยังใช้ StationSheet เดิม
+    // ฝั่งส่ง → AMR กำลังมารับ → ไม่ต้องเปิด popup
     final busy = _stationStatus[station.id];
-    if (busy != null) {
-      _showBusyDialog(station, busy);
-      return;
-    }
+    if (busy != null) return;
 
     showModalBottomSheet(
       context: context,
@@ -163,108 +194,8 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
         station: station,
         userId: widget.userId,
         onConfirmed: () {
-          _loadStationStatus();
+          _loadAllStatus();
         },
-      ),
-    );
-  }
-
-  void _showBusyDialog(StationInfo station, Map<String, dynamic> busy) {
-    final palletId = busy['palletId'] as String;
-    final dest = busy['destination'] as String;
-    final items = busy['items'] as List? ?? [];
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: AppTheme.warning),
-            const SizedBox(width: 8),
-            Text(
-              '${station.id} ไม่ว่าง',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.warning.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: AppTheme.warning.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  InfoRow(label: 'Pallet', value: palletId),
-                  InfoRow(label: 'ปลายทาง', value: dest),
-                  InfoRow(
-                    label: 'สถานะ',
-                    value: station.pwRole == PWRole.receive
-                        ? 'AMR กำลังนำ Pallet มา'
-                        : 'AGV กำลังมารับ',
-                  ),
-                ],
-              ),
-            ),
-            if (items.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                'สินค้าบน Pallet:',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                  color: AppTheme.textPrimary(context),
-                ),
-              ),
-              const SizedBox(height: 6),
-              for (final item in items)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.inventory_2,
-                        size: 14,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          '${item['partId']} — ${item['itemDesc']}',
-                          style: const TextStyle(fontSize: 12),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Text(
-                        'x${item['qty']}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _loadStationStatus();
-            },
-            child: const Text('ปิด'),
-          ),
-        ],
       ),
     );
   }
@@ -346,15 +277,7 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
                         ),
                         const SizedBox(height: 10),
                         for (final s in receiveStations) ...[
-                          StationCard(
-                            station: s,
-                            isDispatching: _stationStatus.containsKey(s.id),
-                            busyPalletId:
-                                _stationStatus[s.id]?['palletId'] as String?,
-                            busyDestination:
-                                _stationStatus[s.id]?['destination'] as String?,
-                            onTap: () => _openStationPopup(s),
-                          ),
+                          _buildReceiveStationCard(s),
                           const SizedBox(height: 10),
                         ],
                       ],
@@ -390,38 +313,431 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
                   ),
                 ],
               ),
-
-              // ── Legend ────────────────────────
-              // WmsCard(
-              //   child: Column(
-              //     crossAxisAlignment: CrossAxisAlignment.start,
-              //     children: [
-              //       Text(
-              //         'การทำงาน',
-              //         style: TextStyle(
-              //           fontWeight: FontWeight.w700,
-              //           fontSize: 13,
-              //           color: AppTheme.textPrimary(context),
-              //         ),
-              //       ),
-              //       const SizedBox(height: 8),
-              //       _LegendRow(
-              //         icon: Icons.download,
-              //         color: _kColorReceive,
-              //         text:
-              //             'รับ Pallet — เรียก PW Pallet จาก ASRS มาที่ Prework',
-              //       ),
-              //       const SizedBox(height: 6),
-              //       _LegendRow(
-              //         icon: Icons.upload,
-              //         color: _kColorSend,
-              //         text: 'ส่ง Pallet — ติดสติ๊กเกอร์ แล้วส่งเข้า ASRS',
-              //       ),
-              //     ],
-              //   ),
-              // ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReceiveStationCard(StationInfo station) {
+    final info = _receiveStatus[station.id];
+    final palletId = info?['palletId'] as String?;
+    final palletStatus = info?['palletStatus'] as String?;
+    final isInTransit = palletStatus == 'IN_TRANSIT';
+    final hasPallet = palletId != null;
+
+    return StationCard(
+      station: station,
+      isDispatching: isInTransit, // animation เฉพาะกำลังมา
+      busyPalletId: palletId,
+      busyDestination: isInTransit
+          ? 'กำลังมาส่ง...'
+          : hasPallet
+          ? 'ตัดยอดแล้ว'
+          : null,
+      onTap: () => _openStationPopup(station),
+    );
+  }
+}
+
+// =============================================
+// _PreworkReceiveSheet — popup แสดง cut items + ปุ่มคืน pallet
+// =============================================
+class _PreworkReceiveSheet extends StatefulWidget {
+  final StationInfo station;
+  final String userId;
+  final String? palletId;
+  final String? palletStatus;
+  final List<Map<String, dynamic>> cutItems;
+  final VoidCallback onCompleted;
+
+  const _PreworkReceiveSheet({
+    required this.station,
+    required this.userId,
+    this.palletId,
+    this.palletStatus,
+    required this.cutItems,
+    required this.onCompleted,
+  });
+
+  @override
+  State<_PreworkReceiveSheet> createState() => _PreworkReceiveSheetState();
+}
+
+class _PreworkReceiveSheetState extends State<_PreworkReceiveSheet> {
+  final _api = ApiService();
+  bool _loading = false;
+
+  Future<void> _returnPallet() async {
+    if (widget.palletId == null) return;
+
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'คืน Pallet เปล่า',
+      message:
+          'คืน ${widget.palletId}\n'
+          'Pallet จะถูกเปลี่ยนเป็นสถานะ AVAILABLE\n\n'
+          'ยืนยันคืน Pallet?',
+      confirmLabel: 'คืน Pallet',
+    );
+    if (!confirm || !mounted) return;
+
+    setState(() => _loading = true);
+
+    final result = await _api.preworkReturnPallet(
+      palletId: widget.palletId!,
+      stationId: widget.station.id,
+      operatorId: widget.userId,
+    );
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (!result.success) {
+      showErrorDialog(context, message: result.error ?? 'เกิดข้อผิดพลาด');
+      return;
+    }
+
+    Navigator.pop(context);
+    showSuccessSnackbar(context, '${widget.palletId} คืนแล้ว (AVAILABLE)');
+    widget.onCompleted();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final bottomPad = mq.viewInsets.bottom + mq.viewPadding.bottom;
+    final hasPallet = widget.palletId != null;
+    final isInTransit = widget.palletStatus == 'IN_TRANSIT';
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.all(Radius.circular(20)),
+      ),
+      child: LoadingOverlay(
+        loading: _loading,
+        message: 'กำลังคืน Pallet...',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+
+            // Station Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: widget.station.color,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(widget.station.icon, color: Colors.white, size: 28),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.station.id,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          hasPallet ? widget.palletId! : 'ว่าง — รอ Pallet',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    if (hasPallet)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          widget.palletStatus ?? '',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            if (!hasPallet) ...[
+              // Empty state
+              Padding(
+                padding: EdgeInsets.fromLTRB(16, 24, 16, bottomPad + 24),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.inbox, size: 48, color: Colors.grey.shade300),
+                      const SizedBox(height: 12),
+                      Text(
+                        'ไม่มี Pallet ที่จุดนี้',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'ส่ง Pallet PW มาจาก Putaway ก่อน',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ] else if (isInTransit) ...[
+              // ── IN_TRANSIT: Pallet กำลังมา ──
+              Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPad + 24),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.warning.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppTheme.warning.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(
+                        Icons.local_shipping,
+                        color: AppTheme.warning,
+                        size: 40,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        widget.palletId!,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'AMR กำลังนำ Pallet มาส่ง...',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.textGrey(context),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'รอยิง API simulate/asrs/receive-pallet\nเพื่อจำลอง Pallet ถึงจุด Prework',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textGrey(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ] else ...[
+              // ── PREWORK_EMPTY: ตัดยอดแล้ว ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.success.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AppTheme.success.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle,
+                        color: AppTheme.success,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'ตัดยอดแล้ว ${widget.cutItems.length} รายการ',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            Text(
+                              'รวม ${widget.cutItems.fold<int>(0, (sum, i) => sum + (i['qty'] as int? ?? 0))} ชิ้น',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.textGrey(context),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // Cut items list
+              if (widget.cutItems.isNotEmpty)
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                    itemCount: widget.cutItems.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final item = widget.cutItems[index];
+                      return Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            PartThumbnail(
+                              imageUrl: item['imageUrl'] as String?,
+                              size: 44,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item['partId'] as String? ?? '',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  Text(
+                                    item['itemDesc'] as String? ?? '',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppTheme.textGrey(context),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    '${item['owner'] ?? ''} / ${item['brand'] ?? ''}',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: AppTheme.textGrey(context),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Column(
+                              children: [
+                                Text(
+                                  '${item['qty'] ?? 0}',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppTheme.primary,
+                                  ),
+                                ),
+                                Text(
+                                  'ชิ้น',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: AppTheme.textGrey(context),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+              // Return pallet button
+              Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPad + 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _returnPallet,
+                    icon: const Icon(Icons.replay, color: Colors.white),
+                    label: const Text(
+                      'คืน Pallet เปล่า',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.danger,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -464,34 +780,6 @@ class _ColumnHeader extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _LegendRow extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String text;
-
-  const _LegendRow({
-    required this.icon,
-    required this.color,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 16),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
-          ),
-        ),
-      ],
     );
   }
 }

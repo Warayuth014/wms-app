@@ -156,7 +156,7 @@ class _StationCardState extends State<StationCard>
         Text(
           widget.station.pwRole == PWRole.receive
               ? 'AMR กำลังนำ Pallet มา...'
-              : 'AGV กำลังมารับ...',
+              : 'AMR กำลังมารับ...',
           style: const TextStyle(color: Colors.white70, fontSize: 11),
         ),
         if (widget.busyPalletId != null) ...[
@@ -180,34 +180,12 @@ class _StationCardState extends State<StationCard>
                 if (widget.busyDestination != null)
                   Text(
                     '→ ${widget.busyDestination}',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 10,
-                    ),
+                    style: const TextStyle(color: Colors.white70, fontSize: 10),
                   ),
               ],
             ),
           ),
         ],
-        const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.25),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.info_outline, color: Colors.white, size: 11),
-              SizedBox(width: 3),
-              Text(
-                'กดดูรายละเอียด',
-                style: TextStyle(color: Colors.white, fontSize: 10),
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }
@@ -223,6 +201,8 @@ class _StationCardState extends State<StationCard>
   }
 
   Widget _buildNormalContent() {
+    final hasBusy = widget.busyPalletId != null;
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -254,6 +234,33 @@ class _StationCardState extends State<StationCard>
           widget.station.label,
           style: const TextStyle(color: Colors.white70, fontSize: 11),
         ),
+        if (hasBusy) ...[
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  widget.busyPalletId!,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (widget.busyDestination != null)
+                  Text(
+                    widget.busyDestination!,
+                    style: const TextStyle(color: Colors.white70, fontSize: 10),
+                  ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -261,14 +268,18 @@ class _StationCardState extends State<StationCard>
             color: Colors.white.withValues(alpha: 0.25),
             borderRadius: BorderRadius.circular(20),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.touch_app, color: Colors.white, size: 11),
-              SizedBox(width: 3),
+              Icon(
+                hasBusy ? Icons.info_outline : Icons.touch_app,
+                color: Colors.white,
+                size: 11,
+              ),
+              const SizedBox(width: 3),
               Text(
-                'กดเลือก',
-                style: TextStyle(color: Colors.white, fontSize: 10),
+                hasBusy ? 'กดดูรายละเอียด' : 'กดเลือก',
+                style: const TextStyle(color: Colors.white, fontSize: 10),
               ),
             ],
           ),
@@ -333,23 +344,6 @@ class _StationSheetState extends State<StationSheet> {
     final palletId = _palletController.text.trim().toUpperCase();
     if (palletId.isEmpty) {
       showErrorDialog(context, message: 'กรุณาใส่ Pallet ID');
-      return;
-    }
-
-    if (_isReceive) {
-      // ปิด bottom sheet แล้วไปหน้า Prework Receive
-      Navigator.pop(context);
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PreworkReceivePage(
-            palletId: palletId,
-            station: widget.station,
-            userId: widget.userId,
-            onCompleted: widget.onConfirmed,
-          ),
-        ),
-      );
       return;
     }
 
@@ -470,6 +464,7 @@ class _StationSheetState extends State<StationSheet> {
       return;
     }
 
+    if (!mounted) return;
     Navigator.pop(context);
     widget.onConfirmed();
   }
@@ -999,7 +994,10 @@ class PalletItemsPage extends StatelessWidget {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: typeColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
@@ -1076,9 +1074,11 @@ class PalletItemsPage extends StatelessWidget {
                                   if (item.lotNumber != null &&
                                       item.lotNumber!.isNotEmpty) ...[
                                     const SizedBox(width: 8),
-                                    Icon(Icons.label_outline,
-                                        size: 12,
-                                        color: AppTheme.textGrey(context)),
+                                    Icon(
+                                      Icons.label_outline,
+                                      size: 12,
+                                      color: AppTheme.textGrey(context),
+                                    ),
                                     const SizedBox(width: 2),
                                     Text(
                                       item.lotNumber!,
@@ -1264,15 +1264,17 @@ class _PreworkReceivePageState extends State<PreworkReceivePage> {
   Widget build(BuildContext context) {
     return LoadingOverlay(
       loading: _actionLoading,
-      message: _state == _PageState.received ? 'กำลังคืน Pallet...' : 'กำลังตัดยอด...',
+      message: _state == _PageState.received
+          ? 'กำลังคืน Pallet...'
+          : 'กำลังตัดยอด...',
       child: Scaffold(
-        appBar: WmsAppBar(
-          title: 'รับ Pallet — ${widget.station.id}',
-        ),
+        appBar: WmsAppBar(title: 'รับ Pallet — ${widget.station.id}'),
         body: SafeArea(
           top: false,
           child: switch (_state) {
-            _PageState.loading => const Center(child: CircularProgressIndicator()),
+            _PageState.loading => const Center(
+              child: CircularProgressIndicator(),
+            ),
             _PageState.error => _buildError(),
             _PageState.selectPallet => _buildSelectPallet(),
             _PageState.received => _buildReceived(),
@@ -1291,9 +1293,11 @@ class _PreworkReceivePageState extends State<PreworkReceivePage> {
           children: [
             const Icon(Icons.error_outline, color: AppTheme.danger, size: 56),
             const SizedBox(height: 16),
-            Text(_error ?? 'เกิดข้อผิดพลาด',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 15)),
+            Text(
+              _error ?? 'เกิดข้อผิดพลาด',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 15),
+            ),
             const SizedBox(height: 24),
             PrimaryButton(
               label: 'ลองใหม่',
@@ -1353,7 +1357,11 @@ class _PreworkReceivePageState extends State<PreworkReceivePage> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
           child: Row(
             children: [
-              Icon(Icons.inventory_2, size: 18, color: AppTheme.textPrimary(context)),
+              Icon(
+                Icons.inventory_2,
+                size: 18,
+                color: AppTheme.textPrimary(context),
+              ),
               const SizedBox(width: 6),
               Text(
                 'เลือก Pallet ที่จะรับ (${_preworkPallets.length})',
@@ -1394,7 +1402,9 @@ class _PreworkReceivePageState extends State<PreworkReceivePage> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.warning.withValues(alpha: 0.4)),
+                    border: Border.all(
+                      color: AppTheme.warning.withValues(alpha: 0.4),
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.04),
@@ -1409,7 +1419,11 @@ class _PreworkReceivePageState extends State<PreworkReceivePage> {
                       // Pallet header
                       Row(
                         children: [
-                          const Icon(Icons.inventory_2, color: AppTheme.warning, size: 22),
+                          const Icon(
+                            Icons.inventory_2,
+                            color: AppTheme.warning,
+                            size: 22,
+                          ),
                           const SizedBox(width: 10),
                           Text(
                             palletId,
@@ -1420,7 +1434,10 @@ class _PreworkReceivePageState extends State<PreworkReceivePage> {
                           ),
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: AppTheme.warning.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(12),
@@ -1496,7 +1513,11 @@ class _PreworkReceivePageState extends State<PreworkReceivePage> {
                         child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.touch_app, size: 16, color: AppTheme.primary),
+                            Icon(
+                              Icons.touch_app,
+                              size: 16,
+                              color: AppTheme.primary,
+                            ),
                             SizedBox(width: 6),
                             Text(
                               'กดเพื่อรับ & ตัดยอด',
@@ -1571,7 +1592,11 @@ class _PreworkReceivePageState extends State<PreworkReceivePage> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: Row(
             children: [
-              Icon(Icons.inventory_2, size: 18, color: AppTheme.textPrimary(context)),
+              Icon(
+                Icons.inventory_2,
+                size: 18,
+                color: AppTheme.textPrimary(context),
+              ),
               const SizedBox(width: 6),
               Text(
                 'สินค้าที่ตัดยอด',
@@ -1645,9 +1670,11 @@ class _PreworkReceivePageState extends State<PreworkReceivePage> {
                               if (item.lotNumber != null &&
                                   item.lotNumber!.isNotEmpty) ...[
                                 const SizedBox(width: 8),
-                                Icon(Icons.label_outline,
-                                    size: 12,
-                                    color: AppTheme.textGrey(context)),
+                                Icon(
+                                  Icons.label_outline,
+                                  size: 12,
+                                  color: AppTheme.textGrey(context),
+                                ),
                                 const SizedBox(width: 2),
                                 Text(
                                   item.lotNumber!,

@@ -579,9 +579,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                     children: [
                       const TextSpan(
                         text: "Batch No.",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                       TextSpan(text: " : ${item.lotNumber}"),
                     ],
@@ -931,7 +929,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
             child: ElevatedButton.icon(
               onPressed: isComplete
                   ? () {
-                      // TODO: ไปหน้า PACK flow
+                      // ไปหน้า PACK flow
                       showSuccessSnackbar(
                         context,
                         'Pick Order $_pickOrderId ครบ — พร้อมส่งไป PACK',
