@@ -465,6 +465,18 @@ class ApiService {
     return ApiResult.success(r.data!);
   }
 
+  // ── Simulation ────────────────────────────
+
+  Future<ApiResult<Map<String, dynamic>>> simulateLabelAndRepalletize({
+    required String palletId,
+  }) async {
+    final r = await _post('/simulate/prework/label-and-repalletize', {
+      'palletId': palletId,
+    });
+    if (!r.success) return ApiResult.error(r.error);
+    return ApiResult.success(r.data!);
+  }
+
   // ── Return ────────────────────────────────
 
   Future<ApiResult<OrderResponse>> getReturnOrder(String orderId) async {
