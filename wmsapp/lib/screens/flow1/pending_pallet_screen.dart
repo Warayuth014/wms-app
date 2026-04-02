@@ -1,6 +1,7 @@
 // lib/screens/flow1/pending_pallet_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
@@ -137,10 +138,10 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
                   focusNode: palletFocus,
                   autofocus: true,
                   textCapitalization: TextCapitalization.characters,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Pallet ID',
                     hintText: 'สแกนหรือพิมพ์ Pallet ID',
-                    prefixIcon: Icon(Icons.qr_code_scanner),
+                    prefixIcon: Icon(MdiIcons.barcodeScan),
                   ),
                   onSubmitted: assigning
                       ? null
@@ -325,7 +326,7 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
           padding: const EdgeInsets.only(bottom: 8, top: 4),
           child: Row(
             children: [
-              const Icon(Icons.receipt_long, size: 16, color: AppTheme.primary),
+              Icon(MdiIcons.fileDocumentOutline, size: 16, color: AppTheme.primary),
               const SizedBox(width: 6),
               Text(
                 'PO: $poId',
@@ -407,7 +408,7 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
                       children: [
                         if (line.lotNumber != null) ...[
                           Icon(
-                            Icons.label_outline,
+                            MdiIcons.tagOutline,
                             size: 12,
                             color: AppTheme.textGrey(context),
                           ),
@@ -461,7 +462,7 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
               // ── ปุ่มผูก ───────────────────────
               Column(
                 children: [
-                  Icon(Icons.link, color: AppTheme.primary, size: 22),
+                  Icon(MdiIcons.linkVariant, color: AppTheme.primary, size: 22),
                   const SizedBox(height: 2),
                   const Text(
                     'ผูก',

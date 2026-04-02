@@ -1,6 +1,7 @@
 // lib/screens/flow1/assign_pallet_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
@@ -396,7 +397,7 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
                         label:
                             'ผูก Pallet'
                             ' (${_selectedLineIds.length} รายการ)',
-                        icon: Icons.link,
+                        icon: MdiIcons.linkVariant,
                         onPressed: _assignPallet,
                       ),
                     ],
@@ -507,7 +508,7 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
                             children: [
                               if (line.lotNumber != null) ...[
                                 Icon(
-                                  Icons.label_outline,
+                                  MdiIcons.tagOutline,
                                   size: 12,
                                   color: AppTheme.textGrey(context),
                                 ),

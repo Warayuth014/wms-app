@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
@@ -253,8 +254,8 @@ class _ReturnScreenState extends State<ReturnScreen> {
                       children: [
                         Row(
                           children: [
-                            const Icon(
-                              Icons.receipt_long,
+                            Icon(
+                              MdiIcons.fileDocumentOutline,
                               color: AppTheme.primary,
                               size: 20,
                             ),
