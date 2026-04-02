@@ -387,7 +387,7 @@ class _StationSheetState extends State<StationSheet> {
     });
   }
 
-  Future<void> _confirmPutaway({bool convertToFG = true}) async {
+  Future<void> _confirmPutaway() async {
     if (_pallet == null) return;
 
     final dest = _effectiveDestination;
@@ -396,29 +396,17 @@ class _StationSheetState extends State<StationSheet> {
       'REPLENISH' => 'Replenish Station',
       _ => 'Prework',
     };
-    final isConvert = widget.station.fixedDestination != null && convertToFG;
-    final isSendAsrsAsPW =
-        widget.station.fixedDestination != null && !convertToFG;
+    final isSendStation = widget.station.fixedDestination != null;
 
     String title;
     String message;
-    if (isConvert) {
-      title = 'ยืนยัน Convert & Putaway';
+    if (isSendStation) {
+      title = 'ยืนยันส่ง Pallet ไป ASRS';
       final wrappingNote = _wrappingRequired
           ? '\nผ่าน Wrapping Machine ก่อน'
           : '';
       message =
-          'เปลี่ยน ${_pallet!.palletId} (PW → FG)\n'
-          'แล้วส่งเข้า ASRS$wrappingNote\n\n'
-          '${_wrappingRequired ? 'จะส่งเข้า Wrapping Machine ก่อน' : 'AMR จะมารับทันที'}';
-    } else if (isSendAsrsAsPW) {
-      title = 'ยืนยันส่งไป ASRS (ยังเป็น PW)';
-      final wrappingNote = _wrappingRequired
-          ? '\nผ่าน Wrapping Machine ก่อน'
-          : '';
-      message =
-          'ส่ง ${_pallet!.palletId} ไปเก็บที่ ASRS\n'
-          'โดยยังคงสถานะเป็น PW (ไม่ convert)$wrappingNote\n\n'
+          'ส่ง ${_pallet!.palletId} ไปเก็บที่ ASRS$wrappingNote\n\n'
           '${_wrappingRequired ? 'จะส่งเข้า Wrapping Machine ก่อน' : 'AMR จะมารับทันที'}';
     } else if (dest == 'REPLENISH') {
       title = 'ยืนยัน Replenish';
@@ -453,7 +441,6 @@ class _StationSheetState extends State<StationSheet> {
       destination: dest,
       operatorId: widget.userId,
       wrappingRequired: _wrappingRequired,
-      convertToFG: convertToFG,
     );
 
     setState(() => _loadingConfirm = false);
@@ -605,22 +592,13 @@ class _StationSheetState extends State<StationSheet> {
                 const SizedBox(height: 16),
                 PrimaryButton(
                   label: widget.station.fixedDestination != null
-                      ? 'ติดสติ๊กเกอร์ ส่ง ASRS'
+                      ? 'ส่ง Pallet ไป ASRS'
                       : 'เก็บ Pallet',
                   icon: widget.station.fixedDestination != null
-                      ? MdiIcons.swapHorizontal
+                      ? MdiIcons.warehouse
                       : MdiIcons.packageVariantClosed,
                   onPressed: _confirmPutaway,
                 ),
-
-                if (widget.station.fixedDestination != null) ...[
-                  const SizedBox(height: 10),
-                  WarningButton(
-                    label: 'ส่งไป ASRS (ยังเป็น PW)',
-                    icon: MdiIcons.warehouse,
-                    onPressed: () => _confirmPutaway(convertToFG: false),
-                  ),
-                ],
               ],
 
               const SizedBox(height: 8),

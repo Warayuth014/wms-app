@@ -394,7 +394,6 @@ class ApiService {
     required String destination,
     required String operatorId,
     bool wrappingRequired = false,
-    bool convertToFG = true,
   }) async {
     final r = await _post('/putaway/confirm', {
       'stationId': stationId,
@@ -402,7 +401,6 @@ class ApiService {
       'destination': destination,
       'operatorId': operatorId,
       'wrappingRequired': wrappingRequired,
-      'convertToFG': convertToFG,
     });
     if (!r.success) return ApiResult.error(r.error);
     return ApiResult.success(PutawayResult.fromJson(r.data!));
