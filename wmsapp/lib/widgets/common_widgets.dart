@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../theme/theme.dart';
 
 // =============================================
@@ -108,7 +109,7 @@ class ScanTextField extends StatelessWidget {
         labelText: label,
         hintText: hint,
         prefixIcon: Icon(
-          Icons.qr_code_scanner_rounded,
+          MdiIcons.barcodeScan,
           color: AppTheme.primary,
         ),
         suffixIcon: Material(
@@ -119,7 +120,7 @@ class ScanTextField extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Icon(
-                Icons.send_rounded,
+                MdiIcons.sendOutline,
                 color: enabled ? AppTheme.primary : AppTheme.textGrey(context),
                 size: 22,
               ),
@@ -390,7 +391,7 @@ class OfflineBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
+          Icon(MdiIcons.wifiOff, color: Colors.white, size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

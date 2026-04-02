@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
 /// Thumbnail รูปสินค้า — ใช้ได้ทุกที่ที่โชว์รายการ Part
 /// ถ้า imageUrl เป็น null จะโชว์ icon แทน
@@ -42,7 +43,7 @@ class PartThumbnail extends StatelessWidget {
                     snap.data!,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Icon(
-                      Icons.inventory_2_outlined,
+                      MdiIcons.packageVariantClosed,
                       color: Colors.grey.shade400,
                       size: size * 0.5,
                     ),
@@ -50,7 +51,7 @@ class PartThumbnail extends StatelessWidget {
                 },
               )
             : Icon(
-                Icons.inventory_2_outlined,
+                MdiIcons.packageVariantClosed,
                 color: Colors.grey.shade400,
                 size: size * 0.5,
               ),

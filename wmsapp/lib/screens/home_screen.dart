@@ -1,6 +1,7 @@
 // lib/screens/home_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wmsapp/screens/flow2/replenishment_menu_screen.dart';
 import '../theme/theme.dart';
@@ -127,8 +128,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.white.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(
-                Icons.warehouse_rounded,
+              child: Icon(
+                MdiIcons.warehouse,
                 color: Colors.white,
                 size: 20,
               ),
@@ -182,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     // ── Flow Cards ──────────────
                     SectionHeader(
                       title: 'เลือกการทำงาน',
-                      icon: Icons.apps_rounded,
+                      icon: MdiIcons.viewDashboardOutline,
                     ),
                     const SizedBox(height: 14),
 
@@ -192,7 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Expanded(
                           child: _FlowCard(
-                            icon: Icons.local_shipping_rounded,
+                            icon: MdiIcons.truckDeliveryOutline,
                             title: 'Receive',
                             subtitle: 'รับสินค้าเข้า',
                             gradient: const [
@@ -217,7 +218,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _FlowCard(
-                            icon: Icons.warehouse_rounded,
+                            icon: MdiIcons.forklift,
                             title: 'Putaway for Receive',
                             subtitle: 'เก็บ Pallet เข้าคลัง',
                             gradient: const [
@@ -250,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Expanded(
                           child: _FlowCard(
-                            icon: Icons.build_circle_rounded,
+                            icon: MdiIcons.clipboardCheckOutline,
                             title: 'Putaway for Prework',
                             subtitle: 'Prework Station',
                             gradient: const [
@@ -275,7 +276,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _FlowCard(
-                            icon: Icons.inventory_2_rounded,
+                            icon: MdiIcons.packageVariantPlus,
                             title: 'Replenishment',
                             subtitle: 'เติมสินค้า',
                             gradient: const [
@@ -308,7 +309,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Expanded(
                           child: _FlowCard(
-                            icon: Icons.content_cut_rounded,
+                            icon: MdiIcons.cartArrowDown,
                             title: 'Picking',
                             subtitle: 'เบิกสินค้า Pick/Pack',
                             gradient: const [
@@ -340,11 +341,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 28),
                       SectionHeader(
                         title: 'Supervisor',
-                        icon: Icons.shield_rounded,
+                        icon: MdiIcons.shieldAccountOutline,
                       ),
                       const SizedBox(height: 14),
                       _ActionCard(
-                        icon: Icons.add_photo_alternate_rounded,
+                        icon: MdiIcons.imageEditOutline,
                         iconColor: AppTheme.primary,
                         title: 'จัดการรูปสินค้า',
                         subtitle: 'อัปโหลด/แก้ไขรูปภาพ Parts',
@@ -363,10 +364,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     // ── TEST Section ────────────
                     if (_userId != null) ...[
                       const SizedBox(height: 28),
-                      SectionHeader(title: 'TEST', icon: Icons.science_rounded),
+                      SectionHeader(title: 'TEST', icon: MdiIcons.flaskOutline),
                       const SizedBox(height: 14),
                       _ActionCard(
-                        icon: Icons.science_rounded,
+                        icon: MdiIcons.flaskOutline,
                         iconColor: AppTheme.textGrey(context),
                         title: 'สร้าง Pick Order (TEST)',
                         subtitle: 'เลือกสินค้าจาก ReceiptLines',
@@ -712,8 +713,8 @@ class _PendingSyncCard extends StatelessWidget {
               color: AppTheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(AppTheme.radiusSm),
             ),
-            child: const Icon(
-              Icons.sync_rounded,
+            child: Icon(
+              MdiIcons.cloudSyncOutline,
               color: AppTheme.primary,
               size: 20,
             ),

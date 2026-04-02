@@ -1,6 +1,7 @@
 // lib/screens/login_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/theme.dart';
 import '../widgets/common_widgets.dart';
@@ -123,8 +124,8 @@ class _LoginScreenState extends State<LoginScreen>
                             width: 1.5,
                           ),
                         ),
-                        child: const Icon(
-                          Icons.warehouse_rounded,
+                        child: Icon(
+                          MdiIcons.warehouse,
                           color: Colors.white,
                           size: 48,
                         ),
@@ -242,8 +243,8 @@ class _LoginScreenState extends State<LoginScreen>
                                             ),
                                             child: Icon(
                                               isSuper
-                                                  ? Icons.shield_rounded
-                                                  : Icons.person_rounded,
+                                                  ? MdiIcons.shieldAccountOutline
+                                                  : MdiIcons.accountOutline,
                                               color: isSelected
                                                   ? Colors.white
                                                   : AppTheme.textGrey(context),
@@ -279,8 +280,8 @@ class _LoginScreenState extends State<LoginScreen>
                                             ),
                                           ),
                                           if (isSelected)
-                                            const Icon(
-                                              Icons.check_circle_rounded,
+                                            Icon(
+                                              MdiIcons.checkCircle,
                                               color: AppTheme.primary,
                                               size: 22,
                                             ),
@@ -304,12 +305,12 @@ class _LoginScreenState extends State<LoginScreen>
                               ),
                               decoration: InputDecoration(
                                 labelText: 'รหัสผ่าน',
-                                prefixIcon: const Icon(Icons.lock_rounded),
+                                prefixIcon: Icon(MdiIcons.lockOutline),
                                 suffixIcon: IconButton(
                                   icon: Icon(
                                     _obscure
-                                        ? Icons.visibility_rounded
-                                        : Icons.visibility_off_rounded,
+                                        ? MdiIcons.eyeOutline
+                                        : MdiIcons.eyeOffOutline,
                                   ),
                                   onPressed: () =>
                                       setState(() => _obscure = !_obscure),
@@ -368,7 +369,7 @@ class _LoginScreenState extends State<LoginScreen>
 
                             PrimaryButton(
                               label: 'เข้าสู่ระบบ',
-                              icon: Icons.login_rounded,
+                              icon: MdiIcons.loginVariant,
                               loading: _loading,
                               onPressed: _login,
                             ),

@@ -1,6 +1,7 @@
 // lib/screens/flow2/replenish_order_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
@@ -108,7 +109,7 @@ class _ReplenishOrderScreenState extends State<ReplenishOrderScreen> {
                       // ── Active Orders ──────────────
                       SectionHeader(
                         title: 'Orders ที่ค้างอยู่ (${_orders.length})',
-                        icon: Icons.list_alt,
+                        icon: MdiIcons.formatListChecks,
                       ),
                       const SizedBox(height: 12),
 
@@ -183,7 +184,7 @@ class _ReplenishOrderScreenState extends State<ReplenishOrderScreen> {
               label: _selectedPartIds.isEmpty
                   ? 'เลือก Part เพื่อสร้าง Order'
                   : 'สร้าง Order (${_selectedPartIds.length} รายการ)',
-              icon: Icons.add_task,
+              icon: MdiIcons.playlistPlus,
               onPressed: _selectedPartIds.isEmpty ? () {} : _createOrder,
             ),
           ),

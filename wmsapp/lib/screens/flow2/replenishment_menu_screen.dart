@@ -1,6 +1,7 @@
 // lib/screens/flow2/replenishment_menu_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import 'unload_screen.dart';
@@ -43,7 +44,7 @@ class ReplenishmentMenuScreen extends StatelessWidget {
 
               // ── Replenish Orders ──────────────
               _MenuCard(
-                icon: Icons.assignment,
+                icon: MdiIcons.clipboardTextOutline,
                 title: 'Replenish Orders',
                 subtitle: 'ดู Order และเติมสินค้าลง Tote (Tote-first workflow)',
                 color: const Color(0xFF7B1FA2),
@@ -60,7 +61,7 @@ class ReplenishmentMenuScreen extends StatelessWidget {
 
               // ── Unload ────────────────────────
               _MenuCard(
-                icon: Icons.upload,
+                icon: MdiIcons.trayArrowUp,
                 title: 'Unload',
                 subtitle: 'ขนสินค้าออกจาก Pallet เพื่อเตรียมลงตะกร้า',
                 color: AppTheme.secondary,
@@ -77,7 +78,7 @@ class ReplenishmentMenuScreen extends StatelessWidget {
 
               // ── Load Basket ───────────────────
               _MenuCard(
-                icon: Icons.shopping_basket,
+                icon: MdiIcons.basketOutline,
                 title: 'Load Basket',
                 subtitle: 'โหลดสินค้าลงตะกร้าเพื่อส่งไปยังพื้นที่จำหน่าย',
                 color: AppTheme.success,

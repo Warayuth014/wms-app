@@ -1,30 +1,31 @@
 // lib/screens/putaway/putaway_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import 'putaway_widgets.dart';
 
 // ── Station constants (STN only) ─────────────
-const _kStations = [
+final _kStations = [
   StationInfo(
     id: 'STN-1',
     label: 'Station 1',
     color: AppTheme.primary,
-    icon: Icons.warehouse,
+    icon: MdiIcons.warehouse,
   ),
   StationInfo(
     id: 'STN-2',
     label: 'Station 2',
     color: AppTheme.teal,
-    icon: Icons.warehouse,
+    icon: MdiIcons.warehouse,
   ),
   StationInfo(
     id: 'STN-3',
     label: 'Station 3',
     color: AppTheme.success,
-    icon: Icons.warehouse,
+    icon: MdiIcons.warehouse,
   ),
 ];
 
@@ -131,15 +132,15 @@ class _PutawayScreenState extends State<PutawayScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
                       children: [
                         Icon(
-                          Icons.qr_code_scanner,
+                          MdiIcons.barcodeScan,
                           color: AppTheme.primary,
                           size: 20,
                         ),
-                        SizedBox(width: 8),
-                        Text(
+                        const SizedBox(width: 8),
+                        const Text(
                           'สแกนบาร์โค้ด Station',
                           style: TextStyle(
                             fontSize: 15,
@@ -170,7 +171,7 @@ class _PutawayScreenState extends State<PutawayScreen> {
               const SizedBox(height: 20),
 
               // ── Station Grid ──────────────────
-              SectionHeader(title: 'เลือก Station', icon: Icons.grid_view),
+              SectionHeader(title: 'เลือก Station', icon: MdiIcons.viewGridOutline),
               const SizedBox(height: 12),
 
               Row(

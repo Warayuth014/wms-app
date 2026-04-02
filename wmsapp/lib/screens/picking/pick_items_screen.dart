@@ -6,6 +6,7 @@ import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import '../../models/wms_models.dart';
 import '../../widgets/part_thumbnail.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
 // ── Screen states ──────────────────────────────────────────────────────────
 enum _PickState {
@@ -301,10 +302,10 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.qr_code_scanner, color: AppTheme.primary),
-                    SizedBox(width: 8),
+                    Icon(MdiIcons.barcodeScan, color: AppTheme.primary),
+                    const SizedBox(width: 8),
                     Text(
                       'Scan Source Pallet',
                       style: TextStyle(

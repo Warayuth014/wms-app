@@ -1,6 +1,7 @@
 // lib/screens/flow1/scan_part_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
@@ -166,7 +167,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                     Icon(
                       poItem.condition == 'FG'
                           ? Icons.check_circle
-                          : Icons.build_circle,
+                          : MdiIcons.cogOutline,
                       color: condColor,
                       size: 36,
                     ),
@@ -212,9 +213,9 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
               TextField(
                 controller: _qtyController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'จำนวนที่รับจริง',
-                  prefixIcon: Icon(Icons.numbers),
+                  prefixIcon: Icon(MdiIcons.numeric),
                 ),
               ),
               const SizedBox(height: 16),
@@ -590,7 +591,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                                 const SizedBox(height: 12),
                                 PrimaryButton(
                                   label: 'สแกน',
-                                  icon: Icons.qr_code_scanner,
+                                  icon: MdiIcons.barcodeScan,
                                   onPressed: _scanPart,
                                 ),
                               ],
@@ -639,7 +640,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.receipt_long, color: AppTheme.primary, size: 18),
+          Icon(MdiIcons.fileDocumentOutline, color: AppTheme.primary, size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -684,7 +685,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       ),
       child: Row(
         children: [
-          Icon(Icons.inventory_2, color: color, size: 18),
+          Icon(MdiIcons.packageVariantClosed, color: color, size: 18),
           const SizedBox(width: 8),
           Text(
             'Pallet: $_lastPalletId',
@@ -721,9 +722,9 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.inventory_2, color: AppTheme.secondary),
+              Icon(MdiIcons.packageVariantClosed, color: AppTheme.secondary),
               SizedBox(width: 8),
               Text(
                 'สแกน Pallet',
@@ -794,7 +795,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
           const SizedBox(height: 12),
           PrimaryButton(
             label: 'ผูก Pallet',
-            icon: Icons.link,
+            icon: MdiIcons.linkVariant,
             onPressed: _scanPallet,
           ),
         ],
@@ -1036,7 +1037,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                             if (item.lotNumber != null &&
                                 item.lotNumber!.isNotEmpty) ...[
                               Icon(
-                                Icons.label_outline,
+                                MdiIcons.tagOutline,
                                 size: 12,
                                 color: AppTheme.textGrey(context),
                               ),

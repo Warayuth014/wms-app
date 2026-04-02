@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
@@ -387,7 +388,7 @@ class _UnloadScreenState extends State<UnloadScreen>
                 ),
               ),
               const SizedBox(height: 32),
-              Icon(Icons.forklift, color: AppTheme.textGrey(context), size: 56),
+              Icon(MdiIcons.forklift, color: AppTheme.textGrey(context), size: 56),
               const SizedBox(height: 24),
               Text(
                 'โฟล์คลิฟกำลังรับ Pallet...',
@@ -467,8 +468,8 @@ class _UnloadScreenState extends State<UnloadScreen>
                   WmsCard(
                     child: Row(
                       children: [
-                        const Icon(
-                          Icons.inventory_2,
+                        Icon(
+                          MdiIcons.packageVariantClosed,
                           color: AppTheme.primary,
                           size: 24,
                         ),
@@ -555,7 +556,7 @@ class _UnloadScreenState extends State<UnloadScreen>
                   const SizedBox(height: 20),
                   OutlinedButton.icon(
                     onPressed: _returnPallet,
-                    icon: const Icon(Icons.reply, color: AppTheme.danger),
+                    icon: Icon(MdiIcons.undoVariant, color: AppTheme.danger),
                     label: const Text(
                       'คืน Pallet',
                       style: TextStyle(
@@ -636,7 +637,7 @@ class _UnloadScreenState extends State<UnloadScreen>
           Row(
             children: [
               Icon(
-                Icons.inventory_2,
+                MdiIcons.packageVariantClosed,
                 color: AppTheme.textPrimary(context),
                 size: 18,
               ),
@@ -742,7 +743,7 @@ class _UnloadScreenState extends State<UnloadScreen>
                         if (item.lotNumber != null &&
                             item.lotNumber!.isNotEmpty) ...[
                           Icon(
-                            Icons.label_outline,
+                            MdiIcons.tagOutline,
                             size: 12,
                             color: AppTheme.textGrey(context),
                           ),

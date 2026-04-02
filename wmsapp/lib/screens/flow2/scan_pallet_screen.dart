@@ -1,6 +1,7 @@
 // lib/screens/flow2/scan_pallet_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
@@ -239,13 +240,13 @@ class _ScanPalletScreenState extends State<ScanPalletScreen> {
                         if (_pallet!.needsLabeling)
                           PrimaryButton(
                             label: 'ติดสติ๊กเกอร์แล้ว',
-                            icon: Icons.label,
+                            icon: MdiIcons.tag,
                             onPressed: _confirmLabeling,
                           )
                         else
                           PrimaryButton(
                             label: 'เริ่ม Unload',
-                            icon: Icons.output,
+                            icon: MdiIcons.exportVariant,
                             onPressed: _openUnloadSession,
                           ),
                       ],
@@ -394,13 +395,13 @@ class _ScanPalletScreenState extends State<ScanPalletScreen> {
                       children: [
                         if (item.lotNumber != null)
                           _InfoChip(
-                            icon: Icons.label_outline,
+                            icon: MdiIcons.tagOutline,
                             label: 'Batch No.: ${item.lotNumber!}',
                           ),
                         if (item.expiredDate != null) ...[
                           const SizedBox(width: 8),
                           _InfoChip(
-                            icon: Icons.calendar_today,
+                            icon: MdiIcons.calendarOutline,
                             label: item.expiredDate!,
                           ),
                         ],

@@ -1,6 +1,7 @@
 // lib/screens/flow2/replenish_work_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
@@ -301,14 +302,14 @@ class _ReplenishWorkScreenState extends State<ReplenishWorkScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionHeader(title: 'Scan Tote ID', icon: Icons.qr_code_scanner),
+          SectionHeader(title: 'Scan Tote ID', icon: MdiIcons.barcodeScan),
           const SizedBox(height: 12),
           TextField(
             controller: _toteCtrl,
             textCapitalization: TextCapitalization.characters,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Tote ID',
-              prefixIcon: Icon(Icons.inventory_2_outlined),
+              prefixIcon: Icon(MdiIcons.packageVariantClosed),
               border: OutlineInputBorder(),
               hintText: 'เช่น TOTE-001',
             ),
@@ -333,7 +334,7 @@ class _ReplenishWorkScreenState extends State<ReplenishWorkScreen> {
         WmsCard(
           child: Row(
             children: [
-              const Icon(Icons.inventory_2, color: AppTheme.primary),
+              Icon(MdiIcons.packageVariantClosed, color: AppTheme.primary),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -362,14 +363,14 @@ class _ReplenishWorkScreenState extends State<ReplenishWorkScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SectionHeader(title: 'Scan Pallet (REPLENISH)', icon: Icons.qr_code_scanner),
+              SectionHeader(title: 'Scan Pallet (REPLENISH)', icon: MdiIcons.barcodeScan),
               const SizedBox(height: 12),
               TextField(
                 controller: _palletCtrl,
                 textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Pallet ID',
-                  prefixIcon: Icon(Icons.view_in_ar_outlined),
+                  prefixIcon: Icon(MdiIcons.cubeScan),
                   border: OutlineInputBorder(),
                   hintText: 'เช่น PLT-0001',
                 ),
@@ -402,7 +403,7 @@ class _ReplenishWorkScreenState extends State<ReplenishWorkScreen> {
         WmsCard(
           child: Row(
             children: [
-              const Icon(Icons.inventory_2, color: AppTheme.primary),
+              Icon(MdiIcons.packageVariantClosed, color: AppTheme.primary),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(

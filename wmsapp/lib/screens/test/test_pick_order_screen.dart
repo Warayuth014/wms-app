@@ -5,6 +5,7 @@ import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import '../../widgets/part_thumbnail.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
 class TestPickOrderScreen extends StatefulWidget {
   final String userId;
@@ -154,8 +155,8 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
                 color: AppTheme.primary.withValues(alpha: 0.05),
                 child: Row(
                   children: [
-                    const Icon(
-                      Icons.science,
+                    Icon(
+                      MdiIcons.flaskOutline,
                       color: AppTheme.primary,
                       size: 20,
                     ),
@@ -205,7 +206,7 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
                     padding: const EdgeInsets.all(16),
                     child: PrimaryButton(
                       label: 'สร้าง Pick Order (${_selected.length} รายการ)',
-                      icon: Icons.add_task,
+                      icon: MdiIcons.playlistPlus,
                       onPressed: _createOrder,
                     ),
                   ),
@@ -282,7 +283,7 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
                       children: [
                         if (lotNumber != null && lotNumber.isNotEmpty) ...[
                           Icon(
-                            Icons.label_outline,
+                            MdiIcons.tagOutline,
                             size: 12,
                             color: AppTheme.textGrey(context),
                           ),
@@ -318,9 +319,9 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        _InfoChip(Icons.inventory_2, palletId),
+                        _InfoChip(MdiIcons.packageVariantClosed, palletId),
                         const SizedBox(width: 6),
-                        _InfoChip(Icons.label, palletType),
+                        _InfoChip(MdiIcons.tag, palletType),
                       ],
                     ),
                   ],

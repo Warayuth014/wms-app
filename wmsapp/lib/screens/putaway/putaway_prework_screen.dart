@@ -1,9 +1,9 @@
 // lib/screens/putaway/putaway_prework_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
-import '../../widgets/part_thumbnail.dart';
 import '../../services/api_service.dart';
 import 'putaway_widgets.dart';
 
@@ -11,12 +11,12 @@ import 'putaway_widgets.dart';
 const _kColorReceive = Color(0xFF00796B); // teal เข้ม — รับ pallet
 const _kColorSend = Color(0xFFD84315); // ส้มแดง — ส่ง pallet
 
-const _kPWStations = [
+final _kPWStations = [
   StationInfo(
     id: 'PW-STN-1',
     label: 'รับ Pallet',
     color: _kColorReceive,
-    icon: Icons.download,
+    icon: MdiIcons.trayArrowDown,
     allowedType: 'PW',
     pwRole: PWRole.receive,
   ),
@@ -24,7 +24,7 @@ const _kPWStations = [
     id: 'PW-STN-2',
     label: 'ส่ง Pallet',
     color: _kColorSend,
-    icon: Icons.upload,
+    icon: MdiIcons.trayArrowUp,
     allowedType: 'PW',
     fixedDestination: 'ASRS',
     pwRole: PWRole.send,
@@ -33,7 +33,7 @@ const _kPWStations = [
     id: 'PW-STN-3',
     label: 'รับ Pallet',
     color: _kColorReceive,
-    icon: Icons.download,
+    icon: MdiIcons.trayArrowDown,
     allowedType: 'PW',
     pwRole: PWRole.receive,
   ),
@@ -41,7 +41,7 @@ const _kPWStations = [
     id: 'PW-STN-4',
     label: 'ส่ง Pallet',
     color: _kColorSend,
-    icon: Icons.upload,
+    icon: MdiIcons.trayArrowUp,
     allowedType: 'PW',
     fixedDestination: 'ASRS',
     pwRole: PWRole.send,
@@ -50,7 +50,7 @@ const _kPWStations = [
     id: 'PW-STN-5',
     label: 'รับ Pallet',
     color: _kColorReceive,
-    icon: Icons.download,
+    icon: MdiIcons.trayArrowDown,
     allowedType: 'PW',
     pwRole: PWRole.receive,
   ),
@@ -58,7 +58,7 @@ const _kPWStations = [
     id: 'PW-STN-6',
     label: 'ส่ง Pallet',
     color: _kColorSend,
-    icon: Icons.upload,
+    icon: MdiIcons.trayArrowUp,
     allowedType: 'PW',
     fixedDestination: 'ASRS',
     pwRole: PWRole.send,
@@ -91,6 +91,10 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
 
   // stationId → { palletId, palletStatus, cutItems } (สำหรับฝั่งรับ)
   Map<String, Map<String, dynamic>> _receiveStatus = {};
+
+  // Return animation state
+  String? _returnAnimStation;  // station ที่กำลังแสดง animation
+  String _returnAnimText = ''; // ข้อความแสดง
 
   @override
   void initState() {
@@ -151,7 +155,29 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
     _openStationPopup(station);
   }
 
+  void _playReturnAnimation(String stationId) {
+    setState(() {
+      _returnAnimStation = stationId;
+      _returnAnimText = 'AMR กำลังมารับ Pallet...';
+    });
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      setState(() => _returnAnimText = 'AMR กำลังคืน Pallet...');
+      Future.delayed(const Duration(seconds: 2), () {
+        if (!mounted) return;
+        setState(() {
+          _returnAnimStation = null;
+          _returnAnimText = '';
+        });
+        _loadAllStatus();
+      });
+    });
+  }
+
   void _openStationPopup(StationInfo station) {
+    // กำลังแสดง return animation → ไม่ต้องเปิด popup
+    if (_returnAnimStation == station.id) return;
+
     // ฝั่งรับ → popup แสดง cut items + ปุ่มคืน pallet
     if (station.pwRole == PWRole.receive) {
       final info = _receiveStatus[station.id];
@@ -175,7 +201,7 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
           palletId: palletId,
           palletStatus: palletStatus,
           cutItems: cutItems,
-          onCompleted: () => _loadAllStatus(),
+          onCompleted: () => _playReturnAnimation(station.id),
         ),
       );
       return;
@@ -224,15 +250,15 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
                       children: [
                         Icon(
-                          Icons.qr_code_scanner,
+                          MdiIcons.barcodeScan,
                           color: _kColorReceive,
                           size: 20,
                         ),
-                        SizedBox(width: 8),
-                        Text(
+                        const SizedBox(width: 8),
+                        const Text(
                           'สแกนบาร์โค้ด Station',
                           style: TextStyle(
                             fontSize: 15,
@@ -272,7 +298,7 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
                       children: [
                         _ColumnHeader(
                           label: 'รับ Pallet',
-                          icon: Icons.download,
+                          icon: MdiIcons.trayArrowDown,
                           color: _kColorReceive,
                         ),
                         const SizedBox(height: 10),
@@ -292,7 +318,7 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
                       children: [
                         _ColumnHeader(
                           label: 'ส่ง Pallet',
-                          icon: Icons.upload,
+                          icon: MdiIcons.trayArrowUp,
                           color: _kColorSend,
                         ),
                         const SizedBox(height: 10),
@@ -321,6 +347,18 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
   }
 
   Widget _buildReceiveStationCard(StationInfo station) {
+    final isReturning = _returnAnimStation == station.id;
+
+    if (isReturning) {
+      return StationCard(
+        station: station,
+        isDispatching: true,
+        busyPalletId: '',
+        busyDestination: _returnAnimText,
+        onTap: () {},
+      );
+    }
+
     final info = _receiveStatus[station.id];
     final palletId = info?['palletId'] as String?;
     final palletStatus = info?['palletStatus'] as String?;
@@ -329,7 +367,7 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
 
     return StationCard(
       station: station,
-      isDispatching: isInTransit, // animation เฉพาะกำลังมา
+      isDispatching: isInTransit,
       busyPalletId: palletId,
       busyDestination: isInTransit
           ? 'กำลังมาส่ง...'
@@ -509,7 +547,7 @@ class _PreworkReceiveSheetState extends State<_PreworkReceiveSheet> {
                 child: Center(
                   child: Column(
                     children: [
-                      Icon(Icons.inbox, size: 48, color: Colors.grey.shade300),
+                      Icon(MdiIcons.packageVariant, size: 48, color: Colors.grey.shade300),
                       const SizedBox(height: 12),
                       Text(
                         'ไม่มี Pallet ที่จุดนี้',
@@ -546,8 +584,8 @@ class _PreworkReceiveSheetState extends State<_PreworkReceiveSheet> {
                   ),
                   child: Column(
                     children: [
-                      const Icon(
-                        Icons.local_shipping,
+                      Icon(
+                        MdiIcons.truckDeliveryOutline,
                         color: AppTheme.warning,
                         size: 40,
                       ),
@@ -581,11 +619,11 @@ class _PreworkReceiveSheetState extends State<_PreworkReceiveSheet> {
                 ),
               ),
             ] else ...[
-              // ── PREWORK_EMPTY: ตัดยอดแล้ว ──
+              // ── ตัดยอดแล้ว — Pallet เปล่า ──
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: AppTheme.success.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(10),
@@ -593,122 +631,25 @@ class _PreworkReceiveSheetState extends State<_PreworkReceiveSheet> {
                       color: AppTheme.success.withValues(alpha: 0.3),
                     ),
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.check_circle,
                         color: AppTheme.success,
-                        size: 22,
+                        size: 28,
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'ตัดยอดแล้ว ${widget.cutItems.length} รายการ',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            Text(
-                              'รวม ${widget.cutItems.fold<int>(0, (sum, i) => sum + (i['qty'] as int? ?? 0))} ชิ้น',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.textGrey(context),
-                              ),
-                            ),
-                          ],
+                      SizedBox(width: 12),
+                      Text(
+                        'ตัดยอดแล้ว — Pallet เปล่า',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-
-              const SizedBox(height: 8),
-
-              // Cut items list
-              if (widget.cutItems.isNotEmpty)
-                Flexible(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                    itemCount: widget.cutItems.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final item = widget.cutItems[index];
-                      return Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.grey.shade200),
-                        ),
-                        child: Row(
-                          children: [
-                            PartThumbnail(
-                              imageUrl: item['imageUrl'] as String?,
-                              size: 44,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item['partId'] as String? ?? '',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  Text(
-                                    item['itemDesc'] as String? ?? '',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: AppTheme.textGrey(context),
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  Text(
-                                    '${item['owner'] ?? ''} / ${item['brand'] ?? ''}',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: AppTheme.textGrey(context),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Column(
-                              children: [
-                                Text(
-                                  '${item['qty'] ?? 0}',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppTheme.primary,
-                                  ),
-                                ),
-                                Text(
-                                  'ชิ้น',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: AppTheme.textGrey(context),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
 
               // Return pallet button
               Padding(
@@ -717,7 +658,7 @@ class _PreworkReceiveSheetState extends State<_PreworkReceiveSheet> {
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: _returnPallet,
-                    icon: const Icon(Icons.replay, color: Colors.white),
+                    icon: Icon(MdiIcons.undoVariant, color: Colors.white),
                     label: const Text(
                       'คืน Pallet เปล่า',
                       style: TextStyle(

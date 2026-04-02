@@ -1,6 +1,7 @@
 // lib/screens/flow1/scan_po_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
@@ -335,7 +336,7 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
                             if (item.lotNumber != null &&
                                 item.lotNumber!.isNotEmpty) ...[
                               Icon(
-                                Icons.label_outline,
+                                MdiIcons.tagOutline,
                                 size: 12,
                                 color: AppTheme.textGrey(context),
                               ),

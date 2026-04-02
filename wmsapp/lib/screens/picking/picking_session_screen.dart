@@ -1,6 +1,7 @@
 // lib/screens/picking/picking_session_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
@@ -93,7 +94,7 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
                   Navigator.pop(ctx);
                   _returnPallet(palletId, 'ASRS');
                 },
-                icon: const Icon(Icons.warehouse, size: 18),
+                icon: Icon(MdiIcons.warehouse, size: 18),
                 label: const Text('ส่งกลับ ASRS'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primary,
@@ -113,7 +114,7 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
                   Navigator.pop(ctx);
                   _returnPallet(palletId, 'ZONE_PACK');
                 },
-                icon: const Icon(Icons.local_shipping, size: 18),
+                icon: Icon(MdiIcons.truckDeliveryOutline, size: 18),
                 label: const Text('ส่งไป ZONE PACK'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.secondary,
@@ -211,15 +212,15 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
                         children: [
                           Icon(
-                            Icons.qr_code_scanner,
+                            MdiIcons.barcodeScan,
                             color: AppTheme.primary,
                             size: 24,
                           ),
-                          SizedBox(width: 8),
-                          Text(
+                          const SizedBox(width: 8),
+                          const Text(
                             'Scan Pallet',
                             style: TextStyle(
                               fontSize: 18,

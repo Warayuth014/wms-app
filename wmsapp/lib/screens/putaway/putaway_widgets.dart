@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
@@ -126,7 +127,7 @@ class _StationCardState extends State<StationCard>
             color: Colors.white.withValues(alpha: 0.15),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.smart_toy, color: Colors.white70, size: 22),
+          child: Icon(MdiIcons.robotIndustrialOutline, color: Colors.white70, size: 22),
         ),
         const SizedBox(height: 6),
         AnimatedBuilder(
@@ -272,7 +273,7 @@ class _StationCardState extends State<StationCard>
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                hasBusy ? Icons.info_outline : Icons.touch_app,
+                hasBusy ? Icons.info_outline : MdiIcons.gestureTap,
                 color: Colors.white,
                 size: 11,
               ),
@@ -537,8 +538,8 @@ class _StationSheetState extends State<StationSheet> {
                       ],
                     ),
                     const Spacer(),
-                    const Icon(
-                      Icons.smart_toy,
+                    Icon(
+                      MdiIcons.robotIndustrialOutline,
                       color: Colors.white54,
                       size: 20,
                     ),
@@ -581,7 +582,7 @@ class _StationSheetState extends State<StationSheet> {
               const SizedBox(height: 10),
               PrimaryButton(
                 label: _isReceive ? 'เรียก Pallet' : 'ค้นหา Pallet',
-                icon: _isReceive ? Icons.download : Icons.search,
+                icon: _isReceive ? MdiIcons.trayArrowDown : Icons.search,
                 loading: _isReceive ? _loadingConfirm : _loadingPallet,
                 onPressed: _scanPallet,
               ),
@@ -607,8 +608,8 @@ class _StationSheetState extends State<StationSheet> {
                       ? 'ติดสติ๊กเกอร์ ส่ง ASRS'
                       : 'เก็บ Pallet',
                   icon: widget.station.fixedDestination != null
-                      ? Icons.swap_horiz
-                      : Icons.inventory_2,
+                      ? MdiIcons.swapHorizontal
+                      : MdiIcons.packageVariantClosed,
                   onPressed: _confirmPutaway,
                 ),
 
@@ -616,7 +617,7 @@ class _StationSheetState extends State<StationSheet> {
                   const SizedBox(height: 10),
                   WarningButton(
                     label: 'ส่งไป ASRS (ยังเป็น PW)',
-                    icon: Icons.warehouse,
+                    icon: MdiIcons.warehouse,
                     onPressed: () => _confirmPutaway(convertToFG: false),
                   ),
                 ],
@@ -696,7 +697,7 @@ class _StationSheetState extends State<StationSheet> {
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: () => _showItemsDetail(context),
-              icon: const Icon(Icons.visibility, size: 18),
+              icon: Icon(MdiIcons.eyeOutline, size: 18),
               label: Text('ดูสินค้าใน Pallet (${_pallet!.items.length})'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppTheme.primary,
@@ -729,7 +730,7 @@ class _StationSheetState extends State<StationSheet> {
   Widget _buildDestinationSelector() {
     final isPW = _pallet!.type == 'PW';
     final headerColor = isPW ? AppTheme.warning : AppTheme.primary;
-    final headerIcon = isPW ? Icons.warning_amber : Icons.inventory_2;
+    final headerIcon = isPW ? Icons.warning_amber : MdiIcons.packageVariantClosed;
     final headerText = isPW
         ? 'Pallet ประเภท PW — เลือกปลายทาง'
         : 'Pallet ประเภท FG — เลือกปลายทาง';
@@ -765,7 +766,7 @@ class _StationSheetState extends State<StationSheet> {
                 child: DestButton(
                   label: 'ASRS',
                   subtitle: 'เก็บเข้าคลังหลัก',
-                  icon: Icons.domain,
+                  icon: MdiIcons.officeBuildingOutline,
                   selected: _selectedDestination == 'ASRS',
                   onTap: () => setState(() => _selectedDestination = 'ASRS'),
                 ),
@@ -776,7 +777,7 @@ class _StationSheetState extends State<StationSheet> {
                     ? DestButton(
                         label: 'Prework',
                         subtitle: 'ส่งจุด Prework',
-                        icon: Icons.build_circle,
+                        icon: MdiIcons.cogOutline,
                         selected: _selectedDestination == 'PREWORK',
                         onTap: () => setState(() {
                           _selectedDestination = 'PREWORK';
@@ -825,7 +826,7 @@ class _StationSheetState extends State<StationSheet> {
         child: Row(
           children: [
             Icon(
-              Icons.wrap_text,
+              MdiIcons.textBoxOutline,
               color: _wrappingRequired ? AppTheme.primary : Colors.grey,
               size: 20,
             ),
@@ -969,7 +970,7 @@ class PalletItemsPage extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.inventory_2, color: typeColor, size: 28),
+                  Icon(MdiIcons.packageVariantClosed, color: typeColor, size: 28),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -1075,7 +1076,7 @@ class PalletItemsPage extends StatelessWidget {
                                       item.lotNumber!.isNotEmpty) ...[
                                     const SizedBox(width: 8),
                                     Icon(
-                                      Icons.label_outline,
+                                      MdiIcons.tagOutline,
                                       size: 12,
                                       color: AppTheme.textGrey(context),
                                     ),
@@ -1319,7 +1320,7 @@ class _PreworkReceivePageState extends State<PreworkReceivePage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.inbox, size: 64, color: Colors.grey.shade300),
+              Icon(MdiIcons.packageVariant, size: 64, color: Colors.grey.shade300),
               const SizedBox(height: 16),
               Text(
                 'ไม่มี Pallet ที่รอ Prework',
@@ -1358,7 +1359,7 @@ class _PreworkReceivePageState extends State<PreworkReceivePage> {
           child: Row(
             children: [
               Icon(
-                Icons.inventory_2,
+                MdiIcons.packageVariantClosed,
                 size: 18,
                 color: AppTheme.textPrimary(context),
               ),
@@ -1419,8 +1420,8 @@ class _PreworkReceivePageState extends State<PreworkReceivePage> {
                       // Pallet header
                       Row(
                         children: [
-                          const Icon(
-                            Icons.inventory_2,
+                          Icon(
+                            MdiIcons.packageVariantClosed,
                             color: AppTheme.warning,
                             size: 22,
                           ),
@@ -1593,7 +1594,7 @@ class _PreworkReceivePageState extends State<PreworkReceivePage> {
           child: Row(
             children: [
               Icon(
-                Icons.inventory_2,
+                MdiIcons.packageVariantClosed,
                 size: 18,
                 color: AppTheme.textPrimary(context),
               ),
@@ -1671,7 +1672,7 @@ class _PreworkReceivePageState extends State<PreworkReceivePage> {
                                   item.lotNumber!.isNotEmpty) ...[
                                 const SizedBox(width: 8),
                                 Icon(
-                                  Icons.label_outline,
+                                  MdiIcons.tagOutline,
                                   size: 12,
                                   color: AppTheme.textGrey(context),
                                 ),

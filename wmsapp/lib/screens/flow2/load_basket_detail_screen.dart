@@ -1,6 +1,7 @@
 // lib/screens/flow2/load_basket_detail_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
@@ -208,7 +209,7 @@ class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen> {
                   const SizedBox(height: 20),
                   PrimaryButton(
                     label: 'Load เข้า Basket',
-                    icon: Icons.add_box,
+                    icon: MdiIcons.plusBoxOutline,
                     onPressed: _loadToBasket,
                   ),
                 ],
@@ -227,7 +228,7 @@ class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.category, color: AppTheme.primary, size: 20),
+              Icon(MdiIcons.shape, color: AppTheme.primary, size: 20),
               const SizedBox(width: 8),
               Text(
                 widget.item.partId,
@@ -278,7 +279,7 @@ class _LoadBasketDetailScreenState extends State<LoadBasketDetailScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.shopping_basket, color: AppTheme.success, size: 28),
+          Icon(MdiIcons.basketOutline, color: AppTheme.success, size: 28),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

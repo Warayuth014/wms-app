@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
@@ -63,7 +64,7 @@ class _Flow1MenuScreenState extends State<Flow1MenuScreen> {
 
               // ── รับสินค้าจาก PO ──────────────
               _MenuCard(
-                icon: Icons.move_to_inbox,
+                icon: MdiIcons.trayArrowDown,
                 title: 'รับเอกสาร',
                 subtitle: 'สแกน PO Number เพื่อรับสินค้าจาก Supplier',
                 color: AppTheme.primary,

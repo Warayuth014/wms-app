@@ -1,6 +1,7 @@
 // lib/screens/flow2/load_basket_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
@@ -177,7 +178,7 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.inventory_2_outlined,
+            MdiIcons.packageVariantClosed,
             size: 64,
             color: Colors.grey.shade300,
           ),
@@ -249,7 +250,7 @@ class _LoadBasketScreenState extends State<LoadBasketScreen> {
                     Row(
                       children: [
                         Icon(
-                          Icons.label_outline,
+                          MdiIcons.tagOutline,
                           size: 14,
                           color: AppTheme.textGrey(context),
                         ),
