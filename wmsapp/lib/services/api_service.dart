@@ -70,6 +70,12 @@ class ApiService {
   /// รีเซ็ต cache (ใช้เมื่อต้องการให้ probe ใหม่ เช่น เปลี่ยน network)
   static void resetBaseUrl() => _cachedBase = null;
 
+  /// คืน server base URL (ไม่รวม /api) สำหรับ SignalR hub
+  static Future<String> resolveServerUrl() async {
+    final base = await _resolveBase(); // e.g. "http://10.0.2.2:5000/api"
+    return base.replaceAll('/api', '');  // e.g. "http://10.0.2.2:5000"
+  }
+
   final _headers = {'Content-Type': 'application/json'};
 
   // ── HTTP helpers ─────────────────────────────
