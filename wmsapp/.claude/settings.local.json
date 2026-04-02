@@ -58,7 +58,11 @@
       "Bash(ls -la \"C:\\\\Users\\\\Admin\\\\Documents\\\\GitHub\\\\wms-api\\\\WmsApi\\\\WmsApi\"\" | grep -E \"Services)",
       "Bash(Integration)",
       "Bash(Webhooks \")",
-      "Bash(grep -ri ship /c/Users/Admin/Documents/GitHub/wms-app --include=*.dart --include=*.json)"
+      "Bash(grep -ri ship /c/Users/Admin/Documents/GitHub/wms-app --include=*.dart --include=*.json)",
+      "Bash(find /c/Users/Admin/Documents/GitHub/wms-app -type f -name *.cs)",
+      "Bash(find /c/Users/Admin/Documents/GitHub -name WmsApi* -o -name *WmsApi*)",
+      "Bash(kill %1)",
+      "Bash(grep -n \"Icons\\\\.\" /c/Users/Admin/Documents/GitHub/wms-app/wmsapp/lib/**/*.dart)"
     ]
   }
 }
