@@ -5,6 +5,7 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
+import '../../services/signalr_service.dart';
 import 'putaway_widgets.dart';
 
 // ── Station constants (STN only) ─────────────
@@ -49,6 +50,7 @@ class PutawayScreen extends StatefulWidget {
 class _PutawayScreenState extends State<PutawayScreen> {
   final _stationController = TextEditingController();
   final _api = ApiService();
+  final _signalR = SignalRService();
 
   // stationId → { palletId, destination, items }
   Map<String, Map<String, dynamic>> _stationStatus = {};
@@ -56,13 +58,27 @@ class _PutawayScreenState extends State<PutawayScreen> {
   @override
   void initState() {
     super.initState();
+    _signalR.addStationDispatchedListener(_handleStationDispatched);
+    _signalR.addPalletArrivedListener(_handlePalletArrived);
+    _signalR.addPalletReturnedListener(_handlePalletReturned);
+    _signalR.addLabelingCompletedListener(_handleLabelingCompleted);
+    _initSignalR();
     _loadStationStatus();
   }
 
   @override
   void dispose() {
+    _signalR.removeStationDispatchedListener(_handleStationDispatched);
+    _signalR.removePalletArrivedListener(_handlePalletArrived);
+    _signalR.removePalletReturnedListener(_handlePalletReturned);
+    _signalR.removeLabelingCompletedListener(_handleLabelingCompleted);
+    _signalR.disconnect();
     _stationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _initSignalR() async {
+    await _signalR.connect();
   }
 
   Future<void> _loadStationStatus() async {
@@ -75,6 +91,42 @@ class _PutawayScreenState extends State<PutawayScreen> {
       }
       setState(() => _stationStatus = map);
     }
+  }
+
+  void _handleStationDispatched(Map<String, dynamic> data) {
+    final stationId = data['stationId'] as String?;
+    if (stationId == null || !_kStations.any((s) => s.id == stationId)) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _stationStatus = {
+          ..._stationStatus,
+          stationId: {
+            ...?_stationStatus[stationId],
+            'stationId': stationId,
+            'palletId': data['palletId'],
+            'destination': data['destination'],
+            'items': _stationStatus[stationId]?['items'] ?? const [],
+          },
+        };
+      });
+    }
+
+    _loadStationStatus();
+  }
+
+  void _handlePalletArrived(Map<String, dynamic> data) {
+    _loadStationStatus();
+  }
+
+  void _handlePalletReturned(Map<String, dynamic> data) {
+    _loadStationStatus();
+  }
+
+  void _handleLabelingCompleted(Map<String, dynamic> data) {
+    _loadStationStatus();
   }
 
   void _onStationBarcodeScan() {

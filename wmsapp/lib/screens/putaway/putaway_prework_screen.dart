@@ -1,10 +1,13 @@
 // lib/screens/putaway/putaway_prework_screen.dart
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
+import '../../services/signalr_service.dart';
 import 'putaway_widgets.dart';
 
 // ── Station constants (PW-STN only) ──────────
@@ -85,12 +88,15 @@ class PutawayPreworkScreen extends StatefulWidget {
 class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
   final _stationController = TextEditingController();
   final _api = ApiService();
+  final _signalR = SignalRService();
 
   // stationId → { palletId, destination, items } (สำหรับฝั่งส่ง)
   Map<String, Map<String, dynamic>> _stationStatus = {};
 
   // stationId → { palletId, palletStatus, cutItems } (สำหรับฝั่งรับ)
   Map<String, Map<String, dynamic>> _receiveStatus = {};
+  Timer? _returnAnimMidTimer;
+  Timer? _returnAnimEndTimer;
 
   // Return animation state
   String? _returnAnimStation;  // station ที่กำลังแสดง animation
@@ -99,13 +105,28 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
   @override
   void initState() {
     super.initState();
+    _signalR.addStationDispatchedListener(_handleStationDispatched);
+    _signalR.addPalletArrivedListener(_handlePalletArrived);
+    _signalR.addPalletReturnedListener(_handlePalletReturned);
+    _signalR.addLabelingCompletedListener(_handleLabelingCompleted);
+    _initSignalR();
     _loadAllStatus();
   }
 
   @override
   void dispose() {
+    _cancelReturnAnimation();
+    _signalR.removeStationDispatchedListener(_handleStationDispatched);
+    _signalR.removePalletArrivedListener(_handlePalletArrived);
+    _signalR.removePalletReturnedListener(_handlePalletReturned);
+    _signalR.removeLabelingCompletedListener(_handleLabelingCompleted);
+    _signalR.disconnect();
     _stationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _initSignalR() async {
+    await _signalR.connect();
   }
 
   Future<void> _loadAllStatus() async {
@@ -156,15 +177,16 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
   }
 
   void _playReturnAnimation(String stationId) {
+    _cancelReturnAnimation();
     setState(() {
       _returnAnimStation = stationId;
       _returnAnimText = 'AMR กำลังมารับ Pallet...';
     });
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
+    _returnAnimMidTimer = Timer(const Duration(seconds: 2), () {
+      if (!mounted || _returnAnimStation != stationId) return;
       setState(() => _returnAnimText = 'AMR กำลังคืน Pallet...');
-      Future.delayed(const Duration(seconds: 2), () {
-        if (!mounted) return;
+      _returnAnimEndTimer = Timer(const Duration(seconds: 2), () {
+        if (!mounted || _returnAnimStation != stationId) return;
         setState(() {
           _returnAnimStation = null;
           _returnAnimText = '';
@@ -172,6 +194,59 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
         _loadAllStatus();
       });
     });
+  }
+
+  void _cancelReturnAnimation() {
+    _returnAnimMidTimer?.cancel();
+    _returnAnimEndTimer?.cancel();
+    _returnAnimMidTimer = null;
+    _returnAnimEndTimer = null;
+  }
+
+  void _handleStationDispatched(Map<String, dynamic> data) {
+    final stationId = data['stationId'] as String?;
+    final destination = data['destination'] as String?;
+
+    if (stationId != null &&
+        _kPWStations.any((s) => s.id == stationId && s.pwRole == PWRole.send) &&
+        mounted) {
+      setState(() {
+        _stationStatus = {
+          ..._stationStatus,
+          stationId: {
+            ...?_stationStatus[stationId],
+            'stationId': stationId,
+            'palletId': data['palletId'],
+            'destination': destination,
+            'items': _stationStatus[stationId]?['items'] ?? const [],
+          },
+        };
+      });
+    }
+
+    if (destination == 'PREWORK') {
+      _loadPreworkStationStatus();
+    }
+    _loadStationStatus();
+  }
+
+  void _handlePalletArrived(Map<String, dynamic> data) {
+    _loadAllStatus();
+  }
+
+  void _handlePalletReturned(Map<String, dynamic> data) {
+    final stationId = data['stationId'] as String?;
+    if (stationId != null &&
+        _kPWStations.any((s) => s.id == stationId && s.pwRole == PWRole.receive)) {
+      _playReturnAnimation(stationId);
+      return;
+    }
+
+    _loadAllStatus();
+  }
+
+  void _handleLabelingCompleted(Map<String, dynamic> data) {
+    _loadAllStatus();
   }
 
   void _openStationPopup(StationInfo station) {

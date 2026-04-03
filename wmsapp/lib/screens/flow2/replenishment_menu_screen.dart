@@ -43,20 +43,19 @@ class ReplenishmentMenuScreen extends StatelessWidget {
               const SizedBox(height: 16),
 
               // ── Replenish Orders ──────────────
-              _MenuCard(
-                icon: MdiIcons.clipboardTextOutline,
-                title: 'Replenish Orders',
-                subtitle: 'ดู Order และเติมสินค้าลง Tote (Tote-first workflow)',
-                color: const Color(0xFF7B1FA2),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        ReplenishOrderScreen(userId: userId, fullName: fullName),
-                  ),
-                ),
-              ),
-
+              // _MenuCard(
+              //   icon: MdiIcons.clipboardTextOutline,
+              //   title: 'Replenish Orders',
+              //   subtitle: 'ดู Order และเติมสินค้าลง Tote (Tote-first workflow)',
+              //   color: const Color(0xFF7B1FA2),
+              //   onTap: () => Navigator.push(
+              //     context,
+              //     MaterialPageRoute(
+              //       builder: (_) =>
+              //           ReplenishOrderScreen(userId: userId, fullName: fullName),
+              //     ),
+              //   ),
+              // ),
               const SizedBox(height: 12),
 
               // ── Unload ────────────────────────

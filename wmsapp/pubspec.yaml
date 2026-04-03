@@ -50,7 +50,7 @@ dependencies:
   # Material Design Icons - extended icon set for WMS
   material_design_icons_flutter: ^7.0.7296
   # SignalR — real-time updates from .NET backend
-  signalr_netcore: ^1.3.7
+  signalr_netcore: 1.3.7
 
 dev_dependencies:
   flutter_test:
