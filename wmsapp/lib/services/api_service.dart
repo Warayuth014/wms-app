@@ -481,54 +481,6 @@ class ApiService {
     return ApiResult.success(r.data!);
   }
 
-  // ── Return ────────────────────────────────
-
-  Future<ApiResult<OrderResponse>> getReturnOrder(String orderId) async {
-    final r = await _get('/return/order/$orderId');
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(OrderResponse.fromJson(r.data!));
-  }
-
-  Future<ApiResult<OpenReturnResponse>> openReturnSession({
-    required String orderId,
-    required String operatorId,
-  }) async {
-    final r = await _post('/return/open-session', {
-      'orderId': orderId,
-      'operatorId': operatorId,
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(OpenReturnResponse.fromJson(r.data!));
-  }
-
-  Future<ApiResult<ReceiveReturnItemResponse>> receiveReturnItem({
-    required int returnId,
-    required String orderId,
-    required String partId,
-    required int qtyReturned,
-    String? note,
-    required String operatorId,
-  }) async {
-    final r = await _post('/return/receive-item', {
-      'returnId': returnId,
-      'orderId': orderId,
-      'partId': partId,
-      'qtyReturned': qtyReturned,
-      'note': note,
-      'operatorId': operatorId,
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(ReceiveReturnItemResponse.fromJson(r.data!));
-  }
-
-  Future<ApiResult<CloseReturnResponse>> closeReturnSession(
-    int returnId,
-  ) async {
-    final r = await _post('/return/close-session/$returnId', {});
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(CloseReturnResponse.fromJson(r.data!));
-  }
-
   // GET confirmed items สำหรับ Load Basket (grouped by PartId)
   Future<ApiResult<List<GroupedUnloadItem>>> getConfirmedUnloadItems() async {
     final r = await _get('/unload/confirmed-items');

@@ -5,7 +5,6 @@ import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import 'scan_po_screen.dart';
 import 'pending_pallet_screen.dart';
-// import 'package:wmsapp/screens/flow1/return_screen.dart'; ยังไม่ได้ใช้
 
 class Flow1MenuScreen extends StatefulWidget {
   final String userId;
@@ -109,24 +108,6 @@ class _Flow1MenuScreenState extends State<Flow1MenuScreen> {
                 },
               ),
 
-              const SizedBox(height: 12),
-
-              // ── รับสินค้าคืน ─────────────────
-              // _MenuCard(
-              //   icon: Icons.replay,
-              //   title: 'รับสินค้าคืน',
-              //   subtitle: 'สแกน Order Number รับสินค้าคืนจากลูกค้า',
-              //   color: AppTheme.warning,
-              //   onTap: () => Navigator.push(
-              //     context,
-              //     MaterialPageRoute(
-              //       builder: (_) => ReturnScreen(
-              //         userId: widget.userId,
-              //         fullName: widget.fullName,
-              //       ),
-              //     ),
-              //   ),
-              // ),
             ],
           ),
         ),
