@@ -348,30 +348,6 @@ class ApiService {
     return ApiResult.success(r.data!);
   }
 
-  Future<ApiResult<BasketScanResponse>> scanBasket(String basketId) async {
-    final r = await _get('/unload/scan-basket/$basketId');
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(BasketScanResponse.fromJson(r.data!));
-  }
-
-  Future<ApiResult<Map<String, dynamic>>> loadToBasketBySession({
-    required int sessionId,
-    required String basketId,
-    required String partId,
-    required String palletId,
-    required String operatorId,
-  }) async {
-    final r = await _post('/unload/load-to-basket', {
-      'sessionId': sessionId,
-      'basketId': basketId,
-      'partId': partId,
-      'palletId': palletId,
-      'operatorId': operatorId,
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(r.data!);
-  }
-
   // =============================================
   // PUTAWAY
   // =============================================
@@ -481,17 +457,6 @@ class ApiService {
     return ApiResult.success(r.data!);
   }
 
-  // GET confirmed items สำหรับ Load Basket (grouped by PartId)
-  Future<ApiResult<List<GroupedUnloadItem>>> getConfirmedUnloadItems() async {
-    final r = await _get('/unload/confirmed-items');
-    if (!r.success) return ApiResult.error(r.error);
-    final list = (r.data!['items'] as List)
-        .map((i) => GroupedUnloadItem.fromJson(i))
-        .toList();
-    return ApiResult.success(list);
-  }
-
-
   Future<ApiResult<Map<String, dynamic>>> returnPalletToAsis({
     required String palletId,
     int? sessionId,
@@ -500,18 +465,6 @@ class ApiService {
     final r = await _post('/unload/return-pallet-to-asis', {
       'palletId': palletId,
       'sessionId': sessionId,
-      'operatorId': operatorId,
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(r.data!);
-  }
-
-  Future<ApiResult<Map<String, dynamic>>> returnBasket({
-    required String basketId,
-    required String operatorId,
-  }) async {
-    final r = await _post('/unload/return-basket', {
-      'basketId': basketId,
       'operatorId': operatorId,
     });
     if (!r.success) return ApiResult.error(r.error);
@@ -673,113 +626,12 @@ class ApiService {
     return ApiResult.success(r.data!);
   }
 
-  Future<ApiResult<Map<String, dynamic>>> simulateBasketReturnComplete(
-    String basketId,
-  ) async {
-    final r = await _post('/simulate/basket/return-complete/$basketId', {});
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(r.data!);
-  }
-
   Future<ApiResult<CompletePickingResult>> completePickingSession(
     int sessionId,
   ) async {
     final r = await _post('/picking/complete-session/$sessionId', {});
     if (!r.success) return ApiResult.error(r.error);
     return ApiResult.success(CompletePickingResult.fromJson(r.data!));
-  }
-
-  // Load to basket (by PartId + Qty)
-  Future<ApiResult<Map<String, dynamic>>> loadToBasket({
-    required String partId,
-    required String basketId,
-    required int qty,
-    required String operatorId,
-  }) async {
-    final r = await _post('/unload/load-basket', {
-      'partId': partId,
-      'basketId': basketId,
-      'qty': qty,
-      'operatorId': operatorId,
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(r.data!);
-  }
-
-  // =============================================
-  // REPLENISHMENT
-  // =============================================
-
-  Future<ApiResult<CheckTriggerResponse>> checkReplenishTrigger() async {
-    final r = await _get('/replenish/check-trigger');
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(CheckTriggerResponse.fromJson(r.data!));
-  }
-
-  Future<ApiResult<ReplenishOrderResponse>> createReplenishOrder({
-    required String triggeredBy,
-    required List<Map<String, dynamic>> lines,
-  }) async {
-    final r = await _post('/replenish/create-order', {
-      'triggeredBy': triggeredBy,
-      'lines': lines,
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(ReplenishOrderResponse.fromJson(r.data!));
-  }
-
-  Future<ApiResult<List<ReplenishOrderResponse>>> getReplenishOrders() async {
-    final r = await _get('/replenish/orders');
-    if (!r.success) return ApiResult.error(r.error);
-    final items = r.data!['items'] as List;
-    return ApiResult.success(
-      items.map((e) => ReplenishOrderResponse.fromJson(e)).toList(),
-    );
-  }
-
-  Future<ApiResult<ToteScanResponse>> scanTote(String toteId) async {
-    final r = await _get('/replenish/scan-tote/$toteId');
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(ToteScanResponse.fromJson(r.data!));
-  }
-
-  Future<ApiResult<ReplenishSessionResponse>> openReplenishSession({
-    required int orderId,
-    required String toteId,
-    required String palletId,
-    required String operatorId,
-  }) async {
-    final r = await _post('/replenish/open-session', {
-      'orderId': orderId,
-      'toteId': toteId,
-      'palletId': palletId,
-      'operatorId': operatorId,
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(ReplenishSessionResponse.fromJson(r.data!));
-  }
-
-  Future<ApiResult<Map<String, dynamic>>> confirmReplenishLine({
-    required int sessionId,
-    required int sessionLineId,
-    required int qtyFilled,
-  }) async {
-    final r = await _post('/replenish/confirm-line', {
-      'sessionId': sessionId,
-      'sessionLineId': sessionLineId,
-      'qtyFilled': qtyFilled,
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(r.data!);
-  }
-
-  Future<ApiResult<Map<String, dynamic>>> completeReplenishSession(
-      int sessionId) async {
-    final r = await _post('/replenish/complete-session', {
-      'sessionId': sessionId,
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(r.data!);
   }
 
   // ── Haipick ──────────────────────────────────

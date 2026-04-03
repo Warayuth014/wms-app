@@ -5,8 +5,6 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import 'unload_screen.dart';
-import 'load_basket_screen.dart';
-import 'replenish_order_screen.dart';
 
 class ReplenishmentMenuScreen extends StatelessWidget {
   final String userId;
@@ -42,22 +40,6 @@ class ReplenishmentMenuScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // ── Replenish Orders ──────────────
-              // _MenuCard(
-              //   icon: MdiIcons.clipboardTextOutline,
-              //   title: 'Replenish Orders',
-              //   subtitle: 'ดู Order และเติมสินค้าลง Tote (Tote-first workflow)',
-              //   color: const Color(0xFF7B1FA2),
-              //   onTap: () => Navigator.push(
-              //     context,
-              //     MaterialPageRoute(
-              //       builder: (_) =>
-              //           ReplenishOrderScreen(userId: userId, fullName: fullName),
-              //     ),
-              //   ),
-              // ),
-              const SizedBox(height: 12),
-
               // ── Unload ────────────────────────
               _MenuCard(
                 icon: MdiIcons.trayArrowUp,
@@ -73,22 +55,6 @@ class ReplenishmentMenuScreen extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 12),
-
-              // ── Load Basket ───────────────────
-              _MenuCard(
-                icon: MdiIcons.basketOutline,
-                title: 'Load Basket',
-                subtitle: 'โหลดสินค้าลงตะกร้าเพื่อส่งไปยังพื้นที่จำหน่าย',
-                color: AppTheme.success,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        LoadBasketScreen(userId: userId, fullName: fullName),
-                  ),
-                ),
-              ),
             ],
           ),
         ),

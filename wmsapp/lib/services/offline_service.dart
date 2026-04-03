@@ -248,15 +248,6 @@ class OfflineService {
           operatorId: data['operatorId'],
         );
 
-      case 'load-to-basket':
-        return api.loadToBasketBySession(
-          sessionId: data['sessionId'],
-          basketId: data['basketId'],
-          partId: data['partId'],
-          palletId: data['palletId'],
-          operatorId: data['operatorId'],
-        );
-
       default:
         return ApiResult.error('Unknown action: $action');
     }
