@@ -634,10 +634,4 @@ class ApiService {
     return ApiResult.success(CompletePickingResult.fromJson(r.data!));
   }
 
-  // ── Haipick ──────────────────────────────────
-  Future<ApiResult<Map<String, dynamic>>> getHaipickInventory() async {
-    final r = await _get('/haipick/inventory');
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(r.data!);
-  }
 }
