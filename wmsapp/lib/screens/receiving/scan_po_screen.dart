@@ -1,4 +1,4 @@
-// lib/screens/flow1/scan_po_screen.dart
+// lib/screens/receiving/scan_po_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';

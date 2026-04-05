@@ -6,21 +6,21 @@ import '../../services/api_service.dart';
 import 'scan_po_screen.dart';
 import 'pending_pallet_screen.dart';
 
-class Flow1MenuScreen extends StatefulWidget {
+class ReceivingMenuScreen extends StatefulWidget {
   final String userId;
   final String fullName;
 
-  const Flow1MenuScreen({
+  const ReceivingMenuScreen({
     super.key,
     required this.userId,
     required this.fullName,
   });
 
   @override
-  State<Flow1MenuScreen> createState() => _Flow1MenuScreenState();
+  State<ReceivingMenuScreen> createState() => _ReceivingMenuScreenState();
 }
 
-class _Flow1MenuScreenState extends State<Flow1MenuScreen> {
+class _ReceivingMenuScreenState extends State<ReceivingMenuScreen> {
   final _api = ApiService();
   int _pendingPalletCount = 0;
 

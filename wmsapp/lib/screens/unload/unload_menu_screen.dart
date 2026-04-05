@@ -1,4 +1,4 @@
-// lib/screens/flow2/replenishment_menu_screen.dart
+// lib/screens/unload/unload_menu_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
@@ -6,11 +6,11 @@ import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import 'unload_screen.dart';
 
-class ReplenishmentMenuScreen extends StatelessWidget {
+class UnloadMenuScreen extends StatelessWidget {
   final String userId;
   final String fullName;
 
-  const ReplenishmentMenuScreen({
+  const UnloadMenuScreen({
     super.key,
     required this.userId,
     required this.fullName,
@@ -20,7 +20,7 @@ class ReplenishmentMenuScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: WmsAppBar(
-        title: 'Replenishment — เติมสินค้า',
+        title: 'Unload',
         userName: fullName,
       ),
       body: SafeArea(
@@ -129,3 +129,4 @@ class _MenuCard extends StatelessWidget {
     );
   }
 }
+

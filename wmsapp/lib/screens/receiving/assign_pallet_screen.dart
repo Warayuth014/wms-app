@@ -1,4 +1,4 @@
-// lib/screens/flow1/assign_pallet_screen.dart
+// lib/screens/receiving/assign_pallet_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';

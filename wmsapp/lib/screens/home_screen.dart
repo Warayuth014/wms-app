@@ -3,11 +3,11 @@
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:wmsapp/screens/flow2/replenishment_menu_screen.dart';
+import 'package:wmsapp/screens/unload/unload_menu_screen.dart';
 import '../theme/theme.dart';
 import '../widgets/common_widgets.dart';
 import 'login_screen.dart';
-import 'package:wmsapp/screens/flow1/flow1_menu_screen.dart';
+import 'package:wmsapp/screens/receiving/receiving_menu_screen.dart';
 import 'package:wmsapp/screens/supervisor/part_image_screen.dart';
 import 'package:wmsapp/screens/putaway/putaway_screen.dart';
 import 'package:wmsapp/screens/putaway/putaway_prework_screen.dart';
@@ -169,7 +169,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => Flow1MenuScreen(
+                                  builder: (_) => ReceivingMenuScreen(
                                     userId: _userId!,
                                     fullName: _fullName!,
                                   ),
@@ -252,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => ReplenishmentMenuScreen(
+                                  builder: (_) => UnloadMenuScreen(
                                     userId: _userId!,
                                     fullName: _fullName!,
                                   ),
