@@ -73,7 +73,7 @@ class ApiService {
   /// คืน server base URL (ไม่รวม /api) สำหรับ SignalR hub
   static Future<String> resolveServerUrl() async {
     final base = await _resolveBase(); // e.g. "http://10.0.2.2:5000/api"
-    return base.replaceAll('/api', '');  // e.g. "http://10.0.2.2:5000"
+    return base.replaceAll('/api', ''); // e.g. "http://10.0.2.2:5000"
   }
 
   final _headers = {'Content-Type': 'application/json'};
@@ -388,22 +388,9 @@ class ApiService {
     return ApiResult.success(PutawayResult.fromJson(r.data!));
   }
 
-  Future<ApiResult<PutawayResult>> recallToPrework({
-    required String palletId,
-    required String stationId,
-    required String operatorId,
-  }) async {
-    final r = await _post('/putaway/recall-to-prework', {
-      'palletId': palletId,
-      'stationId': stationId,
-      'operatorId': operatorId,
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(PutawayResult.fromJson(r.data!));
-  }
-
   /// ดึงสถานะ PW-STN-1,3,5 — pallet ที่แมพ + items ที่ตัดยอดแล้ว
-  Future<ApiResult<List<Map<String, dynamic>>>> getPreworkStationStatus() async {
+  Future<ApiResult<List<Map<String, dynamic>>>>
+  getPreworkStationStatus() async {
     final r = await _get('/putaway/prework-station-status');
     if (!r.success) return ApiResult.error(r.error);
     final stations = (r.data!['stations'] as List).cast<Map<String, dynamic>>();
@@ -445,18 +432,6 @@ class ApiService {
     return ApiResult.success(r.data!);
   }
 
-  // ── Simulation ────────────────────────────
-
-  Future<ApiResult<Map<String, dynamic>>> simulateLabelAndRepalletize({
-    required String palletId,
-  }) async {
-    final r = await _post('/simulate/prework/label-and-repalletize', {
-      'palletId': palletId,
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(r.data!);
-  }
-
   Future<ApiResult<Map<String, dynamic>>> returnPalletToAsis({
     required String palletId,
     int? sessionId,
@@ -474,25 +449,6 @@ class ApiService {
   // =============================================
   // PICKING
   // =============================================
-
-  Future<PickingSession?> getActivePickingSession(String packPalletId) async {
-    try {
-      final base = await ApiService._resolveBase();
-      final res = await http
-          .get(
-            Uri.parse('$base/picking/active-session/$packPalletId'),
-            headers: _headers,
-          )
-          .timeout(const Duration(seconds: 5));
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body) as Map<String, dynamic>;
-        return PickingSession.fromJson(body);
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
 
   Future<ApiResult<AssignPickStationResponse>> assignPickStation({
     required String palletId,
@@ -561,77 +517,4 @@ class ApiService {
     if (!r.success) return ApiResult.error(r.error);
     return ApiResult.success(r.data!);
   }
-
-  // =============================================
-  // SIMULATION — จำลองระบบอัตโนมัติ (AGV/ASRS/Labeling)
-  // =============================================
-
-  Future<ApiResult<Map<String, dynamic>>> simulateAsrsRetrieve({
-    required String palletId,
-    required String destination,
-  }) async {
-    final r = await _post('/simulate/asrs/retrieve-pallet', {
-      'palletId': palletId,
-      'destination': destination,
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(r.data!);
-  }
-
-  Future<ApiResult<Map<String, dynamic>>> simulateAsrsReceive(
-    String palletId,
-  ) async {
-    final r = await _post('/simulate/asrs/receive-pallet/$palletId', {});
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(r.data!);
-  }
-
-  Future<ApiResult<Map<String, dynamic>>> simulateAgvDeliver({
-    required String palletId,
-    required String destination,
-  }) async {
-    final r = await _post('/simulate/agv/deliver-pallet', {
-      'palletId': palletId,
-      'destination': destination,
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(r.data!);
-  }
-
-  Future<ApiResult<Map<String, dynamic>>> simulateAgvPickup(
-    String palletId,
-  ) async {
-    final r = await _post('/simulate/agv/pickup-pallet/$palletId', {});
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(r.data!);
-  }
-
-  Future<ApiResult<Map<String, dynamic>>> simulateLabelingComplete(
-    String palletId,
-  ) async {
-    final r = await _post('/simulate/labeling/complete/$palletId', {});
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(r.data!);
-  }
-
-  Future<ApiResult<Map<String, dynamic>>> simulatePalletReturnComplete({
-    required String palletId,
-    String? destination,
-  }) async {
-    final r = await _post('/simulate/pallet/return-complete', {
-      'palletId': palletId,
-      'destination': destination ?? 'ASRS',
-    });
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(r.data!);
-  }
-
-  Future<ApiResult<CompletePickingResult>> completePickingSession(
-    int sessionId,
-  ) async {
-    final r = await _post('/picking/complete-session/$sessionId', {});
-    if (!r.success) return ApiResult.error(r.error);
-    return ApiResult.success(CompletePickingResult.fromJson(r.data!));
-  }
-
 }
