@@ -6,8 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wmsapp/screens/flow2/replenishment_menu_screen.dart';
 import '../theme/theme.dart';
 import '../widgets/common_widgets.dart';
-import '../services/connectivity_service.dart';
-import '../services/offline_service.dart';
 import 'login_screen.dart';
 import 'package:wmsapp/screens/flow1/flow1_menu_screen.dart';
 import 'package:wmsapp/screens/supervisor/part_image_screen.dart';
@@ -27,14 +25,11 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _userId;
   String? _fullName;
   String? _role;
-  bool _isOnline = true;
-  int _pendingCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadUser();
-    _listenConnectivity();
   }
 
   Future<void> _loadUser() async {
@@ -44,38 +39,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _fullName = prefs.getString('fullName');
       _role = prefs.getString('role');
     });
-    _updatePendingCount();
   }
 
-  void _listenConnectivity() {
-    ConnectivityService().onStatusChanged.listen((online) async {
-      setState(() => _isOnline = online);
-
-      // WiFi กลับมา → sync อัตโนมัติ
-      if (online && _pendingCount > 0) {
-        final result = await OfflineService().syncQueue();
-        if (mounted) {
-          if (result.hasErrors) {
-            showWarningSnackbar(
-              context,
-              'Sync บางรายการล้มเหลว: ${result.failed} รายการ',
-            );
-          } else if (result.total > 0) {
-            showSuccessSnackbar(
-              context,
-              'Sync สำเร็จ ${result.success} รายการ',
-            );
-          }
-          _updatePendingCount();
-        }
-      }
-    });
-  }
-
-  Future<void> _updatePendingCount() async {
-    final count = await OfflineService().getPendingCount();
-    if (mounted) setState(() => _pendingCount = count);
-  }
 
   // ── ตรวจ login ก่อนเข้า flow ─────────────────
   Future<bool> _requireLogin() async {
@@ -163,8 +128,6 @@ class _HomeScreenState extends State<HomeScreen> {
         top: false,
         child: Column(
           children: [
-            // ── Offline Banner ──────────────────
-            if (!_isOnline) OfflineBanner(pendingCount: _pendingCount),
 
             Expanded(
               child: SingleChildScrollView(
@@ -383,23 +346,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ],
 
-                    // ── Pending Sync ────────────
-                    if (_userId != null && _pendingCount > 0) ...[
-                      const SizedBox(height: 24),
-                      _PendingSyncCard(
-                        count: _pendingCount,
-                        isOnline: _isOnline,
-                        onSync: () async {
-                          final result = await OfflineService().syncQueue();
-                          if (context.mounted) {
-                            result.hasErrors
-                                ? showWarningSnackbar(context, result.summary)
-                                : showSuccessSnackbar(context, result.summary);
-                            _updatePendingCount();
-                          }
-                        },
-                      ),
-                    ],
 
                     const SizedBox(height: 16),
                   ],
@@ -688,56 +634,3 @@ class _ActionCard extends StatelessWidget {
   }
 }
 
-// =============================================
-// _PendingSyncCard
-// =============================================
-class _PendingSyncCard extends StatelessWidget {
-  final int count;
-  final bool isOnline;
-  final VoidCallback onSync;
-
-  const _PendingSyncCard({
-    required this.count,
-    required this.isOnline,
-    required this.onSync,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return WmsCard(
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppTheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-            ),
-            child: Icon(
-              MdiIcons.cloudSyncOutline,
-              color: AppTheme.primary,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              '$count pending sync',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimary(context),
-              ),
-            ),
-          ),
-          if (isOnline)
-            TextButton(onPressed: onSync, child: const Text('Sync'))
-          else
-            Text(
-              'รอ WiFi',
-              style: TextStyle(color: AppTheme.textGrey(context), fontSize: 13),
-            ),
-        ],
-      ),
-    );
-  }
-}

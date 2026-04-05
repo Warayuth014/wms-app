@@ -34,11 +34,6 @@ dependencies:
     sdk: flutter
   # API
   http: ^1.2.0
-  # Offline / Local DB
-  sqflite: ^2.3.0
-  path: ^1.9.0
-  # Network Status
-  connectivity_plus: ^5.0.2
   # Login persistence
   shared_preferences: ^2.2.2
   # Date format

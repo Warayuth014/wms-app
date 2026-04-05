@@ -5,8 +5,6 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
-import '../../services/offline_service.dart';
-import '../../services/connectivity_service.dart';
 import '../../models/wms_models.dart';
 import 'scan_part_screen.dart';
 import '../../widgets/part_thumbnail.dart';
@@ -27,18 +25,7 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
 
   POResponse? _po;
   bool _loadingPO = false;
-  bool _isOnline = true;
 
-  @override
-  void initState() {
-    super.initState();
-    _checkConnectivity();
-  }
-
-  Future<void> _checkConnectivity() async {
-    final online = await ConnectivityService().checkNow();
-    setState(() => _isOnline = online);
-  }
 
   // ── สแกน PO ──────────────────────────────────
   Future<void> _scanPO() async {
@@ -53,24 +40,6 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
       _po = null;
     });
 
-    // ถ้า offline → ดึงจาก cache
-    if (!_isOnline) {
-      final cached = await OfflineService().getCachedPO(poId);
-      setState(() => _loadingPO = false);
-
-      if (!mounted) return;
-
-      if (cached == null) {
-        showErrorDialog(
-          context,
-          message: 'ไม่พบ PO ใน cache กรุณาเชื่อมต่อ WiFi ก่อน',
-        );
-        return;
-      }
-      setState(() => _po = cached);
-      showWarningSnackbar(context, 'ใช้ข้อมูล offline');
-      return;
-    }
 
     // online → ดึงจาก API
     final result = await _api.getPO(poId);
@@ -86,8 +55,6 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
     final po = result.data!;
     setState(() => _po = po);
 
-    // cache ไว้ใช้ตอน offline
-    await OfflineService().savePO(po);
 
     setState(() => _loadingPO = false);
   }
@@ -143,7 +110,6 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
     if (!mounted) return;
     if (result.success) {
       setState(() => _po = result.data!);
-      await OfflineService().savePO(result.data!);
     }
   }
 
@@ -155,7 +121,6 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
         top: false,
         child: Column(
           children: [
-            if (!_isOnline) const OfflineBanner(pendingCount: 0),
 
             Expanded(
               child: SingleChildScrollView(

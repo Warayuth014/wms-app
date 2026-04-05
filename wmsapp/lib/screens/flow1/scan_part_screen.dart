@@ -5,8 +5,6 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
-import '../../services/offline_service.dart';
-import '../../services/connectivity_service.dart';
 import '../../models/wms_models.dart';
 
 class ScanPartScreen extends StatefulWidget {
@@ -36,7 +34,6 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
   final _api = ApiService();
 
   bool _loading = false;
-  bool _isOnline = true;
 
   // ── PO ล่าสุด (อัปเดตได้) ─────────────────
   late POResponse _currentPo;
@@ -58,7 +55,6 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
   void initState() {
     super.initState();
     _currentPo = widget.po;
-    _checkConnectivity();
     if (widget.session.pendingLines.isNotEmpty) {
       _resumedPendingLines.addAll(widget.session.pendingLines);
     }
@@ -71,10 +67,6 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
     }
   }
 
-  Future<void> _checkConnectivity() async {
-    final online = await ConnectivityService().checkNow();
-    if (mounted) setState(() => _isOnline = online);
-  }
 
   // ── สแกน Part ────────────────────────────────
   Future<void> _scanPart() async {
@@ -259,40 +251,6 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
 
     setState(() => _loading = true);
 
-    // ถ้า offline → บันทึกลง queue
-    if (!_isOnline) {
-      await OfflineService().addToQueue(
-        action: 'scan-part',
-        data: {
-          'sessionId': widget.session.sessionId,
-          'poId': widget.po.poId,
-          'partId': poItem.partId,
-          'qtyReceived': qty,
-          'operatorId': widget.userId,
-        },
-      );
-
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _pendingLine = ReceiptLineResponse(
-          lineId: -1,
-          partId: poItem.partId,
-          owner: poItem.owner,
-          brand: poItem.brand,
-          itemDesc: poItem.itemDesc,
-          qtyOrdered: poItem.qtyOrdered,
-          qtyReceived: qty,
-          condition: poItem.condition,
-          lotNumber: poItem.lotNumber,
-          poItemStatus: 'PENDING',
-          message: '⚠️ offline',
-        );
-      });
-      _clearFormFields();
-      showWarningSnackbar(context, 'บันทึกแบบ offline');
-      return;
-    }
 
     // online → ยิง API
     final result = await _api.scanReceiptPart(
@@ -543,7 +501,6 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
           top: false,
           child: Column(
             children: [
-              if (!_isOnline) const OfflineBanner(pendingCount: 0),
               Expanded(
                 child: LoadingOverlay(
                   loading: _loading,

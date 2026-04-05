@@ -371,43 +371,6 @@ class InfoRow extends StatelessWidget {
   }
 }
 
-// =============================================
-// OfflineBanner — theme-aware
-// =============================================
-class OfflineBanner extends StatelessWidget {
-  final int pendingCount;
-
-  const OfflineBanner({super.key, required this.pendingCount});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFE65100), Color(0xFFF57C00)],
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(MdiIcons.wifiOff, color: Colors.white, size: 18),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Offline — $pendingCount pending sync',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 // =============================================
 // LoadingOverlay — modern glass effect

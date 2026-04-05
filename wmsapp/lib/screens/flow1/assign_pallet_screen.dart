@@ -5,8 +5,6 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
-import '../../services/offline_service.dart';
-import '../../services/connectivity_service.dart';
 import '../../models/wms_models.dart';
 import '../../widgets/part_thumbnail.dart';
 
@@ -41,20 +39,14 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
 
   String _palletType = 'FG';
   bool _loading = false;
-  bool _isOnline = true;
 
   @override
   void initState() {
     super.initState();
-    _checkConnectivity();
     // เลือกทุก Part เป็น default
     _selectedLineIds.addAll(widget.scannedLines.map((l) => l.lineId));
   }
 
-  Future<void> _checkConnectivity() async {
-    final online = await ConnectivityService().checkNow();
-    setState(() => _isOnline = online);
-  }
 
   // ── Assign Pallet ─────────────────────────────
   Future<void> _assignPallet() async {
@@ -85,33 +77,6 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
 
     setState(() => _loading = true);
 
-    // ถ้า offline → บันทึกลง queue
-    if (!_isOnline) {
-      await OfflineService().addToQueue(
-        action: 'assign-pallet',
-        data: {
-          'sessionId': widget.session.sessionId,
-          'palletId': palletId,
-          'palletType': _palletType,
-          'operatorId': widget.userId,
-          'lineIds': _selectedLineIds.toList(),
-        },
-      );
-
-      setState(() => _loading = false);
-
-      if (!mounted) return;
-
-      showWarningSnackbar(
-        context,
-        'บันทึกแบบ offline จะ sync เมื่อ WiFi กลับมา',
-      );
-
-      widget.onAssigned(_selectedLineIds.toList());
-
-      if (mounted) Navigator.pop(context);
-      return;
-    }
 
     // online → ยิง API
     final result = await _api.assignPallet(
@@ -313,7 +278,6 @@ class _AssignPalletScreenState extends State<AssignPalletScreen> {
         top: false,
         child: Column(
           children: [
-            if (!_isOnline) const OfflineBanner(pendingCount: 0),
 
             Expanded(
               child: LoadingOverlay(
