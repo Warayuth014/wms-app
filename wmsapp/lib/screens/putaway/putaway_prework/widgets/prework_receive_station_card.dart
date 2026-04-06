@@ -40,9 +40,9 @@ class PreworkReceiveStationCard extends StatelessWidget {
       isDispatching: isInTransit,
       busyPalletId: palletId,
       busyDestination: isInTransit
-          ? 'กำลังมาส่ง...'
+          ? 'Arriving...'
           : hasPallet
-              ? 'ตัดยอดแล้ว'
+              ? 'Cut complete'
               : null,
       onTap: onTap,
     );

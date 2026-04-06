@@ -25,20 +25,20 @@ class PutawayStationScanCard extends StatelessWidget {
               Icon(MdiIcons.barcodeScan, color: AppTheme.primary, size: 20),
               const SizedBox(width: 8),
               const Text(
-                'Scan Station Barcode',
+                'สแกนบาร์โค้ด Station',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
               ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
-            'Or tap a station card below',
+            'หรือกดที่รูป Station ด้านล่าง',
             style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
           ),
           const SizedBox(height: 12),
           ScanTextField(
             label: 'Station ID',
-            hint: 'e.g. STN-1',
+            hint: 'เช่น STN-1',
             controller: controller,
             onSubmit: onSubmit,
           ),

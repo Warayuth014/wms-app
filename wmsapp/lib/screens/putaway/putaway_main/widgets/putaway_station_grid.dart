@@ -22,7 +22,7 @@ class PutawayStationGrid extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SectionHeader(
-          title: 'Select Station',
+          title: 'เลือก Station',
           icon: MdiIcons.viewGridOutline,
         ),
         const SizedBox(height: 12),

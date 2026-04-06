@@ -3,7 +3,6 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 
 import '../../../services/api_service.dart';
 import '../../../services/signalr_service.dart';
-import '../../../theme/theme.dart';
 import '../../../widgets/common_widgets.dart';
 import '../shared/putaway_shared_widgets.dart';
 import 'widgets/putaway_station_grid.dart';
@@ -13,19 +12,19 @@ final _kStations = [
   StationInfo(
     id: 'STN-1',
     label: 'Station 1',
-    color: AppTheme.primary,
+    color: const Color(0xFF1976D2),
     icon: MdiIcons.warehouse,
   ),
   StationInfo(
     id: 'STN-2',
     label: 'Station 2',
-    color: AppTheme.teal,
+    color: const Color(0xFF009688),
     icon: MdiIcons.warehouse,
   ),
   StationInfo(
     id: 'STN-3',
     label: 'Station 3',
-    color: AppTheme.success,
+    color: const Color(0xFF4CAF50),
     icon: MdiIcons.warehouse,
   ),
 ];
@@ -49,7 +48,6 @@ class _PutawayScreenState extends State<PutawayScreen> {
   final _api = ApiService();
   final _signalR = SignalRService();
 
-  // stationId -> { palletId, destination, items }
   Map<String, Map<String, dynamic>> _stationStatus = {};
 
   @override

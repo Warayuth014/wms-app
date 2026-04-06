@@ -18,7 +18,7 @@ const _kColorSend = Color(0xFFD84315);
 final _kPWStations = [
   StationInfo(
     id: 'PW-STN-1',
-    label: 'รับ Pallet',
+    label: 'Receive Pallet',
     color: _kColorReceive,
     icon: MdiIcons.trayArrowDown,
     allowedType: 'PW',
@@ -26,7 +26,7 @@ final _kPWStations = [
   ),
   StationInfo(
     id: 'PW-STN-2',
-    label: 'ส่ง Pallet',
+    label: 'Send Pallet',
     color: _kColorSend,
     icon: MdiIcons.trayArrowUp,
     allowedType: 'PW',
@@ -35,7 +35,7 @@ final _kPWStations = [
   ),
   StationInfo(
     id: 'PW-STN-3',
-    label: 'รับ Pallet',
+    label: 'Receive Pallet',
     color: _kColorReceive,
     icon: MdiIcons.trayArrowDown,
     allowedType: 'PW',
@@ -43,7 +43,7 @@ final _kPWStations = [
   ),
   StationInfo(
     id: 'PW-STN-4',
-    label: 'ส่ง Pallet',
+    label: 'Send Pallet',
     color: _kColorSend,
     icon: MdiIcons.trayArrowUp,
     allowedType: 'PW',
@@ -52,7 +52,7 @@ final _kPWStations = [
   ),
   StationInfo(
     id: 'PW-STN-5',
-    label: 'รับ Pallet',
+    label: 'Receive Pallet',
     color: _kColorReceive,
     icon: MdiIcons.trayArrowDown,
     allowedType: 'PW',
@@ -60,7 +60,7 @@ final _kPWStations = [
   ),
   StationInfo(
     id: 'PW-STN-6',
-    label: 'ส่ง Pallet',
+    label: 'Send Pallet',
     color: _kColorSend,
     icon: MdiIcons.trayArrowUp,
     allowedType: 'PW',
@@ -88,10 +88,7 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
   final _api = ApiService();
   final _signalR = SignalRService();
 
-  // stationId -> { palletId, destination, items } for send side
   Map<String, Map<String, dynamic>> _stationStatus = {};
-
-  // stationId -> { palletId, palletStatus, cutItems } for receive side
   Map<String, Map<String, dynamic>> _receiveStatus = {};
 
   Timer? _returnAnimMidTimer;
@@ -162,7 +159,7 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
     if (station == null) {
       showErrorDialog(
         context,
-        message: 'ไม่พบ Station: $raw\nStation ที่รองรับ: PW-STN-1 ถึง PW-STN-6',
+        message: 'Station not found: $raw\nSupported stations: PW-STN-1 to PW-STN-6',
       );
       return;
     }
@@ -174,13 +171,13 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
     _cancelReturnAnimation();
     setState(() {
       _returnAnimStation = stationId;
-      _returnAnimText = 'AMR กำลังมารับ Pallet...';
+      _returnAnimText = 'AMR is picking up the pallet...';
     });
 
     _returnAnimMidTimer = Timer(const Duration(seconds: 2), () {
       if (!mounted || _returnAnimStation != stationId) return;
 
-      setState(() => _returnAnimText = 'AMR กำลังคืน Pallet...');
+      setState(() => _returnAnimText = 'AMR is returning the pallet...');
 
       _returnAnimEndTimer = Timer(const Duration(seconds: 2), () {
         if (!mounted || _returnAnimStation != stationId) return;
@@ -303,7 +300,10 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
         _kPWStations.where((station) => station.pwRole == PWRole.send).toList();
 
     return Scaffold(
-      appBar: WmsAppBar(title: 'Putaway Prework', userName: widget.fullName),
+      appBar: WmsAppBar(
+        title: 'Putaway Prework',
+        userName: widget.fullName,
+      ),
       body: SafeArea(
         top: false,
         child: SingleChildScrollView(
