@@ -1,20 +1,19 @@
-// lib/screens/putaway/putaway_prework/putaway_prework_screen.dart
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
-import '../../../theme/theme.dart';
-import '../../../widgets/common_widgets.dart';
+
 import '../../../services/api_service.dart';
 import '../../../services/signalr_service.dart';
+import '../../../widgets/common_widgets.dart';
 import '../shared/putaway_shared_widgets.dart';
-import 'widgets/prework_column_header.dart';
+import 'widgets/prework_receive_column.dart';
 import 'widgets/prework_receive_sheet.dart';
+import 'widgets/prework_send_column.dart';
+import 'widgets/prework_station_scan_card.dart';
 
-// ── Station constants (PW-STN only) ──────────
-const _kColorReceive = Color(0xFF00796B); // teal เข้ม — รับ pallet
-const _kColorSend = Color(0xFFD84315); // ส้มแดง — ส่ง pallet
+const _kColorReceive = Color(0xFF00796B);
+const _kColorSend = Color(0xFFD84315);
 
 final _kPWStations = [
   StationInfo(
@@ -70,9 +69,6 @@ final _kPWStations = [
   ),
 ];
 
-// =============================================
-// PutawayPreworkScreen — PW-STN-1 ~ PW-STN-6
-// =============================================
 class PutawayPreworkScreen extends StatefulWidget {
   final String userId;
   final String fullName;
@@ -92,17 +88,17 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
   final _api = ApiService();
   final _signalR = SignalRService();
 
-  // stationId → { palletId, destination, items } (สำหรับฝั่งส่ง)
+  // stationId -> { palletId, destination, items } for send side
   Map<String, Map<String, dynamic>> _stationStatus = {};
 
-  // stationId → { palletId, palletStatus, cutItems } (สำหรับฝั่งรับ)
+  // stationId -> { palletId, palletStatus, cutItems } for receive side
   Map<String, Map<String, dynamic>> _receiveStatus = {};
+
   Timer? _returnAnimMidTimer;
   Timer? _returnAnimEndTimer;
 
-  // Return animation state
-  String? _returnAnimStation;  // station ที่กำลังแสดง animation
-  String _returnAnimText = ''; // ข้อความแสดง
+  String? _returnAnimStation;
+  String _returnAnimText = '';
 
   @override
   void initState() {
@@ -137,26 +133,24 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
 
   Future<void> _loadStationStatus() async {
     final result = await _api.getStationStatus();
-    if (!mounted) return;
-    if (result.success) {
-      final map = <String, Map<String, dynamic>>{};
-      for (final s in result.data!) {
-        map[s['stationId'] as String] = s;
-      }
-      setState(() => _stationStatus = map);
+    if (!mounted || !result.success) return;
+
+    final map = <String, Map<String, dynamic>>{};
+    for (final station in result.data!) {
+      map[station['stationId'] as String] = station;
     }
+    setState(() => _stationStatus = map);
   }
 
   Future<void> _loadPreworkStationStatus() async {
     final result = await _api.getPreworkStationStatus();
-    if (!mounted) return;
-    if (result.success) {
-      final map = <String, Map<String, dynamic>>{};
-      for (final s in result.data!) {
-        map[s['stationId'] as String] = s;
-      }
-      setState(() => _receiveStatus = map);
+    if (!mounted || !result.success) return;
+
+    final map = <String, Map<String, dynamic>>{};
+    for (final station in result.data!) {
+      map[station['stationId'] as String] = station;
     }
+    setState(() => _receiveStatus = map);
   }
 
   void _onStationBarcodeScan() {
@@ -164,13 +158,11 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
     _stationController.clear();
     if (raw.isEmpty) return;
 
-    final station = _kPWStations.where((s) => s.id == raw).firstOrNull;
+    final station = _kPWStations.where((item) => item.id == raw).firstOrNull;
     if (station == null) {
       showErrorDialog(
         context,
-        message:
-            'ไม่พบ Station: $raw\n'
-            'Station ที่รองรับ: PW-STN-1 ~ PW-STN-6',
+        message: 'ไม่พบ Station: $raw\nStation ที่รองรับ: PW-STN-1 ถึง PW-STN-6',
       );
       return;
     }
@@ -184,11 +176,15 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
       _returnAnimStation = stationId;
       _returnAnimText = 'AMR กำลังมารับ Pallet...';
     });
+
     _returnAnimMidTimer = Timer(const Duration(seconds: 2), () {
       if (!mounted || _returnAnimStation != stationId) return;
+
       setState(() => _returnAnimText = 'AMR กำลังคืน Pallet...');
+
       _returnAnimEndTimer = Timer(const Duration(seconds: 2), () {
         if (!mounted || _returnAnimStation != stationId) return;
+
         setState(() {
           _returnAnimStation = null;
           _returnAnimText = '';
@@ -210,7 +206,7 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
     final destination = data['destination'] as String?;
 
     if (stationId != null &&
-        _kPWStations.any((s) => s.id == stationId && s.pwRole == PWRole.send) &&
+        _kPWStations.any((station) => station.id == stationId && station.pwRole == PWRole.send) &&
         mounted) {
       setState(() {
         _stationStatus = {
@@ -239,7 +235,7 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
   void _handlePalletReturned(Map<String, dynamic> data) {
     final stationId = data['stationId'] as String?;
     if (stationId != null &&
-        _kPWStations.any((s) => s.id == stationId && s.pwRole == PWRole.receive)) {
+        _kPWStations.any((station) => station.id == stationId && station.pwRole == PWRole.receive)) {
       _playReturnAnimation(stationId);
       return;
     }
@@ -252,16 +248,13 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
   }
 
   void _openStationPopup(StationInfo station) {
-    // กำลังแสดง return animation → ไม่ต้องเปิด popup
     if (_returnAnimStation == station.id) return;
 
-    // ฝั่งรับ → popup แสดง cut items + ปุ่มคืน pallet
     if (station.pwRole == PWRole.receive) {
       final info = _receiveStatus[station.id];
       final palletId = info?['palletId'] as String?;
       final palletStatus = info?['palletStatus'] as String?;
 
-      // AMR กำลังนำ Pallet มา → ไม่ต้องเปิด popup
       if (palletStatus == 'IN_TRANSIT') return;
 
       final cutItems =
@@ -284,7 +277,6 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
       return;
     }
 
-    // ฝั่งส่ง → AMR กำลังมารับ → ไม่ต้องเปิด popup
     final busy = _stationStatus[station.id];
     if (busy != null) return;
 
@@ -305,13 +297,10 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // แบ่ง odd=รับ (index 0,2,4) — even=ส่ง (index 1,3,5)
-    final receiveStations = _kPWStations
-        .where((s) => s.pwRole == PWRole.receive)
-        .toList();
-    final sendStations = _kPWStations
-        .where((s) => s.pwRole == PWRole.send)
-        .toList();
+    final receiveStations =
+        _kPWStations.where((station) => station.pwRole == PWRole.receive).toList();
+    final sendStations =
+        _kPWStations.where((station) => station.pwRole == PWRole.send).toList();
 
     return Scaffold(
       appBar: WmsAppBar(title: 'Putaway Prework', userName: widget.fullName),
@@ -322,96 +311,32 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Scan station barcode ──────────
-              WmsCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          MdiIcons.barcodeScan,
-                          color: _kColorReceive,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'สแกนบาร์โค้ด Station',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'หรือกดที่รูป Station ด้านล่าง',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textGrey(context),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ScanTextField(
-                      label: 'Station ID',
-                      hint: 'เช่น PW-STN-1',
-                      controller: _stationController,
-                      onSubmit: _onStationBarcodeScan,
-                    ),
-                  ],
-                ),
+              PreworkStationScanCard(
+                controller: _stationController,
+                onSubmit: _onStationBarcodeScan,
+                accentColor: _kColorReceive,
               ),
-
               const SizedBox(height: 20),
-
-              // ── Receive / Send columns ────────
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── รับ column ──
                   Expanded(
-                    child: Column(
-                      children: [
-                        PreworkColumnHeader(
-                          label: 'รับ Pallet',
-                          icon: MdiIcons.trayArrowDown,
-                          color: _kColorReceive,
-                        ),
-                        const SizedBox(height: 10),
-                        for (final s in receiveStations) ...[
-                          _buildReceiveStationCard(s),
-                          const SizedBox(height: 10),
-                        ],
-                      ],
+                    child: PreworkReceiveColumn(
+                      stations: receiveStations,
+                      color: _kColorReceive,
+                      returnAnimStation: _returnAnimStation,
+                      returnAnimText: _returnAnimText,
+                      receiveStatus: _receiveStatus,
+                      onStationTap: _openStationPopup,
                     ),
                   ),
-
                   const SizedBox(width: 12),
-
-                  // ── ส่ง column ──
                   Expanded(
-                    child: Column(
-                      children: [
-                        PreworkColumnHeader(
-                          label: 'ส่ง Pallet',
-                          icon: MdiIcons.trayArrowUp,
-                          color: _kColorSend,
-                        ),
-                        const SizedBox(height: 10),
-                        for (final s in sendStations) ...[
-                          StationCard(
-                            station: s,
-                            isDispatching: _stationStatus.containsKey(s.id),
-                            busyPalletId:
-                                _stationStatus[s.id]?['palletId'] as String?,
-                            busyDestination:
-                                _stationStatus[s.id]?['destination'] as String?,
-                            onTap: () => _openStationPopup(s),
-                          ),
-                          const SizedBox(height: 10),
-                        ],
-                      ],
+                    child: PreworkSendColumn(
+                      stations: sendStations,
+                      color: _kColorSend,
+                      stationStatus: _stationStatus,
+                      onStationTap: _openStationPopup,
                     ),
                   ),
                 ],
@@ -420,38 +345,6 @@ class _PutawayPreworkScreenState extends State<PutawayPreworkScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildReceiveStationCard(StationInfo station) {
-    final isReturning = _returnAnimStation == station.id;
-
-    if (isReturning) {
-      return StationCard(
-        station: station,
-        isDispatching: true,
-        busyPalletId: '',
-        busyDestination: _returnAnimText,
-        onTap: () {},
-      );
-    }
-
-    final info = _receiveStatus[station.id];
-    final palletId = info?['palletId'] as String?;
-    final palletStatus = info?['palletStatus'] as String?;
-    final isInTransit = palletStatus == 'IN_TRANSIT';
-    final hasPallet = palletId != null;
-
-    return StationCard(
-      station: station,
-      isDispatching: isInTransit,
-      busyPalletId: palletId,
-      busyDestination: isInTransit
-          ? 'กำลังมาส่ง...'
-          : hasPallet
-          ? 'ตัดยอดแล้ว'
-          : null,
-      onTap: () => _openStationPopup(station),
     );
   }
 }

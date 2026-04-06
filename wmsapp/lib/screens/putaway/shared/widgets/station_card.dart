@@ -124,8 +124,8 @@ class _StationCardState extends State<StationCard>
         ),
         Text(
           widget.station.pwRole == PWRole.receive
-              ? 'AMR เธเธณเธฅเธฑเธเธเธณ Pallet เธกเธฒ...'
-              : 'AMR เธเธณเธฅเธฑเธเธกเธฒเธฃเธฑเธ...',
+              ? 'AMR กำลังนำ Pallet มา...'
+              : 'AMR กำลังมารับ...',
           style: const TextStyle(color: Colors.white70, fontSize: 11),
         ),
         if (widget.busyPalletId != null) ...[
@@ -148,7 +148,7 @@ class _StationCardState extends State<StationCard>
                 ),
                 if (widget.busyDestination != null)
                   Text(
-                    'โ’ ${widget.busyDestination}',
+                    '-> ${widget.busyDestination}',
                     style: const TextStyle(color: Colors.white70, fontSize: 10),
                   ),
               ],
@@ -247,7 +247,7 @@ class _StationCardState extends State<StationCard>
               ),
               const SizedBox(width: 3),
               Text(
-                hasBusy ? 'เธเธ”เธ”เธนเธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”' : 'เธเธ”เน€เธฅเธทเธญเธ',
+                hasBusy ? 'กดดูรายละเอียด' : 'กดเลือก',
                 style: const TextStyle(color: Colors.white, fontSize: 10),
               ),
             ],

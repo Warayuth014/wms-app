@@ -1,14 +1,14 @@
-// lib/screens/putaway/putaway_main/putaway_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
-import '../../../theme/theme.dart';
-import '../../../widgets/common_widgets.dart';
+
 import '../../../services/api_service.dart';
 import '../../../services/signalr_service.dart';
+import '../../../theme/theme.dart';
+import '../../../widgets/common_widgets.dart';
 import '../shared/putaway_shared_widgets.dart';
+import 'widgets/putaway_station_grid.dart';
+import 'widgets/putaway_station_scan_card.dart';
 
-// ── Station constants (STN only) ─────────────
 final _kStations = [
   StationInfo(
     id: 'STN-1',
@@ -30,9 +30,6 @@ final _kStations = [
   ),
 ];
 
-// =============================================
-// PutawayScreen — STN-1, STN-2, STN-3 only
-// =============================================
 class PutawayScreen extends StatefulWidget {
   final String userId;
   final String fullName;
@@ -52,7 +49,7 @@ class _PutawayScreenState extends State<PutawayScreen> {
   final _api = ApiService();
   final _signalR = SignalRService();
 
-  // stationId → { palletId, destination, items }
+  // stationId -> { palletId, destination, items }
   Map<String, Map<String, dynamic>> _stationStatus = {};
 
   @override
@@ -83,19 +80,18 @@ class _PutawayScreenState extends State<PutawayScreen> {
 
   Future<void> _loadStationStatus() async {
     final result = await _api.getStationStatus();
-    if (!mounted) return;
-    if (result.success) {
-      final map = <String, Map<String, dynamic>>{};
-      for (final s in result.data!) {
-        map[s['stationId'] as String] = s;
-      }
-      setState(() => _stationStatus = map);
+    if (!mounted || !result.success) return;
+
+    final map = <String, Map<String, dynamic>>{};
+    for (final station in result.data!) {
+      map[station['stationId'] as String] = station;
     }
+    setState(() => _stationStatus = map);
   }
 
   void _handleStationDispatched(Map<String, dynamic> data) {
     final stationId = data['stationId'] as String?;
-    if (stationId == null || !_kStations.any((s) => s.id == stationId)) {
+    if (stationId == null || !_kStations.any((station) => station.id == stationId)) {
       return;
     }
 
@@ -134,11 +130,11 @@ class _PutawayScreenState extends State<PutawayScreen> {
     _stationController.clear();
     if (raw.isEmpty) return;
 
-    final station = _kStations.where((s) => s.id == raw).firstOrNull;
+    final station = _kStations.where((item) => item.id == raw).firstOrNull;
     if (station == null) {
       showErrorDialog(
         context,
-        message: 'ไม่พบ Station: $raw\nStation ที่รองรับ: STN-1, STN-2, STN-3',
+        message: 'Station not found: $raw\nSupported stations: STN-1, STN-2, STN-3',
       );
       return;
     }
@@ -169,7 +165,7 @@ class _PutawayScreenState extends State<PutawayScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: WmsAppBar(
-        title: 'Putaway — จัดเก็บสินค้า',
+        title: 'Putaway - Store Items',
         userName: widget.fullName,
       ),
       body: SafeArea(
@@ -179,77 +175,15 @@ class _PutawayScreenState extends State<PutawayScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Scan station barcode ──────────
-              WmsCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          MdiIcons.barcodeScan,
-                          color: AppTheme.primary,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'สแกนบาร์โค้ด Station',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'หรือกดที่รูป Station ด้านล่าง',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textGrey(context),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ScanTextField(
-                      label: 'Station ID',
-                      hint: 'เช่น STN-1',
-                      controller: _stationController,
-                      onSubmit: _onStationBarcodeScan,
-                    ),
-                  ],
-                ),
+              PutawayStationScanCard(
+                controller: _stationController,
+                onSubmit: _onStationBarcodeScan,
               ),
-
               const SizedBox(height: 20),
-
-              // ── Station Grid ──────────────────
-              SectionHeader(
-                title: 'เลือก Station',
-                icon: MdiIcons.viewGridOutline,
-              ),
-              const SizedBox(height: 12),
-
-              Row(
-                children: [
-                  for (int i = 0; i < _kStations.length; i++) ...[
-                    if (i > 0) const SizedBox(width: 10),
-                    Expanded(
-                      child: StationCard(
-                        station: _kStations[i],
-                        isDispatching: _stationStatus.containsKey(
-                          _kStations[i].id,
-                        ),
-                        busyPalletId:
-                            _stationStatus[_kStations[i].id]?['palletId']
-                                as String?,
-                        busyDestination:
-                            _stationStatus[_kStations[i].id]?['destination']
-                                as String?,
-                        onTap: () => _openStationPopup(_kStations[i]),
-                      ),
-                    ),
-                  ],
-                ],
+              PutawayStationGrid(
+                stations: _kStations,
+                stationStatus: _stationStatus,
+                onStationTap: _openStationPopup,
               ),
             ],
           ),

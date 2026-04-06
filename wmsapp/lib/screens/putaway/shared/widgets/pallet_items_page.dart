@@ -24,7 +24,7 @@ class PalletItemsPage extends StatelessWidget {
     final typeColor = isFG ? AppTheme.success : AppTheme.warning;
 
     return Scaffold(
-      appBar: WmsAppBar(title: '$palletId โ€” เธชเธดเธเธเนเธฒ'),
+      appBar: WmsAppBar(title: '$palletId - สินค้า'),
       body: SafeArea(
         top: false,
         child: Column(
@@ -56,7 +56,7 @@ class PalletItemsPage extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'เธเธฃเธฐเน€เธ เธ— $type ยท ${items.length} เธฃเธฒเธขเธเธฒเธฃ ยท เธฃเธงเธก ${items.fold<int>(0, (sum, i) => sum + i.qty)} เธเธดเนเธ',
+                          'ประเภท $type • ${items.length} รายการ • รวม ${items.fold<int>(0, (sum, i) => sum + i.qty)} ชิ้น',
                           style: TextStyle(
                             fontSize: 13,
                             color: AppTheme.textGrey(context),
@@ -177,7 +177,7 @@ class PalletItemsPage extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              'เธเธดเนเธ',
+                              'ชิ้น',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: AppTheme.textGrey(context),
