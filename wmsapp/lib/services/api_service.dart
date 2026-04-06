@@ -32,7 +32,7 @@ class ApiService {
 
   ApiService._internal();
 
-  static const _physicalIp = '192.168.1.159';
+  static const _physicalIp = '192.168.1.42';
   static const _port = 5000;
   static String? _cachedBase;
 
@@ -152,7 +152,9 @@ class ApiService {
       request.fields.addAll(fields);
       request.files.add(await http.MultipartFile.fromPath('file', file.path));
 
-      final streamed = await request.send().timeout(const Duration(seconds: 30));
+      final streamed = await request.send().timeout(
+        const Duration(seconds: 30),
+      );
       final response = await http.Response.fromStream(streamed);
       return _handle(response);
     } on SocketException {
