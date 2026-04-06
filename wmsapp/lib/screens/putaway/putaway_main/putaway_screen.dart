@@ -1,12 +1,12 @@
-// lib/screens/putaway/putaway_screen.dart
+// lib/screens/putaway/putaway_main/putaway_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
-import '../../theme/theme.dart';
-import '../../widgets/common_widgets.dart';
-import '../../services/api_service.dart';
-import '../../services/signalr_service.dart';
-import 'putaway_widgets.dart';
+import '../../../theme/theme.dart';
+import '../../../widgets/common_widgets.dart';
+import '../../../services/api_service.dart';
+import '../../../services/signalr_service.dart';
+import '../shared/putaway_shared_widgets.dart';
 
 // ── Station constants (STN only) ─────────────
 final _kStations = [
