@@ -6,7 +6,7 @@ import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import '../../models/wms_models.dart';
-import 'scan_part_screen.dart';
+import 'scan_part/scan_part_screen.dart';
 import '../../widgets/part_thumbnail.dart';
 
 class ScanPoScreen extends StatefulWidget {

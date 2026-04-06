@@ -1,11 +1,14 @@
-// lib/screens/receiving/scan_part_screen.dart
+// lib/screens/receiving/scan_part/scan_part_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
-import '../../theme/theme.dart';
-import '../../widgets/common_widgets.dart';
-import '../../services/api_service.dart';
-import '../../models/wms_models.dart';
+import '../../../theme/theme.dart';
+import '../../../widgets/common_widgets.dart';
+import '../../../services/api_service.dart';
+import '../../../models/wms_models.dart';
+import 'ui_models/assigned_receiving_line.dart';
+import 'widgets/current_pallet_bar.dart';
+import 'widgets/receiving_session_bar.dart';
 
 class ScanPartScreen extends StatefulWidget {
   final String userId;
@@ -46,7 +49,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
   ReceiptLineResponse? _pendingLine;
 
   // ── Lines ที่ผูก pallet แล้ว ──────────────
-  final List<_AssignedLine> _assignedLines = [];
+  final List<AssignedReceivingLine> _assignedLines = [];
 
   // ── Lines ที่รอผูก pallet จาก resume ──────
   final List<ReceiptLineResponse> _resumedPendingLines = [];
@@ -65,6 +68,38 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
     if (mounted && result.success) {
       setState(() => _currentPo = result.data!);
     }
+  }
+
+  void _clearPalletMemoryForRetry(ReceiptLineResponse line) {
+    setState(() {
+      _pendingLine = line;
+      _lastPalletId = null;
+      _lastPalletType = null;
+    });
+  }
+
+  void _storeAssignedLine(ReceiptLineResponse line, String palletId) {
+    final existIdx = _assignedLines.indexWhere(
+      (assigned) => assigned.partId == line.partId && assigned.palletId == palletId,
+    );
+
+    if (existIdx >= 0) {
+      final current = _assignedLines[existIdx];
+      _assignedLines[existIdx] = current.copyWith(
+        qtyReceived: current.qtyReceived + line.qtyReceived,
+      );
+      return;
+    }
+
+    _assignedLines.add(
+      AssignedReceivingLine(
+        partId: line.partId,
+        itemDesc: line.itemDesc,
+        qtyReceived: line.qtyReceived,
+        condition: line.condition,
+        palletId: palletId,
+      ),
+    );
   }
 
 
@@ -318,11 +353,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
 
     if (!result.success) {
       // ถ้า auto-assign ล้มเหลว → ให้ scan pallet ใหม่
-      setState(() {
-        _pendingLine = line;
-        _lastPalletId = null;
-        _lastPalletType = null;
-      });
+      _clearPalletMemoryForRetry(line);
       showErrorDialog(context, message: result.error ?? 'ผูก Pallet ไม่สำเร็จ');
       _palletFocus.requestFocus();
       return;
@@ -338,29 +369,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       _pendingLine = null;
 
       // ถ้า partId + palletId เดียวกัน → รวม qty
-      final existIdx = _assignedLines.indexWhere(
-        (a) => a.partId == line.partId && a.palletId == palletId,
-      );
-      if (existIdx >= 0) {
-        final old = _assignedLines[existIdx];
-        _assignedLines[existIdx] = _AssignedLine(
-          partId: old.partId,
-          itemDesc: old.itemDesc,
-          qtyReceived: old.qtyReceived + line.qtyReceived,
-          condition: old.condition,
-          palletId: old.palletId,
-        );
-      } else {
-        _assignedLines.add(
-          _AssignedLine(
-            partId: line.partId,
-            itemDesc: line.itemDesc,
-            qtyReceived: line.qtyReceived,
-            condition: line.condition,
-            palletId: palletId,
-          ),
-        );
-      }
+      _storeAssignedLine(line, palletId);
     });
 
     showSuccessSnackbar(context, '${line.partId} → Pallet $palletId สำเร็จ');
@@ -588,88 +597,23 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
 
   // ── Session Info Bar ────────────────────────
   Widget _buildSessionBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppTheme.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        children: [
-          Icon(MdiIcons.fileDocumentOutline, color: AppTheme.primary, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.po.poId,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    color: AppTheme.primary,
-                  ),
-                ),
-                Text(
-                  widget.po.supplierName,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textGrey(context),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            'Session #${widget.session.sessionId}',
-            style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
-          ),
-        ],
-      ),
+    return ReceivingSessionBar(
+      po: widget.po,
+      session: widget.session,
     );
   }
 
   // ── Current Pallet Bar ──────────────────────
   Widget _buildCurrentPalletBar() {
-    final color = _lastPalletType == 'FG' ? AppTheme.success : AppTheme.warning;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Icon(MdiIcons.packageVariantClosed, color: color, size: 18),
-          const SizedBox(width: 8),
-          Text(
-            'Pallet: $_lastPalletId',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-              color: color,
-            ),
-          ),
-          const SizedBox(width: 8),
-          StatusBadge(_lastPalletType!),
-          const Spacer(),
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _lastPalletId = null;
-                _lastPalletType = null;
-              });
-            },
-            child: Icon(
-              Icons.close,
-              size: 18,
-              color: AppTheme.textGrey(context),
-            ),
-          ),
-        ],
-      ),
+    return CurrentPalletBar(
+      palletId: _lastPalletId!,
+      palletType: _lastPalletType!,
+      onClear: () {
+        setState(() {
+          _lastPalletId = null;
+          _lastPalletType = null;
+        });
+      },
     );
   }
 
@@ -1052,21 +996,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
 }
 
 // ── Assigned Line Model ─────────────────────────
-class _AssignedLine {
-  final String partId;
-  final String itemDesc;
-  final int qtyReceived;
-  final String condition;
-  final String palletId;
 
-  _AssignedLine({
-    required this.partId,
-    required this.itemDesc,
-    required this.qtyReceived,
-    required this.condition,
-    required this.palletId,
-  });
-}
 
 // ── Thai Buddhist Era Date Picker ─────────────
 class _ThaiDatePicker extends StatefulWidget {

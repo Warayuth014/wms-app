@@ -58,7 +58,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-
   // ── ตรวจ login ก่อนเข้า flow ─────────────────
   Future<bool> _requireLogin() async {
     if (_userId != null) return true;
@@ -99,11 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.white.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
-                MdiIcons.warehouse,
-                color: Colors.white,
-                size: 20,
-              ),
+              child: Icon(MdiIcons.warehouse, color: Colors.white, size: 20),
             ),
             const SizedBox(width: 10),
             const Text('WMS'),
@@ -134,7 +129,6 @@ class _HomeScreenState extends State<HomeScreen> {
         top: false,
         child: Column(
           children: [
-
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
@@ -158,152 +152,179 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     IntrinsicHeight(
                       child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: HomeFlowCard(
-                            icon: MdiIcons.truckDeliveryOutline,
-                            title: 'Receive',
-                            subtitle: 'รับสินค้าเข้า',
-                            gradient: const [
-                              Color(0xFF1B5E20),
-                              Color(0xFF43A047),
-                            ],
-                            onTap: () async {
-                              if (!await _requireLogin()) return;
-                              if (!context.mounted) return;
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ReceivingMenuScreen(
-                                    userId: _userId!,
-                                    fullName: _fullName!,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: HomeFlowCard(
+                              icon: MdiIcons.truckDeliveryOutline,
+                              title: 'Receive',
+                              subtitle: 'รับสินค้าเข้า',
+                              gradient: const [
+                                Color(0xFF1B5E20),
+                                Color(0xFF43A047),
+                              ],
+                              onTap: () async {
+                                if (!await _requireLogin()) return;
+                                if (!context.mounted) return;
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ReceivingMenuScreen(
+                                      userId: _userId!,
+                                      fullName: _fullName!,
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: HomeFlowCard(
-                            icon: MdiIcons.forklift,
-                            title: 'Putaway for Receive',
-                            subtitle: 'เก็บ Pallet เข้าคลัง',
-                            gradient: const [
-                              Color(0xFF0D47A1),
-                              Color(0xFF1E88E5),
-                            ],
-                            onTap: () async {
-                              if (!await _requireLogin()) return;
-                              if (!context.mounted) return;
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => PutawayScreen(
-                                    userId: _userId!,
-                                    fullName: _fullName!,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: HomeFlowCard(
+                              icon: MdiIcons.forklift,
+                              title: 'Putaway for Receive',
+                              subtitle: 'เก็บ Pallet เข้าคลัง',
+                              gradient: const [
+                                Color(0xFF0D47A1),
+                                Color(0xFF1E88E5),
+                              ],
+                              onTap: () async {
+                                if (!await _requireLogin()) return;
+                                if (!context.mounted) return;
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => PutawayScreen(
+                                      userId: _userId!,
+                                      fullName: _fullName!,
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                      ],
-                    )),
+                        ],
+                      ),
+                    ),
 
                     const SizedBox(height: 12),
 
                     IntrinsicHeight(
                       child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: HomeFlowCard(
-                            icon: MdiIcons.clipboardCheckOutline,
-                            title: 'Putaway for Prework',
-                            subtitle: 'Prework Station',
-                            gradient: const [
-                              Color(0xFF004D40),
-                              Color(0xFF00897B),
-                            ],
-                            onTap: () async {
-                              if (!await _requireLogin()) return;
-                              if (!context.mounted) return;
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => PutawayPreworkScreen(
-                                    userId: _userId!,
-                                    fullName: _fullName!,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: HomeFlowCard(
+                              icon: MdiIcons.clipboardCheckOutline,
+                              title: 'Putaway for Prework',
+                              subtitle: 'Prework Station',
+                              gradient: const [
+                                Color(0xFF004D40),
+                                Color(0xFF00897B),
+                              ],
+                              onTap: () async {
+                                if (!await _requireLogin()) return;
+                                if (!context.mounted) return;
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => PutawayPreworkScreen(
+                                      userId: _userId!,
+                                      fullName: _fullName!,
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: HomeFlowCard(
-                            icon: MdiIcons.packageVariantPlus,
-                            title: 'Replenishment',
-                            subtitle: 'เติมสินค้า',
-                            gradient: const [
-                              Color(0xFFE65100),
-                              Color(0xFFFB8C00),
-                            ],
-                            onTap: () async {
-                              if (!await _requireLogin()) return;
-                              if (!context.mounted) return;
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => UnloadMenuScreen(
-                                    userId: _userId!,
-                                    fullName: _fullName!,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: HomeFlowCard(
+                              icon: MdiIcons.packageVariantPlus,
+                              title: 'Replenishment',
+                              subtitle: 'เติมสินค้า',
+                              gradient: const [
+                                Color(0xFFE65100),
+                                Color(0xFFFB8C00),
+                              ],
+                              onTap: () async {
+                                if (!await _requireLogin()) return;
+                                if (!context.mounted) return;
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => UnloadMenuScreen(
+                                      userId: _userId!,
+                                      fullName: _fullName!,
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                      ],
-                    )),
+                        ],
+                      ),
+                    ),
 
                     const SizedBox(height: 12),
 
                     IntrinsicHeight(
                       child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: HomeFlowCard(
-                            icon: MdiIcons.cartArrowDown,
-                            title: 'Picking',
-                            subtitle: 'เบิกสินค้า Pick/Pack',
-                            gradient: const [
-                              Color(0xFF4A148C),
-                              Color(0xFF8E24AA),
-                            ],
-                            onTap: () async {
-                              if (!await _requireLogin()) return;
-                              if (!context.mounted) return;
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => PickingSessionScreen(
-                                    userId: _userId!,
-                                    fullName: _fullName!,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: HomeFlowCard(
+                              icon: MdiIcons.cartArrowDown,
+                              title: 'Picking',
+                              subtitle: 'เบิกสินค้า Pick/Pack',
+                              gradient: const [
+                                Color(0xFF4A148C),
+                                Color(0xFF8E24AA),
+                              ],
+                              onTap: () async {
+                                if (!await _requireLogin()) return;
+                                if (!context.mounted) return;
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => PickingSessionScreen(
+                                      userId: _userId!,
+                                      fullName: _fullName!,
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(child: SizedBox()),
-                      ],
-                    )),
+
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: HomeFlowCard(
+                              icon: MdiIcons.packageVariantPlus,
+                              title: 'Packing',
+                              subtitle: 'แพ็คสินค้า',
+                              gradient: const [
+                                Color.fromARGB(255, 255, 0, 0),
+                                Color.fromARGB(255, 230, 34, 0),
+                              ],
+                              onTap: () async {
+                                if (!await _requireLogin()) return;
+                                if (!context.mounted) return;
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => UnloadMenuScreen(
+                                      userId: _userId!,
+                                      fullName: _fullName!,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
                     // ── Supervisor Section ──────
                     if (_role == 'SUPERVISOR') ...[
@@ -351,7 +372,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ],
-
 
                     const SizedBox(height: 16),
                   ],
@@ -462,4 +482,3 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-
