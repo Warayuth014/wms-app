@@ -11,7 +11,7 @@ import 'package:wmsapp/screens/receiving/receiving_menu/receiving_menu_screen.da
 import 'package:wmsapp/screens/supervisor/part_image_screen.dart';
 import 'package:wmsapp/screens/putaway/putaway_screen.dart';
 import 'package:wmsapp/screens/putaway/putaway_prework_screen.dart';
-import 'package:wmsapp/screens/picking/picking_session_screen.dart';
+import 'package:wmsapp/screens/picking/picking_session/picking_session_screen.dart';
 import 'package:wmsapp/screens/test/test_pick_order_screen.dart';
 import 'home/widgets/home_action_card.dart';
 import 'home/widgets/home_flow_card.dart';

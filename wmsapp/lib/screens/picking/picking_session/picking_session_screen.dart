@@ -1,11 +1,13 @@
-// lib/screens/picking/picking_session_screen.dart
+// lib/screens/picking/picking_session/picking_session_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
-import '../../theme/theme.dart';
-import '../../widgets/common_widgets.dart';
-import '../../services/api_service.dart';
-import 'pick_items_screen.dart';
+
+import '../../../services/api_service.dart';
+import '../../../theme/theme.dart';
+import '../../../widgets/common_widgets.dart';
+import '../pick_items/pick_items_screen.dart';
+import 'widgets/picking_scan_card.dart';
 
 class PickingSessionScreen extends StatefulWidget {
   final String userId;
@@ -35,12 +37,20 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _scanCtrl.dispose();
+    _scanFocus.dispose();
+    super.dispose();
+  }
+
   Future<void> _returnPallet(String palletId, String destination) async {
     setState(() => _loading = true);
     final result = await _api.returnPallet(
       palletId: palletId,
       destination: destination,
     );
+
     if (!mounted) return;
     setState(() => _loading = false);
 
@@ -62,7 +72,7 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
@@ -79,7 +89,10 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
           children: [
             Text(
               errorMsg ?? 'ไม่มีสินค้าที่ต้อง Pick บน Pallet นี้',
-              style: TextStyle(fontSize: 13, color: AppTheme.textGrey(context)),
+              style: TextStyle(
+                fontSize: 13,
+                color: AppTheme.textGrey(context),
+              ),
             ),
             const SizedBox(height: 6),
             const Text(
@@ -91,7 +104,7 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  Navigator.pop(ctx);
+                  Navigator.pop(dialogContext);
                   _returnPallet(palletId, 'ASRS');
                 },
                 icon: Icon(MdiIcons.warehouse, size: 18),
@@ -111,7 +124,7 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  Navigator.pop(ctx);
+                  Navigator.pop(dialogContext);
                   _returnPallet(palletId, 'ZONE_PACK');
                 },
                 icon: Icon(MdiIcons.truckDeliveryOutline, size: 18),
@@ -130,7 +143,7 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(
-                onPressed: () => Navigator.pop(ctx),
+                onPressed: () => Navigator.pop(dialogContext),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppTheme.textGrey(context),
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -156,15 +169,17 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
       palletId: palletId,
       operatorId: widget.userId,
     );
+
     if (!mounted) return;
     setState(() => _loading = false);
 
     if (!result.success) {
       if (result.isNotFound) {
-        // 404 — ไม่พบ Pallet ใน DB เลย → แค่โชว์ error ปกติ
-        showErrorDialog(context, message: result.error ?? 'ไม่พบ Pallet');
+        showErrorDialog(
+          context,
+          message: result.error ?? 'ไม่พบ Pallet',
+        );
       } else {
-        // 400 — Pallet มีอยู่แต่ไม่มีของ pick → ให้เลือกส่งกลับได้
         await _showReturnOrErrorDialog(palletId, result.error);
       }
       _scanCtrl.clear();
@@ -174,7 +189,6 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
 
     final assignment = result.data!;
 
-    // Navigate to pick flow — เริ่มจาก pickView เลย (ไม่ต้อง scan อีก)
     if (!mounted) return;
     Navigator.push(
       context,
@@ -187,7 +201,6 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
         ),
       ),
     ).then((_) {
-      // กลับมาแล้ว clear + focus ใหม่
       _scanCtrl.clear();
       _scanFocus.requestFocus();
     });
@@ -207,50 +220,10 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Scan card
-                WmsCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            MdiIcons.barcodeScan,
-                            color: AppTheme.primary,
-                            size: 24,
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Scan Pallet',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      // const Text(
-                      //   'สแกน Pallet ที่ต้องการ Pick\nระบบจะหา Pick Order + Station อัตโนมัติ',
-                      //   style: TextStyle(fontSize: 13, color: AppTheme.textGrey),
-                      // ),
-                      const SizedBox(height: 16),
-                      ScanTextField(
-                        label: 'Pallet ID',
-                        hint: 'Scan Pallet ID',
-                        controller: _scanCtrl,
-                        focusNode: _scanFocus,
-                        onSubmit: _scanPallet,
-                      ),
-                      const SizedBox(height: 12),
-                      PrimaryButton(
-                        label: 'Scan',
-                        icon: Icons.search,
-                        onPressed: _scanPallet,
-                      ),
-                    ],
-                  ),
+                PickingScanCard(
+                  controller: _scanCtrl,
+                  focusNode: _scanFocus,
+                  onScan: _scanPallet,
                 ),
                 const SizedBox(height: 24),
               ],
@@ -259,12 +232,5 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _scanCtrl.dispose();
-    _scanFocus.dispose();
-    super.dispose();
   }
 }
