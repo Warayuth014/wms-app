@@ -3,7 +3,7 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
-import 'scan_po_screen.dart';
+import 'scan_po/scan_po_screen.dart';
 import 'pending_pallet_screen.dart';
 
 class ReceivingMenuScreen extends StatefulWidget {
