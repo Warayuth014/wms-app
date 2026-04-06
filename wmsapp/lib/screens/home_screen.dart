@@ -2,8 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wmsapp/screens/unload/unload_menu_screen.dart';
+import 'package:wmsapp/services/auth_session_service.dart';
 import '../theme/theme.dart';
 import '../widgets/common_widgets.dart';
 import 'login_screen.dart';
@@ -13,6 +13,8 @@ import 'package:wmsapp/screens/putaway/putaway_screen.dart';
 import 'package:wmsapp/screens/putaway/putaway_prework_screen.dart';
 import 'package:wmsapp/screens/picking/picking_session_screen.dart';
 import 'package:wmsapp/screens/test/test_pick_order_screen.dart';
+import 'home/widgets/home_action_card.dart';
+import 'home/widgets/home_flow_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,6 +24,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final _sessionService = const AuthSessionService();
   String? _userId;
   String? _fullName;
   String? _role;
@@ -33,19 +36,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadUser() async {
-    final prefs = await SharedPreferences.getInstance();
+    final session = await _sessionService.loadSession();
     setState(() {
-      _userId = prefs.getString('userId');
-      _fullName = prefs.getString('fullName');
-      _role = prefs.getString('role');
+      _userId = session.userId;
+      _fullName = session.fullName;
+      _role = session.role;
     });
   }
 
-
-  // ── ตรวจ login ก่อนเข้า flow ─────────────────
-  Future<bool> _requireLogin() async {
-    if (_userId != null) return true;
-
+  Future<void> _openLogin() async {
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -57,6 +56,14 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+
+  // ── ตรวจ login ก่อนเข้า flow ─────────────────
+  Future<bool> _requireLogin() async {
+    if (_userId != null) return true;
+
+    await _openLogin();
     return _userId != null;
   }
 
@@ -70,8 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (!confirm) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await _sessionService.clearSession();
     setState(() {
       _userId = null;
       _fullName = null;
@@ -155,7 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Expanded(
-                          child: _FlowCard(
+                          child: HomeFlowCard(
                             icon: MdiIcons.truckDeliveryOutline,
                             title: 'Receive',
                             subtitle: 'รับสินค้าเข้า',
@@ -180,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: _FlowCard(
+                          child: HomeFlowCard(
                             icon: MdiIcons.forklift,
                             title: 'Putaway for Receive',
                             subtitle: 'เก็บ Pallet เข้าคลัง',
@@ -213,7 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Expanded(
-                          child: _FlowCard(
+                          child: HomeFlowCard(
                             icon: MdiIcons.clipboardCheckOutline,
                             title: 'Putaway for Prework',
                             subtitle: 'Prework Station',
@@ -238,7 +244,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: _FlowCard(
+                          child: HomeFlowCard(
                             icon: MdiIcons.packageVariantPlus,
                             title: 'Replenishment',
                             subtitle: 'เติมสินค้า',
@@ -271,7 +277,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Expanded(
-                          child: _FlowCard(
+                          child: HomeFlowCard(
                             icon: MdiIcons.cartArrowDown,
                             title: 'Picking',
                             subtitle: 'เบิกสินค้า Pick/Pack',
@@ -307,7 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         icon: MdiIcons.shieldAccountOutline,
                       ),
                       const SizedBox(height: 14),
-                      _ActionCard(
+                      HomeActionCard(
                         icon: MdiIcons.imageEditOutline,
                         iconColor: AppTheme.primary,
                         title: 'จัดการรูปสินค้า',
@@ -329,7 +335,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 28),
                       SectionHeader(title: 'TEST', icon: MdiIcons.flaskOutline),
                       const SizedBox(height: 14),
-                      _ActionCard(
+                      HomeActionCard(
                         icon: MdiIcons.flaskOutline,
                         iconColor: AppTheme.textGrey(context),
                         title: 'สร้าง Pick Order (TEST)',
@@ -452,183 +458,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           StatusBadge(_role ?? ''),
         ],
-      ),
-    );
-  }
-}
-
-// =============================================
-// _FlowCard — modern gradient card
-// =============================================
-class _FlowCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final List<Color> gradient;
-  final VoidCallback onTap;
-
-  const _FlowCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.gradient,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-      clipBehavior: Clip.antiAlias,
-      elevation: 2,
-      shadowColor: gradient.first.withValues(alpha: 0.3),
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: gradient,
-            ),
-          ),
-          child: Stack(
-            children: [
-              // decorative circle
-              Positioned(
-                right: -20,
-                top: -20,
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-              Positioned(
-                left: -10,
-                bottom: -10,
-                child: Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.06),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-              // content
-              Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                      ),
-                      child: Icon(icon, color: Colors.white, size: 28),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.8),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// =============================================
-// _ActionCard — for supervisor / test items
-// =============================================
-class _ActionCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  const _ActionCard({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                ),
-                child: Icon(icon, color: iconColor, size: 22),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: AppTheme.textPrimary(context),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textGrey(context),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: AppTheme.textGrey(context),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
