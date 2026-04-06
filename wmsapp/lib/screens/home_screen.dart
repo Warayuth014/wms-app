@@ -7,7 +7,7 @@ import 'package:wmsapp/services/auth_session_service.dart';
 import '../theme/theme.dart';
 import '../widgets/common_widgets.dart';
 import 'login_screen.dart';
-import 'package:wmsapp/screens/receiving/receiving_menu_screen.dart';
+import 'package:wmsapp/screens/receiving/receiving_menu/receiving_menu_screen.dart';
 import 'package:wmsapp/screens/supervisor/part_image_screen.dart';
 import 'package:wmsapp/screens/putaway/putaway_screen.dart';
 import 'package:wmsapp/screens/putaway/putaway_prework_screen.dart';
