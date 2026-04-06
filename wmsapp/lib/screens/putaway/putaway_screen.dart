@@ -223,7 +223,10 @@ class _PutawayScreenState extends State<PutawayScreen> {
               const SizedBox(height: 20),
 
               // ── Station Grid ──────────────────
-              SectionHeader(title: 'เลือก Station', icon: MdiIcons.viewGridOutline),
+              SectionHeader(
+                title: 'เลือก Station',
+                icon: MdiIcons.viewGridOutline,
+              ),
               const SizedBox(height: 12),
 
               Row(
@@ -248,43 +251,6 @@ class _PutawayScreenState extends State<PutawayScreen> {
                   ],
                 ],
               ),
-
-              const SizedBox(height: 20),
-
-              // // ── Legend ────────────────────────
-              // WmsCard(
-              //   child: Column(
-              //     crossAxisAlignment: CrossAxisAlignment.start,
-              //     children: [
-              //       Text(
-              //         'การทำงาน',
-              //         style: TextStyle(
-              //           fontWeight: FontWeight.w700,
-              //           fontSize: 13,
-              //           color: AppTheme.textPrimary(context),
-              //         ),
-              //       ),
-              //       const SizedBox(height: 8),
-              //       _LegendRow(
-              //         icon: Icons.domain,
-              //         color: AppTheme.primary,
-              //         text: 'FG → เก็บเข้า ASRS หรือ Replenish Rack',
-              //       ),
-              //       const SizedBox(height: 6),
-              //       _LegendRow(
-              //         icon: Icons.build_circle,
-              //         color: AppTheme.warning,
-              //         text: 'PW → ส่งจุด Prework หรือเก็บ ASRS',
-              //       ),
-              //       const SizedBox(height: 6),
-              //       _LegendRow(
-              //         icon: Icons.wrap_text,
-              //         color: AppTheme.secondary,
-              //         text: 'เลือกพัน Pallet ผ่าน Wrapping Machine ก่อนเข้า ASRS',
-              //       ),
-              //     ],
-              //   ),
-              // ),
             ],
           ),
         ),
@@ -292,31 +258,3 @@ class _PutawayScreenState extends State<PutawayScreen> {
     );
   }
 }
-
-// class _LegendRow extends StatelessWidget {
-//   final IconData icon;
-//   final Color color;
-//   final String text;
-
-//   const _LegendRow({
-//     required this.icon,
-//     required this.color,
-//     required this.text,
-//   });
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Row(
-//       children: [
-//         Icon(icon, color: color, size: 16),
-//         const SizedBox(width: 8),
-//         Expanded(
-//           child: Text(
-//             text,
-//             style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
-//           ),
-//         ),
-//       ],
-//     );
-//   }
-// }
