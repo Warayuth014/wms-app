@@ -300,12 +300,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: HomeFlowCard(
-                              icon: MdiIcons.packageVariantPlus,
+                              icon: MdiIcons.packageVariant,
                               title: 'Packing',
                               subtitle: 'แพ็คสินค้า',
                               gradient: const [
-                                Color.fromARGB(255, 255, 0, 0),
-                                Color.fromARGB(255, 230, 34, 0),
+                                Color.fromARGB(255, 218, 52, 52),
+                                Color.fromARGB(255, 255, 66, 33),
                               ],
                               onTap: () async {
                                 if (!await _requireLogin()) return;
@@ -313,10 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => UnloadMenuScreen(
-                                      userId: _userId!,
-                                      fullName: _fullName!,
-                                    ),
+                                    builder: (_) => Placeholder(),
                                   ),
                                 );
                               },
