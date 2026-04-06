@@ -4,7 +4,7 @@ import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
 import 'scan_po/scan_po_screen.dart';
-import 'pending_pallet_screen.dart';
+import 'pending_pallet/pending_pallet_screen.dart';
 
 class ReceivingMenuScreen extends StatefulWidget {
   final String userId;
