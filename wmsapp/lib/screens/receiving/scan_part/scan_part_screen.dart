@@ -8,12 +8,12 @@ import '../../../services/api_service.dart';
 import '../../../theme/theme.dart';
 import '../../../widgets/common_widgets.dart';
 import 'ui_models/assigned_receiving_line.dart';
-import 'widgets/assigned_list.dart';
-import 'widgets/current_pallet_bar.dart';
-import 'widgets/pallet_scan_section.dart';
-import 'widgets/pending_items_list.dart';
-import 'widgets/receiving_session_bar.dart';
-import 'widgets/resumed_pending_list.dart';
+import 'widgets/lists/assigned_list.dart';
+import 'widgets/bars/current_pallet_bar.dart';
+import 'widgets/scan/pallet_scan_section.dart';
+import 'widgets/lists/pending_items_list.dart';
+import 'widgets/bars/receiving_session_bar.dart';
+import 'widgets/lists/resumed_pending_list.dart';
 
 class ScanPartScreen extends StatefulWidget {
   final String userId;

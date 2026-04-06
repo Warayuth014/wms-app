@@ -7,10 +7,10 @@ import '../../../services/api_service.dart';
 import '../../../services/signalr_service.dart';
 import '../../../widgets/common_widgets.dart';
 import '../shared/putaway_shared_widgets.dart';
-import 'widgets/prework_receive_column.dart';
-import 'widgets/prework_receive_sheet.dart';
-import 'widgets/prework_send_column.dart';
-import 'widgets/prework_station_scan_card.dart';
+import 'widgets/receive/prework_receive_column.dart';
+import 'widgets/receive/prework_receive_sheet.dart';
+import 'widgets/send/prework_send_column.dart';
+import 'widgets/scan/prework_station_scan_card.dart';
 
 const _kColorReceive = Color(0xFF00796B);
 const _kColorSend = Color(0xFFD84315);

@@ -7,12 +7,12 @@ import '../../../models/wms_models.dart';
 import '../../../services/api_service.dart';
 import '../../../theme/theme.dart';
 import '../../../widgets/common_widgets.dart';
-import 'widgets/unload_items_list.dart';
-import 'widgets/unload_pallet_info_card.dart';
-import 'widgets/unload_pallet_scan_section.dart';
-import 'widgets/unload_part_scan_section.dart';
-import 'widgets/unload_progress_bar.dart';
-import 'widgets/unload_return_animation.dart';
+import 'widgets/lists/unload_items_list.dart';
+import 'widgets/pallet/unload_pallet_info_card.dart';
+import 'widgets/scan/unload_pallet_scan_section.dart';
+import 'widgets/scan/unload_part_scan_section.dart';
+import 'widgets/status/unload_progress_bar.dart';
+import 'widgets/status/unload_return_animation.dart';
 
 class UnloadScreen extends StatefulWidget {
   final String userId;

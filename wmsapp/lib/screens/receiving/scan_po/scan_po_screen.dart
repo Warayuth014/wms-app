@@ -7,10 +7,10 @@ import '../../../services/api_service.dart';
 import '../../../theme/theme.dart';
 import '../../../widgets/common_widgets.dart';
 import '../scan_part/scan_part_screen.dart';
-import 'widgets/po_info_card.dart';
-import 'widgets/po_items_list.dart';
-import 'widgets/po_search_card.dart';
-import 'widgets/po_step_indicator.dart';
+import 'widgets/info/po_info_card.dart';
+import 'widgets/info/po_items_list.dart';
+import 'widgets/search/po_search_card.dart';
+import 'widgets/steps/po_step_indicator.dart';
 
 class ScanPoScreen extends StatefulWidget {
   final String userId;

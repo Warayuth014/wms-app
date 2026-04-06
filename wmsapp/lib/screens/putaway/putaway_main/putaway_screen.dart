@@ -5,8 +5,8 @@ import '../../../services/api_service.dart';
 import '../../../services/signalr_service.dart';
 import '../../../widgets/common_widgets.dart';
 import '../shared/putaway_shared_widgets.dart';
-import 'widgets/putaway_station_grid.dart';
-import 'widgets/putaway_station_scan_card.dart';
+import 'widgets/station/putaway_station_grid.dart';
+import 'widgets/station/putaway_station_scan_card.dart';
 
 final _kStations = [
   StationInfo(

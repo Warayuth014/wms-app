@@ -7,8 +7,8 @@ import '../../../models/wms_models.dart';
 import '../../../services/api_service.dart';
 import '../../../theme/theme.dart';
 import '../../../widgets/common_widgets.dart';
-import 'widgets/pending_pallet_empty_state.dart';
-import 'widgets/pending_pallet_po_group.dart';
+import 'widgets/states/pending_pallet_empty_state.dart';
+import 'widgets/groups/pending_pallet_po_group.dart';
 
 class PendingPalletScreen extends StatefulWidget {
   final String userId;

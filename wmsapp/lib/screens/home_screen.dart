@@ -13,8 +13,8 @@ import 'package:wmsapp/screens/putaway/putaway_main/putaway_screen.dart';
 import 'package:wmsapp/screens/putaway/putaway_prework/putaway_prework_screen.dart';
 import 'package:wmsapp/screens/picking/picking_session/picking_session_screen.dart';
 import 'package:wmsapp/screens/test/test_pick_order_screen.dart';
-import 'home/widgets/home_action_card.dart';
-import 'home/widgets/home_flow_card.dart';
+import 'home/widgets/cards/home_action_card.dart';
+import 'home/widgets/cards/home_flow_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

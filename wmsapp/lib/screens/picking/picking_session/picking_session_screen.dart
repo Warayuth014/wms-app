@@ -7,7 +7,7 @@ import '../../../services/api_service.dart';
 import '../../../theme/theme.dart';
 import '../../../widgets/common_widgets.dart';
 import '../pick_items/pick_items_screen.dart';
-import 'widgets/picking_scan_card.dart';
+import 'widgets/scan/picking_scan_card.dart';
 
 class PickingSessionScreen extends StatefulWidget {
   final String userId;
