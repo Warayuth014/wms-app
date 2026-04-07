@@ -12,6 +12,7 @@ import 'package:wmsapp/screens/supervisor/part_image_screen.dart';
 import 'package:wmsapp/screens/putaway/putaway_main/putaway_screen.dart';
 import 'package:wmsapp/screens/putaway/putaway_prework/putaway_prework_screen.dart';
 import 'package:wmsapp/screens/picking/picking_session/picking_session_screen.dart';
+import 'package:wmsapp/screens/packing/packing_screen.dart';
 import 'package:wmsapp/screens/test/test_pick_order_screen.dart';
 import 'home/widgets/cards/home_action_card.dart';
 import 'home/widgets/cards/home_flow_card.dart';
@@ -313,7 +314,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => Placeholder(),
+                                    builder: (_) => PackingScreen(
+                                      userId: _userId!,
+                                      fullName: _fullName!,
+                                    ),
                                   ),
                                 );
                               },
@@ -348,16 +352,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ],
 
-                    // ── TEST Section ────────────
-                    if (_userId != null) ...[
+                    // ── Manual Operations ───────
+                    if (_role == 'SUPERVISOR') ...[
                       const SizedBox(height: 28),
-                      SectionHeader(title: 'TEST', icon: MdiIcons.flaskOutline),
+                      SectionHeader(
+                        title: 'Manual Operations',
+                        icon: MdiIcons.playlistPlus,
+                      ),
                       const SizedBox(height: 14),
                       HomeActionCard(
-                        icon: MdiIcons.flaskOutline,
-                        iconColor: AppTheme.textGrey(context),
-                        title: 'สร้าง Pick Order (TEST)',
-                        subtitle: 'เลือกสินค้าจาก ReceiptLines',
+                        icon: MdiIcons.playlistPlus,
+                        iconColor: AppTheme.primary,
+                        title: 'สร้าง Pick Order (Manual)',
+                        subtitle: 'เลือกสินค้าจาก Pallet ที่พร้อม Pick',
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(

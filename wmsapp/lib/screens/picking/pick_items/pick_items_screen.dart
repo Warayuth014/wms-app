@@ -18,6 +18,7 @@ import 'widgets/return_source/picking_return_source_info_card.dart';
 import 'widgets/scan_dest/picking_dest_scan_card.dart';
 import 'widgets/scan_dest/picking_picked_summary_card.dart';
 import 'widgets/scan_source/picking_scan_source_card.dart';
+import '../../packing/packing_screen.dart';
 
 enum _PickState {
   scanSource,
@@ -558,13 +559,18 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: isComplete
+              onPressed: isComplete && _destPalletId != null
                   ? () {
-                      showSuccessSnackbar(
+                      Navigator.pushReplacement(
                         context,
-                        'Pick Order $_pickOrderId ครบแล้ว พร้อมส่งไป PACK',
+                        MaterialPageRoute(
+                          builder: (_) => PackingScreen(
+                            userId: widget.userId,
+                            fullName: widget.fullName,
+                            initialPalletId: _destPalletId,
+                          ),
+                        ),
                       );
-                      Navigator.pop(context);
                     }
                   : null,
               icon: const Icon(Icons.local_shipping, size: 20),

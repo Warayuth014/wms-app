@@ -138,7 +138,10 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: WmsAppBar(title: 'TEST Pick Order', userName: widget.fullName),
+      appBar: WmsAppBar(
+        title: 'สร้าง Pick Order (Manual)',
+        userName: widget.fullName,
+      ),
       body: SafeArea(
         top: false,
         child: LoadingOverlay(
