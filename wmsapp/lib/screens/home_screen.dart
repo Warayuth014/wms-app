@@ -13,7 +13,6 @@ import 'package:wmsapp/screens/putaway/putaway_main/putaway_screen.dart';
 import 'package:wmsapp/screens/putaway/putaway_prework/putaway_prework_screen.dart';
 import 'package:wmsapp/screens/picking/picking_session/picking_session_screen.dart';
 import 'package:wmsapp/screens/packing/packing_screen.dart';
-import 'package:wmsapp/screens/sorting/sorting_screen.dart';
 import 'package:wmsapp/screens/test/test_pick_order_screen.dart';
 import 'home/widgets/cards/home_action_card.dart';
 import 'home/widgets/cards/home_flow_card.dart';
@@ -324,42 +323,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               },
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(
-                            child: HomeFlowCard(
-                              icon: MdiIcons.sortVariant,
-                              title: 'Sorting',
-                              subtitle: 'คัดแยกสินค้าลง Pallet',
-                              gradient: const [
-                                Color(0xFF00695C),
-                                Color(0xFF00897B),
-                              ],
-                              onTap: () async {
-                                if (!await _requireLogin()) return;
-                                if (!context.mounted) return;
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => SortingScreen(
-                                      userId: _userId!,
-                                      fullName: _fullName!,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Expanded(child: SizedBox()),
                         ],
                       ),
                     ),
