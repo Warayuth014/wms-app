@@ -4,28 +4,24 @@ import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
 import '../../../../../theme/theme.dart';
-import '../../../../../widgets/common_widgets.dart';
 
 class UnloadReturnAnimation extends StatelessWidget {
-  final String userName;
   final Animation<double> arrowAnimation;
 
   const UnloadReturnAnimation({
     super.key,
-    required this.userName,
     required this.arrowAnimation,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: WmsAppBar(title: 'Unload', userName: userName),
-      body: SafeArea(
-        top: false,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
               AnimatedBuilder(
                 animation: arrowAnimation,
                 builder: (_, __) => Transform.translate(
@@ -58,9 +54,8 @@ class UnloadReturnAnimation extends StatelessWidget {
                 style: TextStyle(color: AppTheme.textGrey(context)),
               ),
               const SizedBox(height: 32),
-              const _CountdownTimer(seconds: 5),
-            ],
-          ),
+            const _CountdownTimer(seconds: 5),
+          ],
         ),
       ),
     );

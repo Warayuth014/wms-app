@@ -191,11 +191,14 @@ class _UnloadItemCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                         ],
-                        Text(
-                          '${item.owner} / ${item.brand}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppTheme.textGrey(context),
+                        Expanded(
+                          child: Text(
+                            '${item.owner} / ${item.brand}',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textGrey(context),
+                            ),
                           ),
                         ),
                       ],

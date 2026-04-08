@@ -1,4 +1,4 @@
-// lib/screens/unload/unload_session/unload_screen.dart
+// lib/screens/unload/unload_session/unload_session_sheet.dart
 
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
@@ -7,6 +7,7 @@ import '../../../models/wms_models.dart';
 import '../../../services/api_service.dart';
 import '../../../theme/theme.dart';
 import '../../../widgets/common_widgets.dart';
+import '../../putaway/shared/putaway_shared_widgets.dart';
 import 'widgets/lists/unload_items_list.dart';
 import 'widgets/pallet/unload_pallet_info_card.dart';
 import 'widgets/scan/unload_pallet_scan_section.dart';
@@ -14,21 +15,23 @@ import 'widgets/scan/unload_part_scan_section.dart';
 import 'widgets/status/unload_progress_bar.dart';
 import 'widgets/status/unload_return_animation.dart';
 
-class UnloadScreen extends StatefulWidget {
+class UnloadSessionSheet extends StatefulWidget {
+  final StationInfo station;
   final String userId;
   final String fullName;
 
-  const UnloadScreen({
+  const UnloadSessionSheet({
     super.key,
+    required this.station,
     required this.userId,
     required this.fullName,
   });
 
   @override
-  State<UnloadScreen> createState() => _UnloadScreenState();
+  State<UnloadSessionSheet> createState() => _UnloadSessionSheetState();
 }
 
-class _UnloadScreenState extends State<UnloadScreen>
+class _UnloadSessionSheetState extends State<UnloadSessionSheet>
     with SingleTickerProviderStateMixin {
   late final AnimationController _arrowController;
   late final Animation<double> _arrowAnimation;
@@ -392,91 +395,161 @@ class _UnloadScreenState extends State<UnloadScreen>
     _palletFocus.requestFocus();
   }
 
+  bool get _canDismiss => !_loading && !_returning;
+
   @override
   Widget build(BuildContext context) {
-    if (_returning) {
-      return UnloadReturnAnimation(
-        userName: widget.fullName,
-        arrowAnimation: _arrowAnimation,
-      );
-    }
+    final mq = MediaQuery.of(context);
+    final bottomPad = mq.viewInsets.bottom + mq.viewPadding.bottom;
+    final maxHeight = mq.size.height * 0.92;
 
-    return LoadingOverlay(
-      loading: _loading,
-      child: Scaffold(
-        appBar: WmsAppBar(
-          title: 'Unload',
-          userName: widget.fullName,
-          actions: [
+    return PopScope(
+      canPop: _canDismiss,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.all(Radius.circular(20)),
+        ),
+        child: LoadingOverlay(
+          loading: _loading,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              // Header
+              _buildHeader(),
+              const SizedBox(height: 12),
+              // Body
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPad + 16),
+                  child: _returning
+                      ? UnloadReturnAnimation(arrowAnimation: _arrowAnimation)
+                      : _buildSessionBody(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: widget.station.color,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(widget.station.icon, color: Colors.white, size: 28),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.station.id,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  widget.station.label,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
             if (_sessionOpen)
               IconButton(
                 icon: const Icon(Icons.refresh, color: Colors.white),
                 tooltip: 'สแกน Pallet ใหม่',
                 onPressed: _resetForNextPallet,
               ),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              tooltip: 'ปิด',
+              onPressed: _canDismiss ? () => Navigator.pop(context) : null,
+            ),
           ],
         ),
-        body: SafeArea(
-          top: false,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_sessionOpen) ...[
-                  _buildProgressBar(),
-                  const SizedBox(height: 16),
-                ],
-                if (!_sessionOpen) _buildPalletScanSection(),
-                if (_pallet != null) _buildPalletInfoSection(),
-                if (_sessionOpen) _buildPartScanSection(),
-                if (_partStatus.isNotEmpty) _buildItemsList(),
-                if (_scannedPartId != null) ...[
-                  const SizedBox(height: 12),
-                  PrimaryButton(
-                    label: 'ยืนยัน Unload: $_scannedPartId',
-                    icon: Icons.check,
-                    onPressed: _confirmScannedPart,
-                  ),
-                  const SizedBox(height: 8),
-                  DangerButton(
-                    label: 'ยกเลิก',
-                    icon: Icons.close,
-                    onPressed: () {
-                      setState(() => _scannedPartId = null);
-                      _partFocus.requestFocus();
-                    },
-                  ),
-                ],
-                if (_sessionOpen) ...[
-                  const SizedBox(height: 20),
-                  OutlinedButton.icon(
-                    onPressed: _returnPallet,
-                    icon: Icon(MdiIcons.undoVariant, color: AppTheme.danger),
-                    label: const Text(
-                      'คืน Pallet',
-                      style: TextStyle(
-                        color: AppTheme.danger,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(
-                        color: AppTheme.danger,
-                        width: 1.5,
-                      ),
-                      minimumSize: const Size(double.infinity, 52),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+      ),
+    );
+  }
+
+  Widget _buildSessionBody() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_sessionOpen) ...[
+          _buildProgressBar(),
+          const SizedBox(height: 16),
+        ],
+        if (!_sessionOpen) _buildPalletScanSection(),
+        if (_pallet != null) _buildPalletInfoSection(),
+        if (_sessionOpen) _buildPartScanSection(),
+        if (_partStatus.isNotEmpty) _buildItemsList(),
+        if (_scannedPartId != null) ...[
+          const SizedBox(height: 12),
+          PrimaryButton(
+            label: 'ยืนยัน Unload: $_scannedPartId',
+            icon: Icons.check,
+            onPressed: _confirmScannedPart,
+          ),
+          const SizedBox(height: 8),
+          DangerButton(
+            label: 'ยกเลิก',
+            icon: Icons.close,
+            onPressed: () {
+              setState(() => _scannedPartId = null);
+              _partFocus.requestFocus();
+            },
+          ),
+        ],
+        if (_sessionOpen) ...[
+          const SizedBox(height: 20),
+          OutlinedButton.icon(
+            onPressed: _returnPallet,
+            icon: Icon(MdiIcons.undoVariant, color: AppTheme.danger),
+            label: const Text(
+              'คืน Pallet',
+              style: TextStyle(
+                color: AppTheme.danger,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: AppTheme.danger, width: 1.5),
+              minimumSize: const Size(double.infinity, 52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           ),
-        ),
-      ),
+        ],
+      ],
     );
   }
 

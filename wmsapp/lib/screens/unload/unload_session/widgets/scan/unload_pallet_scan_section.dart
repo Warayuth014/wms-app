@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
 import '../../../../../theme/theme.dart';
 import '../../../../../widgets/common_widgets.dart';
@@ -32,6 +33,12 @@ class UnloadPalletScanSection extends StatelessWidget {
           label: 'Pallet ID เช่น PAL-001',
           hint: 'PAL-001',
           onSubmit: onSubmit,
+        ),
+        const SizedBox(height: 10),
+        PrimaryButton(
+          label: 'ค้นหา Pallet',
+          icon: MdiIcons.magnify,
+          onPressed: onSubmit,
         ),
       ],
     );
