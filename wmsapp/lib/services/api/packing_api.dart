@@ -21,7 +21,7 @@ extension PackingApi on ApiService {
     return ApiResult.success(PackingDetailResponse.fromJson(response.data!));
   }
 
-  /// ดึง Order → list ของ Part + จำนวนที่สแกนแล้ว
+  /// ดึง Order → list ของ Part + จำนวนที่สแกนแล้ว (per-pallet)
   Future<ApiResult<PackingOrderResponse>> getPackOrder({
     required String packingId,
     required String pickOrderId,
@@ -33,7 +33,7 @@ extension PackingApi on ApiService {
     return ApiResult.success(PackingOrderResponse.fromJson(response.data!));
   }
 
-  /// สแกน Part 1 ครั้ง (เพิ่ม scanned qty)
+  /// สแกน Part (เพิ่ม scanned qty)
   Future<ApiResult<PackingOrderResponse>> scanPackPart({
     required String packingId,
     required String pickOrderId,
@@ -54,7 +54,7 @@ extension PackingApi on ApiService {
     return ApiResult.success(PackingOrderResponse.fromJson(response.data!));
   }
 
-  /// ยืนยัน Pack → DONE + (auto-ship Pallet ถ้าเป็น Pack สุดท้าย)
+  /// ยืนยัน Pack → DONE
   Future<ApiResult<ConfirmPackResponse>> confirmPack({
     required String packingId,
     required String operatorId,

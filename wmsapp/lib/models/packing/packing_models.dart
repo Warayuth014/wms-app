@@ -44,15 +44,16 @@ class PackingSummary {
   });
 
   factory PackingSummary.fromJson(Map<String, dynamic> json) => PackingSummary(
-    packingId: json['packingId'],
-    status: json['status'],
-    createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
-    completedAt: json['completedAt'] != null
-        ? DateTime.tryParse(json['completedAt'])
-        : null,
-    orderCount: json['orderCount'] ?? 0,
-    orderDoneCount: json['orderDoneCount'] ?? 0,
-  );
+        packingId: json['packingId'],
+        status: json['status'],
+        createdAt:
+            DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
+        completedAt: json['completedAt'] != null
+            ? DateTime.tryParse(json['completedAt'])
+            : null,
+        orderCount: json['orderCount'] ?? 0,
+        orderDoneCount: json['orderDoneCount'] ?? 0,
+      );
 
   bool get isDone => status == 'DONE';
 }
@@ -82,7 +83,8 @@ class PackingDetailResponse {
         packingId: json['packingId'],
         palletId: json['palletId'],
         status: json['status'],
-        createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
+        createdAt:
+            DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
         completedAt: json['completedAt'] != null
             ? DateTime.tryParse(json['completedAt'])
             : null,
@@ -119,7 +121,7 @@ class PackingOrderSummary {
   bool get isDone => status == 'DONE';
 }
 
-// ── Order level ──────────────────────────────────
+// ── Order level (parts on this pallet) ──────────────────────────────────
 class PackingOrderResponse {
   final String packingId;
   final String pickOrderId;
@@ -152,7 +154,7 @@ class PackingPartItem {
   final String brand;
   final String itemDesc;
   final String? imageUrl;
-  final int requiredQty;
+  final int requiredQty; // qty บน Pallet นี้ (จาก ReceiptLines)
   final int scannedQty;
 
   PackingPartItem({
@@ -204,7 +206,8 @@ class ConfirmPackResponse {
         status: json['status'],
         trackingId: json['trackingId'],
         palletShipped: json['palletShipped'] ?? false,
-        completedAt: DateTime.tryParse(json['completedAt'] ?? '') ?? DateTime.now(),
+        completedAt:
+            DateTime.tryParse(json['completedAt'] ?? '') ?? DateTime.now(),
         message: json['message'] ?? '',
       );
 }
