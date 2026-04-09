@@ -539,12 +539,18 @@ class _PackingScreenState extends State<PackingScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: part.imageUrl != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(part.imageUrl!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      const Icon(Icons.image_not_supported)),
+                          ? FutureBuilder<String>(
+                              future: _api.getImageFullUrl(part.imageUrl!),
+                              builder: (_, snap) {
+                                if (!snap.hasData) return const SizedBox();
+                                return ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(snap.data!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) =>
+                                          const Icon(Icons.image_not_supported)),
+                                );
+                              },
                             )
                           : const Icon(Icons.inventory_2_outlined,
                               color: Colors.grey),

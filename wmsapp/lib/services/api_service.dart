@@ -12,6 +12,7 @@ part 'api/unload_api.dart';
 part 'api/putaway_api.dart';
 part 'api/picking_api.dart';
 part 'api/packing_api.dart';
+part 'api/basket_api.dart';
 
 class ApiResult<T> {
   final bool success;

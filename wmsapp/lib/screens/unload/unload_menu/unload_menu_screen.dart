@@ -5,31 +5,10 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 
 import '../../../theme/theme.dart';
 import '../../../widgets/common_widgets.dart';
-import '../../putaway/shared/putaway_shared_widgets.dart';
-import '../unload_session/unload_session_sheet.dart';
+import '../unload_screen.dart';
+import '../load_to_basket/load_to_basket_screen.dart';
 
-final _kUnloadStations = <StationInfo>[
-  StationInfo(
-    id: 'UNL-1',
-    label: 'Unload 1',
-    color: const Color(0xFF1976D2),
-    icon: MdiIcons.trayArrowUp,
-  ),
-  StationInfo(
-    id: 'UNL-2',
-    label: 'Unload 2',
-    color: const Color(0xFF009688),
-    icon: MdiIcons.trayArrowUp,
-  ),
-  StationInfo(
-    id: 'UNL-3',
-    label: 'Unload 3',
-    color: const Color(0xFF4CAF50),
-    icon: MdiIcons.trayArrowUp,
-  ),
-];
-
-class UnloadMenuScreen extends StatefulWidget {
+class UnloadMenuScreen extends StatelessWidget {
   final String userId;
   final String fullName;
 
@@ -40,85 +19,49 @@ class UnloadMenuScreen extends StatefulWidget {
   });
 
   @override
-  State<UnloadMenuScreen> createState() => _UnloadMenuScreenState();
-}
-
-class _UnloadMenuScreenState extends State<UnloadMenuScreen> {
-  final _stationController = TextEditingController();
-
-  @override
-  void dispose() {
-    _stationController.dispose();
-    super.dispose();
-  }
-
-  void _onStationBarcodeScan() {
-    final raw = _stationController.text.trim().toUpperCase();
-    _stationController.clear();
-    if (raw.isEmpty) return;
-
-    final station = _kUnloadStations.where((s) => s.id == raw).firstOrNull;
-    if (station == null) {
-      showErrorDialog(
-        context,
-        message:
-            'Station not found: $raw\nSupported stations: UNL-1, UNL-2, UNL-3',
-      );
-      return;
-    }
-    _openStation(station);
-  }
-
-  void _openStation(StationInfo station) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => UnloadSessionSheet(
-        station: station,
-        userId: widget.userId,
-        fullName: widget.fullName,
-      ),
-    );
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: WmsAppBar(
         title: 'Replenishment - Unload',
-        userName: widget.fullName,
+        userName: fullName,
       ),
       body: SafeArea(
         top: false,
-        child: SingleChildScrollView(
+        child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _UnloadStationScanCard(
-                controller: _stationController,
-                onSubmit: _onStationBarcodeScan,
-              ),
-              const SizedBox(height: 20),
-              SectionHeader(
-                title: 'เลือก Station',
-                icon: MdiIcons.viewGridOutline,
+              _MenuCard(
+                icon: MdiIcons.trayArrowUp,
+                color: AppTheme.primary,
+                title: 'Unload',
+                subtitle: 'Unload สินค้าจาก Pallet ลงสถานี',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => UnloadScreen(
+                      userId: userId,
+                      fullName: fullName,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  for (int i = 0; i < _kUnloadStations.length; i++) ...[
-                    if (i > 0) const SizedBox(width: 10),
-                    Expanded(
-                      child: StationCard(
-                        station: _kUnloadStations[i],
-                        onTap: () => _openStation(_kUnloadStations[i]),
-                      ),
+              _MenuCard(
+                icon: MdiIcons.basketOutline,
+                color: AppTheme.teal,
+                title: 'Load to Basket',
+                subtitle: 'โหลดสินค้าที่ Unload แล้วเข้า Basket',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => LoadToBasketScreen(
+                      userId: userId,
+                      fullName: fullName,
                     ),
-                  ],
-                ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -128,44 +71,61 @@ class _UnloadMenuScreenState extends State<UnloadMenuScreen> {
   }
 }
 
-class _UnloadStationScanCard extends StatelessWidget {
-  final TextEditingController controller;
-  final VoidCallback onSubmit;
+class _MenuCard extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
 
-  const _UnloadStationScanCard({
-    required this.controller,
-    required this.onSubmit,
+  const _MenuCard({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return WmsCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
             children: [
-              Icon(MdiIcons.barcodeScan, color: AppTheme.primary, size: 20),
-              const SizedBox(width: 8),
-              const Text(
-                'สแกนบาร์โค้ด Station',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: color, size: 28),
               ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: const TextStyle(
+                            fontSize: 17, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    Text(subtitle,
+                        style: TextStyle(
+                            fontSize: 13, color: AppTheme.textGrey(context))),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: Colors.grey[400]),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            'หรือกดที่รูป Station ด้านล่าง',
-            style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
-          ),
-          const SizedBox(height: 12),
-          ScanTextField(
-            label: 'Station ID',
-            hint: 'เช่น UNL-1',
-            controller: controller,
-            onSubmit: onSubmit,
-          ),
-        ],
+        ),
       ),
     );
   }

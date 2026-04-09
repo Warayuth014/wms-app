@@ -63,7 +63,10 @@
       "Bash(find /c/Users/Admin/Documents/GitHub -name WmsApi* -o -name *WmsApi*)",
       "Bash(kill %1)",
       "Bash(grep -n \"Icons\\\\.\" /c/Users/Admin/Documents/GitHub/wms-app/wmsapp/lib/**/*.dart)",
-      "Bash(find \"c:\\\\Users\\\\Admin\\\\Documents\\\\GitHub\\\\wms-api\\\\WmsApi\\\\WmsApi\\\\Controllers\" -name \"*.cs\" -type f -exec grep -l \"Tote\\\\|Replenish\" {} \\\\;)"
+      "Bash(find \"c:\\\\Users\\\\Admin\\\\Documents\\\\GitHub\\\\wms-api\\\\WmsApi\\\\WmsApi\\\\Controllers\" -name \"*.cs\" -type f -exec grep -l \"Tote\\\\|Replenish\" {} \\\\;)",
+      "Bash(grep -iA 30 \"CREATE TABLE.*[Bb]asket\")",
+      "Bash(sqlcmd -S \"LAPTOP-7ELHM2GA\\\\\\\\SQLEXPRESS\" -U sa -P '0993904232pOpU#/#' -d WmsDB -Q \"SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='unload' AND TABLE_NAME IN \\('Baskets','BasketLines'\\) ORDER BY TABLE_NAME, ORDINAL_POSITION\" -W)",
+      "Bash(sqlcmd -S \"LAPTOP-7ELHM2GA\\\\\\\\SQLEXPRESS\" -U sa -P '0993904232pOpU#/#' -d WmsDB -Q \"SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE, COLUMNPROPERTY\\(OBJECT_ID\\(TABLE_SCHEMA+'.'+TABLE_NAME\\), COLUMN_NAME, 'IsIdentity'\\) AS IsIdentity FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='unload' AND TABLE_NAME IN \\('Baskets','BasketLines'\\) ORDER BY TABLE_NAME, ORDINAL_POSITION\" -W)"
     ]
   }
 }
