@@ -553,7 +553,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: isComplete && _destPalletId != null
+              onPressed: _destPalletId != null
                   ? () {
                       Navigator.pushReplacement(
                         context,
@@ -569,9 +569,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                   : null,
               icon: const Icon(Icons.local_shipping, size: 20),
               label: Text(
-                isComplete
-                    ? 'ส่งไป PACK'
-                    : 'ส่งไป PACK (เมื่อ Pick ครบเท่านั้น)',
+                'ส่งไป PACK',
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
