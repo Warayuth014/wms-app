@@ -11,7 +11,6 @@ import 'widgets/after_pick/picking_after_pick_success_banner.dart';
 import 'widgets/after_pick/picking_remaining_items_card.dart';
 import 'widgets/pick_view/picking_dest_pallet_banner.dart';
 import 'widgets/pick_view/picking_order_info_banner.dart';
-import 'widgets/pick_view/picking_order_needs_card.dart';
 import 'widgets/pick_view/picking_station_banner.dart';
 import 'widgets/return_source/picking_return_source_actions.dart';
 import 'widgets/return_source/picking_return_source_info_card.dart';
@@ -303,11 +302,6 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PickingStationBanner(assignment: assignment),
-          const SizedBox(height: 12),
-          PickingOrderNeedsCard(
-            pickOrderId: _pickOrderId,
-            pickOrderItems: assignment.pickOrderItems,
-          ),
           const SizedBox(height: 12),
           Row(
             children: [
