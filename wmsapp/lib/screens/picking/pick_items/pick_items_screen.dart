@@ -17,7 +17,6 @@ import 'widgets/return_source/picking_return_source_info_card.dart';
 import 'widgets/scan_dest/picking_dest_scan_card.dart';
 import 'widgets/scan_dest/picking_picked_summary_card.dart';
 import 'widgets/scan_source/picking_scan_source_card.dart';
-import '../../packing/packing_screen.dart';
 
 enum _PickState {
   scanSource,
@@ -221,6 +220,29 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _sourceScanFocus.requestFocus();
     });
+  }
+
+  Future<void> _sendToPack(String palletId) async {
+    setState(() => _loading = true);
+    final result = await _api.sendToPack(palletId: palletId);
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (!result.success) {
+      showErrorDialog(context, message: result.error ?? 'ส่งไป PACK ไม่สำเร็จ');
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(result.data?['message'] ?? 'ส่งไป PACK สำเร็จ'),
+        backgroundColor: AppTheme.success,
+      ),
+    );
+
+    // กลับไปสแกน source ต่อ (ยังอยู่หน้า Pick)
+    setState(() => _destPalletId = null);
+    _goToScanSource();
   }
 
   void _handleBack() {
@@ -554,18 +576,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: _destPalletId != null
-                  ? () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PackingScreen(
-                            userId: widget.userId,
-                            fullName: widget.fullName,
-                            initialPalletId: _destPalletId,
-                          ),
-                        ),
-                      );
-                    }
+                  ? () => _sendToPack(_destPalletId!)
                   : null,
               icon: const Icon(Icons.local_shipping, size: 20),
               label: Text(

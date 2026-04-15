@@ -60,6 +60,14 @@ extension PickingApi on ApiService {
     return ApiResult.success(list);
   }
 
+  Future<ApiResult<Map<String, dynamic>>> sendToPack({
+    required String palletId,
+  }) async {
+    final response = await _post('/picking/send-to-pack/$palletId', {});
+    if (!response.success) return ApiResult.error(response.error);
+    return ApiResult.success(response.data!);
+  }
+
   Future<ApiResult<Map<String, dynamic>>> createTestOrder({
     required String operatorId,
     required List<Map<String, dynamic>> items,
