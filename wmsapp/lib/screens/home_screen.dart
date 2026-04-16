@@ -13,6 +13,7 @@ import 'package:wmsapp/screens/putaway/putaway_main/putaway_screen.dart';
 import 'package:wmsapp/screens/putaway/putaway_prework/putaway_prework_screen.dart';
 import 'package:wmsapp/screens/picking/picking_session/picking_session_screen.dart';
 import 'package:wmsapp/screens/packing/packing_screen.dart';
+import 'package:wmsapp/screens/checkin/checkin_screen.dart';
 import 'package:wmsapp/screens/test/test_pick_order_screen.dart';
 import 'home/widgets/cards/home_action_card.dart';
 import 'home/widgets/cards/home_flow_card.dart';
@@ -323,6 +324,42 @@ class _HomeScreenState extends State<HomeScreen> {
                               },
                             ),
                           ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: HomeFlowCard(
+                              icon: MdiIcons.clipboardCheckOutline,
+                              title: 'Check-in',
+                              subtitle: 'จัดกลุ่มกล่อง + ปริ้น Tracking',
+                              gradient: const [
+                                Color(0xFF1B5E20),
+                                Color(0xFF66BB6A),
+                              ],
+                              onTap: () async {
+                                if (!await _requireLogin()) return;
+                                if (!context.mounted) return;
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => CheckInScreen(
+                                      userId: _userId!,
+                                      fullName: _fullName!,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(child: SizedBox()),
                         ],
                       ),
                     ),

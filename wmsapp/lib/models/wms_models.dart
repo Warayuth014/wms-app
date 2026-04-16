@@ -6,3 +6,4 @@ export 'putaway/putaway_models.dart';
 export 'picking/picking_models.dart';
 export 'packing/packing_models.dart';
 export 'basket/basket_models.dart';
+export 'checkin/checkin_models.dart';
