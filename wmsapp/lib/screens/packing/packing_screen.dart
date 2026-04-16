@@ -43,6 +43,10 @@ class _PackingScreenState extends State<PackingScreen> {
   String _currentPackingId = '';
   String _currentPickOrderId = '';
 
+  // qty controllers per Part (เหมือน Unload)
+  final Map<String, TextEditingController> _qtyCtrl = {};
+  String? _selectedPartId;
+
   @override
   void initState() {
     super.initState();
@@ -63,6 +67,9 @@ class _PackingScreenState extends State<PackingScreen> {
     _scanFocus.dispose();
     _partScanCtrl.dispose();
     _partScanFocus.dispose();
+    for (final c in _qtyCtrl.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -139,10 +146,9 @@ class _PackingScreenState extends State<PackingScreen> {
     final partId = _partScanCtrl.text.trim().toUpperCase();
     if (partId.isEmpty) return;
 
-    // หา Part ใน list
     final part = _orderResp?.parts.where((p) => p.partId == partId).firstOrNull;
     if (part == null) {
-      showErrorDialog(context, message: 'ไม่พบ Part "$partId" บน Pallet นี้');
+      showErrorDialog(context, message: 'ไม่พบ Part "$partId" ใน Order นี้');
       _partScanCtrl.clear();
       _partScanFocus.requestFocus();
       return;
@@ -155,11 +161,18 @@ class _PackingScreenState extends State<PackingScreen> {
       return;
     }
 
-    // แสดง dialog ระบุจำนวน
-    final qty = await _showQtyDialog(part);
-    if (qty == null || qty <= 0) {
-      _partScanCtrl.clear();
-      _partScanFocus.requestFocus();
+    // select Part + เตรียม qty field
+    _qtyCtrl.putIfAbsent(partId, () => TextEditingController());
+    _qtyCtrl[partId]!.text = part.remaining.toString();
+
+    setState(() => _selectedPartId = partId);
+    _partScanCtrl.clear();
+  }
+
+  Future<void> _confirmScanPart(String partId) async {
+    final qty = int.tryParse(_qtyCtrl[partId]?.text ?? '') ?? 0;
+    if (qty <= 0) {
+      showErrorDialog(context, message: 'จำนวนต้องมากกว่า 0');
       return;
     }
 
@@ -176,64 +189,38 @@ class _PackingScreenState extends State<PackingScreen> {
 
     if (!result.success) {
       showErrorDialog(context, message: result.error ?? 'สแกนไม่สำเร็จ');
-      _partScanCtrl.clear();
-      _partScanFocus.requestFocus();
       return;
     }
 
     setState(() {
       _orderResp = result.data;
+      _selectedPartId = null;
+      _qtyCtrl.remove(partId);
     });
-    _partScanCtrl.clear();
     _partScanFocus.requestFocus();
   }
 
-  Future<int?> _showQtyDialog(PackingPartItem part) async {
-    final qtyCtrl = TextEditingController(text: part.remaining.toString());
-    return showDialog<int>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('สแกน ${part.partId}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(part.itemDesc,
-                style: const TextStyle(fontSize: 13, color: Colors.grey)),
-            const SizedBox(height: 8),
-            Text('ต้องการ: ${part.requiredQty}  สแกนแล้ว: ${part.scannedQty}  เหลือ: ${part.remaining}',
-                style: const TextStyle(fontSize: 13)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: qtyCtrl,
-              keyboardType: TextInputType.number,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'จำนวน',
-                border: OutlineInputBorder(),
-              ),
-              onSubmitted: (_) {
-                final v = int.tryParse(qtyCtrl.text) ?? 0;
-                Navigator.pop(ctx, v);
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('ยกเลิก'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final v = int.tryParse(qtyCtrl.text) ?? 0;
-              Navigator.pop(ctx, v);
-            },
-            child: const Text('ยืนยัน'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _refreshPackList() async {
+    // reload pallet data แล้วกลับหน้า packList
+    setState(() => _loading = true);
+    final palletId = _palletResp!.palletId;
+    final result = await _api.scanPalletForPacking(palletId);
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (!result.success) {
+      // pallet อาจ shipped ไปแล้ว
+      showErrorDialog(context, message: result.error ?? 'โหลดข้อมูลไม่สำเร็จ');
+      _resetAll();
+      return;
+    }
+
+    setState(() {
+      _palletResp = result.data;
+      _orderResp = null;
+      _selectedPartId = null;
+      _state = _PackState.packList;
+    });
   }
 
   Future<void> _confirmPack() async {
@@ -258,12 +245,17 @@ class _PackingScreenState extends State<PackingScreen> {
   }
 
   void _resetAll() {
+    for (final c in _qtyCtrl.values) {
+      c.dispose();
+    }
+    _qtyCtrl.clear();
     setState(() {
       _palletResp = null;
       _orderResp = null;
       _confirmResult = null;
       _currentPackingId = '';
       _currentPickOrderId = '';
+      _selectedPartId = null;
       _scanCtrl.clear();
       _partScanCtrl.clear();
       _state = _PackState.scanPallet;
@@ -440,6 +432,31 @@ class _PackingScreenState extends State<PackingScreen> {
               ),
             )),
         const SizedBox(height: 12),
+        // ยืนยัน Pack (เมื่อทุก Pack DONE)
+        if (pallet.packs.every((p) => p.isDone))
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                // ใช้ Pack แรก (หรือตัวใดก็ได้ที่ DONE) เพื่อ confirm
+                final packId = pallet.packs.first.packingId;
+                setState(() => _currentPackingId = packId);
+                _confirmPack();
+              },
+              icon: const Icon(Icons.check_circle_outline, size: 20),
+              label: const Text('ยืนยัน Pack ทั้งหมด',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.success,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        if (pallet.packs.every((p) => p.isDone))
+          const SizedBox(height: 8),
         OutlinedButton.icon(
           onPressed: _resetAll,
           icon: const Icon(Icons.arrow_back, size: 18),
@@ -522,92 +539,167 @@ class _PackingScreenState extends State<PackingScreen> {
         const SizedBox(height: 8),
 
         // Part list
-        ...order.parts.map((part) => Card(
-              color: part.isDone
-                  ? AppTheme.success.withValues(alpha: 0.06)
-                  : null,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    // image or icon
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(8),
+        ...order.parts.map((part) {
+          final isSelected = _selectedPartId == part.partId && !part.isDone;
+          return Card(
+            color: part.isDone
+                ? AppTheme.success.withValues(alpha: 0.06)
+                : isSelected
+                    ? AppTheme.primary.withValues(alpha: 0.06)
+                    : null,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: isSelected
+                  ? const BorderSide(color: AppTheme.primary, width: 2)
+                  : BorderSide.none,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      // image or icon
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: part.imageUrl != null
+                            ? FutureBuilder<String>(
+                                future: _api.getImageFullUrl(part.imageUrl!),
+                                builder: (_, snap) {
+                                  if (!snap.hasData) return const SizedBox();
+                                  return ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(snap.data!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            const Icon(Icons.image_not_supported)),
+                                  );
+                                },
+                              )
+                            : const Icon(Icons.inventory_2_outlined,
+                                color: Colors.grey),
                       ),
-                      child: part.imageUrl != null
-                          ? FutureBuilder<String>(
-                              future: _api.getImageFullUrl(part.imageUrl!),
-                              builder: (_, snap) {
-                                if (!snap.hasData) return const SizedBox();
-                                return ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(snap.data!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) =>
-                                          const Icon(Icons.image_not_supported)),
-                                );
-                              },
-                            )
-                          : const Icon(Icons.inventory_2_outlined,
-                              color: Colors.grey),
-                    ),
-                    const SizedBox(width: 12),
-                    // info
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      const SizedBox(width: 12),
+                      // info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(part.partId,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 14)),
+                            Text(part.itemDesc,
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.grey[600]),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
+                            Text('${part.owner} / ${part.brand}',
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey[500])),
+                          ],
+                        ),
+                      ),
+                      // qty
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(part.partId,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w600, fontSize: 14)),
-                          Text(part.itemDesc,
-                              style: TextStyle(
-                                  fontSize: 12, color: Colors.grey[600]),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
-                          Text('${part.owner} / ${part.brand}',
-                              style: TextStyle(
-                                  fontSize: 11, color: Colors.grey[500])),
+                          Text(
+                            '${part.scannedQty} / ${part.requiredQty}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                              color: part.isDone
+                                  ? AppTheme.success
+                                  : AppTheme.primary,
+                            ),
+                          ),
+                          if (part.isDone)
+                            const Icon(Icons.check_circle,
+                                color: AppTheme.success, size: 18),
                         ],
                       ),
-                    ),
-                    // qty
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                    ],
+                  ),
+                  // ── qty input row (เมื่อ Part ถูกเลือก) ──
+                  if (isSelected) ...[
+                    const SizedBox(height: 10),
+                    Row(
                       children: [
-                        Text(
-                          '${part.scannedQty} / ${part.requiredQty}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                            color: part.isDone
-                                ? AppTheme.success
-                                : AppTheme.primary,
-                          ),
-                        ),
-                        if (part.isDone)
-                          const Icon(Icons.check_circle,
-                              color: AppTheme.success, size: 18),
+                        Text('บน Pallet: ${part.requiredQty} ชิ้น',
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                        const Spacer(),
+                        Text('เหลือ: ${part.remaining}',
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.warning)),
                       ],
                     ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Text('จำนวน Pack: ',
+                            style: TextStyle(fontSize: 13)),
+                        SizedBox(
+                          width: 70,
+                          child: TextField(
+                            controller: _qtyCtrl[part.partId],
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.w700),
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 10),
+                              border: OutlineInputBorder(),
+                            ),
+                            onSubmitted: (_) => _confirmScanPart(part.partId),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _confirmScanPart(part.partId),
+                        icon: const Icon(Icons.check, size: 18),
+                        label: const Text('ยืนยัน',
+                            style: TextStyle(fontWeight: FontWeight.w600)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.success,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
                   ],
-                ),
+                ],
               ),
-            )),
+            ),
+          );
+        }),
         const SizedBox(height: 16),
 
-        // Confirm Pack button (เมื่อทุก Part ครบ)
+        // เมื่อ Part ครบใน Order นี้ → กลับไปหน้า packList
         if (allDone)
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _confirmPack,
+              onPressed: () async {
+                // reload pack data แล้วกลับ packList
+                await _refreshPackList();
+              },
               icon: const Icon(Icons.check_circle_outline, size: 20),
-              label: const Text('ยืนยัน Pack',
+              label: const Text('Order นี้เสร็จแล้ว',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.success,
@@ -678,36 +770,46 @@ class _PackingScreenState extends State<PackingScreen> {
             padding: const EdgeInsets.all(20),
             child: Column(
               children: [
-                Icon(
-                  result.palletShipped
-                      ? Icons.local_shipping_outlined
-                      : Icons.check_circle_outline,
+                const Icon(
+                  Icons.check_circle,
                   color: AppTheme.success,
                   size: 56,
                 ),
                 const SizedBox(height: 12),
-                Text(result.message,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700),
+                const Text('Pack Complete',
+                    style: TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w700),
                     textAlign: TextAlign.center),
-                const SizedBox(height: 8),
-                if (result.trackingId != null)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text('Tracking: ${result.trackingId}',
-                        style: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w600)),
-                  ),
               ],
             ),
           ),
         ),
         const SizedBox(height: 16),
+        if (result.trackingId != null)
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('กำลังปริ้น Tracking...'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.print, size: 20),
+              label: Text('Print Tracking: ${result.trackingId}',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.secondary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(

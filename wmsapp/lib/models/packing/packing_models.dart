@@ -55,7 +55,7 @@ class PackingSummary {
         orderDoneCount: json['orderDoneCount'] ?? 0,
       );
 
-  bool get isDone => status == 'DONE';
+  bool get isDone => status == 'DONE' || (orderCount > 0 && orderDoneCount >= orderCount);
 }
 
 // ── Pack level ──────────────────────────────────
