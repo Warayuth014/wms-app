@@ -223,9 +223,18 @@ class _PackingScreenState extends State<PackingScreen> {
     });
   }
 
-  Future<void> _confirmPack() async {
+  Future<void> _splitPack() async {
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'ปิดกล่องนี้?',
+      message:
+          'ของที่สแกนแล้วจะถูกปิดในกล่องนี้ และเปิดกล่องใหม่สำหรับของที่เหลือ',
+      confirmLabel: 'ปิดกล่อง + เปิดใหม่',
+    );
+    if (!confirm || !mounted) return;
+
     setState(() => _loading = true);
-    final result = await _api.confirmPack(
+    final result = await _api.splitPack(
       packingId: _currentPackingId,
       operatorId: widget.userId,
     );
@@ -233,15 +242,57 @@ class _PackingScreenState extends State<PackingScreen> {
     setState(() => _loading = false);
 
     if (!result.success) {
-      showErrorDialog(
-          context, message: result.error ?? 'ยืนยัน Pack ไม่สำเร็จ');
+      showErrorDialog(context, message: result.error ?? 'แบ่งกล่องไม่สำเร็จ');
       return;
     }
 
-    setState(() {
-      _confirmResult = result.data;
-      _state = _PackState.success;
-    });
+    // แสดง snackbar แจ้งผล
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.data!.message),
+          backgroundColor: AppTheme.success,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+
+    // reload pallet data → จะเห็น Pack ใหม่ในลิสต์
+    await _refreshPackList();
+  }
+
+  Future<void> _confirmAllPacks() async {
+    final packs = _palletResp!.packs
+        .where((p) => p.status != 'DONE')
+        .toList();
+
+    setState(() => _loading = true);
+
+    ConfirmPackResponse? lastResult;
+    for (final pack in packs) {
+      final result = await _api.confirmPack(
+        packingId: pack.packingId,
+        operatorId: widget.userId,
+      );
+      if (!mounted) return;
+
+      if (!result.success) {
+        setState(() => _loading = false);
+        showErrorDialog(
+            context, message: result.error ?? 'ยืนยัน ${pack.packingId} ไม่สำเร็จ');
+        return;
+      }
+      lastResult = result.data;
+    }
+
+    setState(() => _loading = false);
+
+    if (lastResult != null) {
+      setState(() {
+        _confirmResult = lastResult;
+        _state = _PackState.success;
+      });
+    }
   }
 
   void _resetAll() {
@@ -437,12 +488,7 @@ class _PackingScreenState extends State<PackingScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () {
-                // ใช้ Pack แรก (หรือตัวใดก็ได้ที่ DONE) เพื่อ confirm
-                final packId = pallet.packs.first.packingId;
-                setState(() => _currentPackingId = packId);
-                _confirmPack();
-              },
+              onPressed: _confirmAllPacks,
               icon: const Icon(Icons.check_circle_outline, size: 20),
               label: const Text('ยืนยัน Pack ทั้งหมด',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
@@ -522,17 +568,33 @@ class _PackingScreenState extends State<PackingScreen> {
           Card(
             child: Padding(
               padding: const EdgeInsets.all(12),
-              child: TextField(
-                controller: _partScanCtrl,
-                focusNode: _partScanFocus,
-                textCapitalization: TextCapitalization.characters,
-                decoration: InputDecoration(
-                  labelText: 'สแกน Part ID',
-                  prefixIcon: Icon(MdiIcons.barcodeScan),
-                  border: const OutlineInputBorder(),
-                  isDense: true,
-                ),
-                onSubmitted: (_) => _scanPart(),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _partScanCtrl,
+                      focusNode: _partScanFocus,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        labelText: 'สแกน Part ID',
+                        prefixIcon: Icon(MdiIcons.barcodeScan),
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      ),
+                      onSubmitted: (_) => _scanPart(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: _scanPart,
+                    icon: const Icon(Icons.send, color: AppTheme.primary),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -710,6 +772,29 @@ class _PackingScreenState extends State<PackingScreen> {
               ),
             ),
           ),
+
+        // ปุ่มแบ่งกล่อง (แสดงเมื่อยังสแกนไม่ครบ + มีของสแกนแล้วอย่างน้อย 1 ชิ้น)
+        if (!allDone && order.parts.any((p) => p.scannedQty > 0))
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _splitPack,
+                icon: Icon(MdiIcons.packageVariantPlus, size: 18),
+                label: const Text('ปิดกล่องนี้ + เปิดกล่องใหม่',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.warning,
+                  side: const BorderSide(color: AppTheme.warning),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ),
+
         const SizedBox(height: 8),
         OutlinedButton.icon(
           onPressed: _handleBack,

@@ -49,6 +49,8 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
   final _sourceScanFocus = FocusNode();
   final _destScanCtrl = TextEditingController();
   final _destScanFocus = FocusNode();
+  final _partScanCtrl = TextEditingController();
+  final _partScanFocus = FocusNode();
   final _api = ApiService();
 
   _PickState _state = _PickState.pickView;
@@ -60,6 +62,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
   String? _destPalletId;
   ConfirmPickResponse? _lastResult;
   String? _returnPalletId;
+  String? _highlightedPartId;
   final Map<String, TextEditingController> _qtyCtrl = {};
 
   @override
@@ -113,6 +116,26 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
     setState(() {
       _state = _PickState.pickView;
     });
+  }
+
+  void _scanPart() {
+    final partId = _partScanCtrl.text.trim().toUpperCase();
+    if (partId.isEmpty) return;
+
+    final match = _assignment.palletItems
+        .where((item) => item.partId == partId)
+        .firstOrNull;
+
+    if (match == null) {
+      showErrorDialog(context, message: 'ไม่พบ Part "$partId" บน Pallet นี้');
+      _partScanCtrl.clear();
+      _partScanFocus.requestFocus();
+      return;
+    }
+
+    setState(() => _highlightedPartId = partId);
+    _partScanCtrl.clear();
+    _partScanFocus.requestFocus();
   }
 
   void _goToScanDestOrConfirm() {
@@ -325,6 +348,45 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
         children: [
           PickingStationBanner(assignment: assignment),
           const SizedBox(height: 12),
+          // ── สแกน Part ──
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.border(context)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _partScanCtrl,
+                    focusNode: _partScanFocus,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: InputDecoration(
+                      labelText: 'สแกน Part',
+                      hintText: 'กรุณา barcode →',
+                      prefixIcon: const Icon(Icons.qr_code_scanner, size: 20),
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    ),
+                    onSubmitted: (_) => _scanPart(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: _scanPart,
+                  icon: const Icon(Icons.send, color: AppTheme.primary),
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               Icon(
@@ -364,14 +426,20 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
         .where((pickOrderItem) => pickOrderItem.partId == item.partId)
         .firstOrNull;
     final needed = orderItem?.remainingQty ?? 0;
+    final isHighlighted = _highlightedPartId == item.partId;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isHighlighted
+            ? AppTheme.primary.withValues(alpha: 0.06)
+            : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.border(context)),
+        border: Border.all(
+          color: isHighlighted ? AppTheme.primary : AppTheme.border(context),
+          width: isHighlighted ? 2 : 1,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -636,6 +704,8 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
     _sourceScanFocus.dispose();
     _destScanCtrl.dispose();
     _destScanFocus.dispose();
+    _partScanCtrl.dispose();
+    _partScanFocus.dispose();
     _disposeQtyCtrl();
     super.dispose();
   }

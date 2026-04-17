@@ -182,6 +182,32 @@ class PackingPartItem {
   int get remaining => (requiredQty - scannedQty).clamp(0, requiredQty);
 }
 
+// ── Split Pack response ──────────────────────────────────
+class SplitPackResponse {
+  final String closedPackingId;
+  final String newPackingId;
+  final int itemsInClosedPack;
+  final int remainingItems;
+  final String message;
+
+  SplitPackResponse({
+    required this.closedPackingId,
+    required this.newPackingId,
+    required this.itemsInClosedPack,
+    required this.remainingItems,
+    required this.message,
+  });
+
+  factory SplitPackResponse.fromJson(Map<String, dynamic> json) =>
+      SplitPackResponse(
+        closedPackingId: json['closedPackingId'],
+        newPackingId: json['newPackingId'],
+        itemsInClosedPack: json['itemsInClosedPack'] ?? 0,
+        remainingItems: json['remainingItems'] ?? 0,
+        message: json['message'] ?? '',
+      );
+}
+
 // ── Confirm response ──────────────────────────────────
 class ConfirmPackResponse {
   final String packingId;
