@@ -62,7 +62,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
   String? _destPalletId;
   ConfirmPickResponse? _lastResult;
   String? _returnPalletId;
-  String? _highlightedPartId;
+  final Set<String> _selectedPartIds = {};
   final Map<String, TextEditingController> _qtyCtrl = {};
 
   @override
@@ -75,10 +75,10 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
 
   void _buildQtyControllers() {
     _disposeQtyCtrl();
+    _selectedPartIds.clear();
     for (final item in _assignment.palletItems) {
-      _qtyCtrl[item.partId] = TextEditingController(
-        text: '${item.qtyToPickSuggested}',
-      );
+      // เริ่มต้น qty = 0 → ผู้ใช้ต้องเลือก Part ก่อน
+      _qtyCtrl[item.partId] = TextEditingController(text: '0');
     }
   }
 
@@ -133,9 +133,32 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
       return;
     }
 
-    setState(() => _highlightedPartId = partId);
+    setState(() {
+      // เลือก Part อัตโนมัติ + เติม qty ที่แนะนำ
+      if (!_selectedPartIds.contains(partId)) {
+        _selectedPartIds.add(partId);
+        _qtyCtrl[partId]?.text = '${match.qtyToPickSuggested}';
+      }
+    });
     _partScanCtrl.clear();
     _partScanFocus.requestFocus();
+  }
+
+  void _togglePartSelection(String partId) {
+    final item = _assignment.palletItems
+        .where((i) => i.partId == partId)
+        .firstOrNull;
+    if (item == null) return;
+
+    setState(() {
+      if (_selectedPartIds.contains(partId)) {
+        _selectedPartIds.remove(partId);
+        _qtyCtrl[partId]?.text = '0';
+      } else {
+        _selectedPartIds.add(partId);
+        _qtyCtrl[partId]?.text = '${item.qtyToPickSuggested}';
+      }
+    });
   }
 
   void _goToScanDestOrConfirm() {
@@ -173,6 +196,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
   Future<void> _confirmPick(String destId) async {
     final items = <Map<String, dynamic>>[];
     for (final item in _assignment.palletItems) {
+      if (!_selectedPartIds.contains(item.partId)) continue;
       final qty = int.tryParse(_qtyCtrl[item.partId]?.text.trim() ?? '') ?? 0;
       if (qty > 0) {
         items.add({'partId': item.partId, 'qty': qty});
@@ -182,7 +206,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
     if (items.isEmpty) {
       showWarningSnackbar(
         context,
-        'กรุณาระบุจำนวนที่จะ Pick อย่างน้อย 1 รายการ',
+        'กรุณาเลือก Part ที่จะ Pick อย่างน้อย 1 รายการ',
       );
       return;
     }
@@ -426,145 +450,173 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
         .where((pickOrderItem) => pickOrderItem.partId == item.partId)
         .firstOrNull;
     final needed = orderItem?.remainingQty ?? 0;
-    final isHighlighted = _highlightedPartId == item.partId;
+    final isSelected = _selectedPartIds.contains(item.partId);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isHighlighted
-            ? AppTheme.primary.withValues(alpha: 0.06)
-            : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isHighlighted ? AppTheme.primary : AppTheme.border(context),
-          width: isHighlighted ? 2 : 1,
+    return GestureDetector(
+      onTap: () => _togglePartSelection(item.partId),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.primary.withValues(alpha: 0.06)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppTheme.primary : AppTheme.border(context),
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              PartThumbnail(imageUrl: item.imageUrl, size: 40),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  item.partId,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                // Checkbox เลือก Part
+                SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: Checkbox(
+                    value: isSelected,
+                    onChanged: (_) => _togglePartSelection(item.partId),
+                    activeColor: AppTheme.primary,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
                   ),
                 ),
-              ),
-              StatusBadge(item.condition),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            item.itemDesc,
-            style: TextStyle(fontSize: 13, color: AppTheme.textGrey(context)),
-          ),
-          Row(
-            children: [
-              if (item.lotNumber != null && item.lotNumber!.isNotEmpty) ...[
-                Icon(
-                  Icons.label_outline,
-                  size: 12,
-                  color: AppTheme.textGrey(context),
-                ),
-                const SizedBox(width: 2),
-                Text.rich(
-                  TextSpan(
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppTheme.textGrey(context),
+                const SizedBox(width: 6),
+                PartThumbnail(imageUrl: item.imageUrl, size: 40),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    item.partId,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
                     ),
-                    children: [
-                      const TextSpan(
-                        text: 'Batch No.',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      TextSpan(text: ' : ${item.lotNumber}'),
-                    ],
                   ),
                 ),
-                const SizedBox(width: 8),
+                StatusBadge(item.condition),
               ],
-              Text(
-                '${item.owner} / ${item.brand}',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppTheme.textGrey(context),
-                ),
-              ),
-            ],
-          ),
-          const Divider(height: 14),
-          Row(
-            children: [
-              Column(
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(left: 34),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'คงเหลือบน Pallet: ${item.qtyOnPallet}',
+                    item.itemDesc,
+                    style: TextStyle(
+                        fontSize: 13, color: AppTheme.textGrey(context)),
+                  ),
+                  Row(
+                    children: [
+                      if (item.lotNumber != null &&
+                          item.lotNumber!.isNotEmpty) ...[
+                        Icon(
+                          Icons.label_outline,
+                          size: 12,
+                          color: AppTheme.textGrey(context),
+                        ),
+                        const SizedBox(width: 2),
+                        Text.rich(
+                          TextSpan(
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textGrey(context),
+                            ),
+                            children: [
+                              const TextSpan(
+                                text: 'Batch No.',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              TextSpan(text: ' : ${item.lotNumber}'),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Text(
+                        '${item.owner} / ${item.brand}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textGrey(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 14),
+            Row(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'คงเหลือบน Pallet: ${item.qtyOnPallet}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.textGrey(context),
+                      ),
+                    ),
+                    if (needed > 0)
+                      Text(
+                        'ต้องการ: $needed',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.warning,
+                        ),
+                      ),
+                  ],
+                ),
+                const Spacer(),
+                if (isSelected) ...[
+                  Text(
+                    'จำนวนที่หยิบ: ',
                     style: TextStyle(
                       fontSize: 13,
                       color: AppTheme.textGrey(context),
                     ),
                   ),
-                  if (needed > 0)
-                    Text(
-                      'ต้องการ: $needed',
+                  SizedBox(
+                    width: 72,
+                    height: 38,
+                    child: TextField(
+                      controller: controller,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
                       style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.warning,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        isDense: true,
                       ),
                     ),
+                  ),
                 ],
-              ),
-              const Spacer(),
-              Text(
-                'จำนวนที่หยิบ: ',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppTheme.textGrey(context),
-                ),
-              ),
-              SizedBox(
-                width: 72,
-                height: 38,
-                child: TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  decoration: InputDecoration(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    isDense: true,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -572,6 +624,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
   Widget _buildScanDest() {
     final pickedItems = <String, int>{};
     for (final item in _assignment.palletItems) {
+      if (!_selectedPartIds.contains(item.partId)) continue;
       final qty = int.tryParse(_qtyCtrl[item.partId]?.text.trim() ?? '') ?? 0;
       if (qty > 0) pickedItems[item.partId] = qty;
     }
