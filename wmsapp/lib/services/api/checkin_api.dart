@@ -1,6 +1,18 @@
 part of '../api_service.dart';
 
 extension CheckInApi on ApiService {
+  /// Preview Pack ก่อน Check-IN (ไม่เขียน DB)
+  Future<ApiResult<PreviewCheckInResponse>> previewCheckIn(
+      String packingId) async {
+    final response = await _post('/checkin/preview', {
+      'packingId': packingId,
+    });
+    if (!response.success) {
+      return ApiResult.error(response.error, statusCode: response.statusCode);
+    }
+    return ApiResult.success(PreviewCheckInResponse.fromJson(response.data!));
+  }
+
   /// สแกน Carton (PackingId) → assign Slot ตาม Owner
   Future<ApiResult<ScanCheckInResponse>> scanCheckIn({
     required String packingId,

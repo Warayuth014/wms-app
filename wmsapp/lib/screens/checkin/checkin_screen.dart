@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
@@ -7,21 +5,6 @@ import '../../models/wms_models.dart';
 import '../../services/api_service.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
-
-enum _CheckInState { scan, slotDetail, trackingReady, dispatchDone }
-
-// สถานที่ปลายทางให้สุ่มแจ้ง operator ตอนสแกน (mock สำหรับเทสต์)
-const _kDispatchDestinations = [
-  'ประตู 1',
-  'ประตู 2',
-  'ประตู 3',
-  'ประตู VIP',
-  'ท่า A',
-  'ท่า B',
-  'ท่า C',
-  'Dock 1',
-  'Dock 2',
-];
 
 class CheckInScreen extends StatefulWidget {
   final String userId;
@@ -42,20 +25,18 @@ class _CheckInScreenState extends State<CheckInScreen> {
   final _scanCtrl = TextEditingController();
   final _scanFocus = FocusNode();
 
-  _CheckInState _state = _CheckInState.scan;
   bool _loading = false;
 
-  // data
-  List<CheckInSlotSummary> _activeSlots = [];
+  // Pack ที่สแกนไว้รอกด Check-IN (ยังไม่เข้า DB)
+  PreviewCheckInResponse? _pendingPack;
+
+  // Slot ที่กำลังดูอยู่ (null = ยังไม่ได้สแกน, อยู่หน้าเริ่ม)
   CheckInSlotDetail? _slotDetail;
-  CompleteCheckInResponse? _completeResult;
-  DispatchCheckInResponse? _dispatchResult;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadActiveSlots();
       _scanFocus.requestFocus();
     });
   }
@@ -67,25 +48,14 @@ class _CheckInScreenState extends State<CheckInScreen> {
     super.dispose();
   }
 
-  // ── API ──────────────────────────────────
-
-  Future<void> _loadActiveSlots() async {
-    final res = await _api.getActiveCheckInSlots();
-    if (!mounted) return;
-    if (res.success) {
-      setState(() => _activeSlots = res.data ?? []);
-    }
-  }
+  // ── Actions ──────────────────────────────────
 
   Future<void> _scanCarton() async {
     final packingId = _scanCtrl.text.trim().toUpperCase();
     if (packingId.isEmpty) return;
 
     setState(() => _loading = true);
-    final res = await _api.scanCheckIn(
-      packingId: packingId,
-      operatorId: widget.userId,
-    );
+    final res = await _api.previewCheckIn(packingId);
     if (!mounted) return;
     setState(() => _loading = false);
 
@@ -96,35 +66,22 @@ class _CheckInScreenState extends State<CheckInScreen> {
       return;
     }
 
-    final r = res.data!;
+    final preview = res.data!;
     _scanCtrl.clear();
 
-    // popup สุ่มปลายทาง — ให้ operator รู้ว่าจะเอากล่องนี้ไปวางช่องไหน
-    final dest = _kDispatchDestinations[
-        Random().nextInt(_kDispatchDestinations.length)];
-    await _showDestinationDialog(
-      packingId: packingId,
-      destination: dest,
-      slotId: r.slotId,
-      ready: r.isReadyToComplete,
-    );
+    // popup แจ้งปลายทาง
+    await _showDestinationDialog(preview);
     if (!mounted) return;
 
-    // ครบกล่อง → auto complete slot เงียบๆ (ไม่มีปุ่มให้กดแล้ว)
-    if (r.isReadyToComplete) {
-      await _autoCompleteSlot(r.slotId);
-      if (!mounted) return;
+    // ตั้ง pending pack แล้วโหลด slot เดิมถ้ามีจริงใน DB
+    setState(() => _pendingPack = preview);
+    if (!preview.isNewSlot) {
+      await _openSlot(preview.slotId);
     }
-
-    await _openSlot(r.slotId);
+    _scanFocus.requestFocus();
   }
 
-  Future<void> _showDestinationDialog({
-    required String packingId,
-    required String destination,
-    required String slotId,
-    required bool ready,
-  }) async {
+  Future<void> _showDestinationDialog(PreviewCheckInResponse p) async {
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -132,53 +89,63 @@ class _CheckInScreenState extends State<CheckInScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(MdiIcons.truckDeliveryOutline,
-                color: AppTheme.primary, size: 24),
+            Icon(
+              p.isAlreadyCheckedIn
+                  ? Icons.warning_amber_rounded
+                  : MdiIcons.truckDeliveryOutline,
+              color:
+                  p.isAlreadyCheckedIn ? AppTheme.warning : AppTheme.primary,
+              size: 24,
+            ),
             const SizedBox(width: 8),
-            const Text('ส่งปลายทาง',
-                style: TextStyle(fontWeight: FontWeight.w700)),
+            Text(p.isAlreadyCheckedIn ? 'สแกนซ้ำ' : 'ส่งปลายทาง',
+                style: const TextStyle(fontWeight: FontWeight.w700)),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(packingId,
-                style:
-                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            Text(p.packingId,
+                style: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                    color: AppTheme.primary.withValues(alpha: 0.3)),
-              ),
-              child: Center(
-                child: Text(
-                  destination,
-                  style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.primary),
+            if (!p.isAlreadyCheckedIn && p.dispatchDestination != null)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: AppTheme.primary.withValues(alpha: 0.3)),
+                ),
+                child: Center(
+                  child: Text(
+                    p.dispatchDestination!,
+                    style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.primary),
+                  ),
                 ),
               ),
-            ),
             const SizedBox(height: 8),
-            Text('ช่อง $slotId', style: TextStyle(color: Colors.grey[600])),
-            if (ready) ...[
+            Text('ช่อง ${p.slotId}',
+                style: TextStyle(color: Colors.grey[600])),
+            if (p.isAlreadyCheckedIn) ...[
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.check_circle,
-                      color: AppTheme.success, size: 18),
+                  Icon(Icons.info_outline,
+                      color: AppTheme.warning, size: 18),
                   const SizedBox(width: 6),
-                  const Text('ครบทุกกล่องแล้ว',
-                      style: TextStyle(
-                          color: AppTheme.success,
-                          fontWeight: FontWeight.w600)),
+                  const Expanded(
+                    child: Text('Pack นี้ถูก check-in ไปแล้ว',
+                        style: TextStyle(
+                            color: AppTheme.warning,
+                            fontWeight: FontWeight.w600)),
+                  ),
                 ],
               ),
             ],
@@ -188,7 +155,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
+              backgroundColor: p.isAlreadyCheckedIn
+                  ? AppTheme.warning
+                  : AppTheme.primary,
               foregroundColor: Colors.white,
               padding:
                   const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
@@ -199,17 +168,6 @@ class _CheckInScreenState extends State<CheckInScreen> {
         ],
       ),
     );
-  }
-
-  Future<void> _autoCompleteSlot(String slotId) async {
-    final res = await _api.completeCheckIn(
-      slotId: slotId,
-      operatorId: widget.userId,
-    );
-    if (!mounted) return;
-    if (!res.success) {
-      showErrorDialog(context, message: res.error ?? 'Complete ไม่สำเร็จ');
-    }
   }
 
   Future<void> _openSlot(String slotId) async {
@@ -223,43 +181,75 @@ class _CheckInScreenState extends State<CheckInScreen> {
       return;
     }
 
-    setState(() {
-      _slotDetail = res.data;
-      _state = _CheckInState.slotDetail;
-    });
+    setState(() => _slotDetail = res.data);
   }
 
-  Future<void> _dispatchSlot() async {
-    final slot = _completeResult?.slotId ?? _slotDetail?.slotId;
-    if (slot == null) return;
+  Future<void> _confirmCheckIn() async {
+    final pack = _pendingPack;
+    if (pack == null) return;
+
+    if (pack.isAlreadyCheckedIn) {
+      showErrorDialog(context,
+          message: 'Pack ${pack.packingId} ถูก check-in ไปแล้ว');
+      return;
+    }
 
     setState(() => _loading = true);
-    final res = await _api.dispatchCheckIn(
-      slotId: slot,
+    final res = await _api.scanCheckIn(
+      packingId: pack.packingId,
       operatorId: widget.userId,
     );
     if (!mounted) return;
     setState(() => _loading = false);
 
     if (!res.success) {
-      showErrorDialog(context, message: res.error ?? 'Dispatch ไม่สำเร็จ');
+      showErrorDialog(context, message: res.error ?? 'Check-IN ไม่สำเร็จ');
       return;
     }
 
-    setState(() {
-      _dispatchResult = res.data;
-      _state = _CheckInState.dispatchDone;
-    });
+    final scanResult = res.data!;
+
+    // ถ้าครบทุกกล่อง → auto complete + auto dispatch เงียบ ๆ
+    if (scanResult.isReadyToComplete) {
+      await _autoCompleteSlot(scanResult.slotId);
+      if (!mounted) return;
+      await _autoDispatchSlot(scanResult.slotId);
+      if (!mounted) return;
+    }
+
+    // เคลียร์ pending + refresh slot
+    setState(() => _pendingPack = null);
+    await _openSlot(scanResult.slotId);
+    _scanFocus.requestFocus();
+  }
+
+  Future<void> _autoCompleteSlot(String slotId) async {
+    final res = await _api.completeCheckIn(
+      slotId: slotId,
+      operatorId: widget.userId,
+    );
+    if (!mounted) return;
+    if (!res.success) {
+      showErrorDialog(context, message: res.error ?? 'Complete ไม่สำเร็จ');
+    }
+  }
+
+  Future<void> _autoDispatchSlot(String slotId) async {
+    final res = await _api.dispatchCheckIn(
+      slotId: slotId,
+      operatorId: widget.userId,
+    );
+    if (!mounted) return;
+    if (!res.success) {
+      showErrorDialog(context, message: res.error ?? 'Dispatch ไม่สำเร็จ');
+    }
   }
 
   void _backToScan() {
     setState(() {
       _slotDetail = null;
-      _completeResult = null;
-      _dispatchResult = null;
-      _state = _CheckInState.scan;
+      _pendingPack = null;
     });
-    _loadActiveSlots();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scanFocus.requestFocus();
     });
@@ -269,8 +259,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final onSlotPage = _slotDetail != null || _pendingPack != null;
     return PopScope(
-      canPop: _state == _CheckInState.scan,
+      canPop: !onSlotPage,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         _backToScan();
@@ -287,12 +278,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (_state == _CheckInState.scan) _buildScan(),
-                  if (_state == _CheckInState.slotDetail) _buildSlotDetail(),
-                  if (_state == _CheckInState.trackingReady)
-                    _buildTrackingReady(),
-                  if (_state == _CheckInState.dispatchDone)
-                    _buildDispatchDone(),
+                  onSlotPage ? _buildSlotDetail() : _buildScan(),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -303,206 +289,86 @@ class _CheckInScreenState extends State<CheckInScreen> {
     );
   }
 
-  // ── State 1: Scan Carton + list active slots ────────────
+  // ── Page: Scan (หน้าแรก) ──────────────────────────────────
   Widget _buildScan() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Icon(MdiIcons.packageVariantClosed,
-                        color: AppTheme.primary, size: 22),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'สแกน Carton',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'สแกน Packing ID ที่ติดบน Carton',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _scanCtrl,
-                  focusNode: _scanFocus,
-                  textCapitalization: TextCapitalization.characters,
-                  decoration: InputDecoration(
-                    labelText: 'Packing ID',
-                    prefixIcon: Icon(MdiIcons.barcodeScan),
-                    border: const OutlineInputBorder(),
-                  ),
-                  onSubmitted: (_) => _scanCarton(),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _scanCarton,
-                    icon: const Icon(Icons.search, size: 20),
-                    label: const Text('สแกน'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
+                Icon(MdiIcons.packageVariantClosed,
+                    color: AppTheme.primary, size: 22),
+                const SizedBox(width: 8),
+                const Text(
+                  'สแกน Carton',
+                  style:
+                      TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
               ],
             ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        // ── Active slots ──
-        SectionHeader(
-          title: 'ช่องที่เปิดอยู่ (${_activeSlots.length})',
-          icon: MdiIcons.viewGridOutline,
-        ),
-        const SizedBox(height: 8),
-        if (_activeSlots.isEmpty)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Center(
-                child: Column(
-                  children: [
-                    Icon(MdiIcons.trayRemove,
-                        color: Colors.grey[400], size: 40),
-                    const SizedBox(height: 8),
-                    Text('ยังไม่มีช่อง check-in',
-                        style:
-                            TextStyle(fontSize: 13, color: Colors.grey[600])),
-                  ],
+            const SizedBox(height: 4),
+            Text(
+              'สแกน Packing ID ที่ติดบน Carton',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _scanCtrl,
+              focusNode: _scanFocus,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                labelText: 'Packing ID',
+                prefixIcon: Icon(MdiIcons.barcodeScan),
+                border: const OutlineInputBorder(),
+              ),
+              onSubmitted: (_) => _scanCarton(),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _scanCarton,
+                icon: const Icon(Icons.search, size: 20),
+                label: const Text('สแกน'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ),
-          )
-        else
-          ..._activeSlots.map((s) => _buildSlotCard(s)),
-      ],
-    );
-  }
-
-  Widget _buildSlotCard(CheckInSlotSummary s) {
-    final ready = s.isReady;
-    return Card(
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: ready ? AppTheme.success : AppTheme.warning,
-          child: Icon(
-            ready ? Icons.check : MdiIcons.viewGridOutline,
-            color: Colors.white,
-            size: 20,
-          ),
-        ),
-        title: Text(
-          s.slotId,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(s.owner, style: const TextStyle(fontSize: 13)),
-            Text(
-              'กล่อง: ${s.cartonsInSlot}/${s.expectedCartons}',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
           ],
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _statusChip(s.status),
-            const SizedBox(width: 4),
-            const Icon(Icons.chevron_right),
-          ],
-        ),
-        onTap: () => _openSlot(s.slotId),
       ),
     );
   }
 
-  // ── State 2: Slot detail ──────────────────────────────────
+  // ── Page: Slot Detail ──────────────────────────────────
   Widget _buildSlotDetail() {
-    final slot = _slotDetail!;
-    final total = slot.expectedCartons;
-    final current = slot.cartonsInSlot;
-    final pct = total > 0 ? current / total : 0.0;
-
+    final slot = _slotDetail;
+    final pending = _pendingPack;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // header
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(MdiIcons.viewGridOutline,
-                        color: AppTheme.primary, size: 22),
-                    const SizedBox(width: 8),
-                    Text(
-                      slot.slotId,
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w700),
-                    ),
-                    const Spacer(),
-                    _statusChip(slot.status),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text('ลูกค้า: ${slot.owner}',
-                    style:
-                        const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 12),
-                // progress
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('$current / $total กล่อง',
-                        style: const TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w600)),
-                    Text('${(pct * 100).toStringAsFixed(0)}%',
-                        style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: pct,
-                    minHeight: 6,
-                    backgroundColor: Colors.grey[300],
-                    valueColor: AlwaysStoppedAnimation(
-                        pct >= 1.0 ? AppTheme.success : AppTheme.primary),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
+        // 1) Pack details card (บนสุด) — มีเฉพาะเมื่อมี pending
+        if (pending != null) ...[
+          _buildPendingPackCard(pending),
+          const SizedBox(height: 12),
+        ],
 
-        // ── 3-column pipeline: Pick / Pack / Check-IN ──
-        _buildPipelineCard(slot),
-        const SizedBox(height: 8),
+        // 2) ความคืบหน้า Customer Order
+        if (slot != null) ...[
+          _buildPipelineCard(slot),
+          const SizedBox(height: 12),
+        ],
 
-        // ── scan field (ถ้ายังไม่ READY) ──
-        if (slot.status == 'OPEN')
+        // 3) สแกน Carton เพิ่ม
+        if (slot != null && (slot.status == 'OPEN' || slot.status == 'READY'))
           Card(
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -522,80 +388,10 @@ class _CheckInScreenState extends State<CheckInScreen> {
           ),
         const SizedBox(height: 8),
 
-        // ── Carton list ──
-        ...slot.cartons.map((c) => Card(
-              child: ListTile(
-                dense: true,
-                leading: CircleAvatar(
-                  radius: 16,
-                  backgroundColor: AppTheme.success.withValues(alpha: 0.15),
-                  child: const Icon(Icons.check,
-                      color: AppTheme.success, size: 16),
-                ),
-                title: Text(c.packingId,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 14)),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(MdiIcons.packageVariantClosed,
-                            size: 12, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Text('${c.itemCount} ชิ้น',
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey[700])),
-                        Text('  ·  ',
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey[400])),
-                        Icon(MdiIcons.clipboardListOutline,
-                            size: 12, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Text('${c.orderCount} Order',
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey[700])),
-                      ],
-                    ),
-                    if (c.trackingId != null)
-                      Text('TRK: ${c.trackingId}',
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: AppTheme.secondary,
-                              fontWeight: FontWeight.w600)),
-                  ],
-                ),
-                trailing: Text(
-                  _formatTime(c.scannedAt),
-                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                ),
-              ),
-            )),
+        // 4) รายการ Packing ที่ check-in แล้ว (stacked)
+        if (slot != null) ...slot.cartons.map(_buildCartonItem),
+
         const SizedBox(height: 12),
-
-        // ── ถ้า READY แล้ว → แสดงปุ่ม dispatch ──
-        if (slot.status == 'READY') ...[
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _dispatchSlot,
-              icon: Icon(MdiIcons.truckDeliveryOutline, size: 20),
-              label: const Text('ย้ายขึ้นรถแล้ว',
-                  style:
-                      TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.success,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ),
-        ],
-
-        const SizedBox(height: 8),
         OutlinedButton.icon(
           onPressed: _backToScan,
           icon: const Icon(Icons.arrow_back, size: 18),
@@ -611,171 +407,159 @@ class _CheckInScreenState extends State<CheckInScreen> {
     );
   }
 
-  // ── State 3: Tracking ready (just completed) ──────────────
-  Widget _buildTrackingReady() {
-    final r = _completeResult!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
+  // ── Pack preview card + ปุ่ม Check-IN ────────────────────
+  Widget _buildPendingPackCard(PreviewCheckInResponse p) {
+    final disabled = p.isAlreadyCheckedIn;
+    final badgeColor = disabled ? AppTheme.warning : AppTheme.primary;
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: badgeColor.withValues(alpha: 0.4), width: 1.2),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                const Icon(Icons.check_circle,
-                    color: AppTheme.success, size: 56),
-                const SizedBox(height: 12),
-                Text(
-                  'ของลูกค้า ${r.owner}\nพร้อมจัดส่ง',
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700),
-                  textAlign: TextAlign.center,
+                Icon(MdiIcons.packageVariantClosed,
+                    color: badgeColor, size: 22),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(p.packingId,
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w800)),
                 ),
-                const SizedBox(height: 4),
-                Text('ช่อง ${r.slotId} • ${r.cartonsCount} กล่อง',
-                    style:
-                        TextStyle(fontSize: 13, color: Colors.grey[600])),
+                _statusChip(p.packStatus),
               ],
             ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        if (r.trackings.isNotEmpty)
-          Card(
-            color: AppTheme.secondary.withValues(alpha: 0.06),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(MdiIcons.barcodeScan,
-                          color: AppTheme.secondary, size: 18),
-                      const SizedBox(width: 6),
-                      Text('Tracking (${r.trackings.length} กล่อง)',
-                          style: const TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ...r.trackings.map((t) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Row(
-                          children: [
-                            Text('${t.packingId}:  ',
-                                style: TextStyle(
-                                    fontSize: 12, color: Colors.grey[700])),
-                            Expanded(
-                              child: Text(t.trackingId ?? '—',
-                                  style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      fontFamily: 'monospace')),
-                            ),
-                          ],
-                        ),
-                      )),
-                ],
+            const SizedBox(height: 6),
+            Text('ลูกค้า: ${p.owner}',
+                style: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(MdiIcons.packageVariantClosed,
+                    size: 14, color: Colors.grey[600]),
+                const SizedBox(width: 4),
+                Text('${p.itemCount} ชิ้น',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[700])),
+                const SizedBox(width: 12),
+                Icon(MdiIcons.clipboardListOutline,
+                    size: 14, color: Colors.grey[600]),
+                const SizedBox(width: 4),
+                Text('${p.orderCount} Order',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[700])),
+              ],
+            ),
+            if (disabled) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.warning.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline,
+                        size: 16, color: AppTheme.warning),
+                    const SizedBox(width: 6),
+                    const Expanded(
+                      child: Text(
+                        'Pack นี้ถูก check-in ไปแล้ว',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.warning,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: disabled ? null : _confirmCheckIn,
+                icon: Icon(MdiIcons.checkboxMarkedCircleOutline, size: 20),
+                label: const Text('Check-IN',
+                    style: TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w800)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.success,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey[300],
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
               ),
             ),
-          ),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _dispatchSlot,
-            icon: Icon(MdiIcons.truckDeliveryOutline, size: 20),
-            label: const Text('ย้ายขึ้นรถแล้ว',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.success,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
+          ],
         ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: _backToScan,
-          icon: const Icon(Icons.arrow_back, size: 18),
-          label: const Text('กลับไปสแกนต่อ'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppTheme.textGrey(context),
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
-  // ── State 4: Dispatch done ──────────────────────────────────
-  Widget _buildDispatchDone() {
-    final r = _dispatchResult!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
+  // ── Carton list item (ของที่ check-in ไปแล้ว) ─────────────
+  Widget _buildCartonItem(CheckInCartonItem c) {
+    return Card(
+      child: ListTile(
+        dense: true,
+        leading: CircleAvatar(
+          radius: 16,
+          backgroundColor: AppTheme.success.withValues(alpha: 0.15),
+          child:
+              const Icon(Icons.check, color: AppTheme.success, size: 16),
+        ),
+        title: Text(c.packingId,
+            style:
+                const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Icon(MdiIcons.truckCheckOutline,
-                    color: AppTheme.success, size: 64),
-                const SizedBox(height: 12),
-                const Text('ส่งขึ้นรถเรียบร้อย',
-                    style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w700),
-                    textAlign: TextAlign.center),
-                const SizedBox(height: 6),
-                Text(
-                  '${r.owner}\nช่อง ${r.slotId} • ${r.cartonsCount} กล่อง',
-                  style:
-                      TextStyle(fontSize: 13, color: Colors.grey[600]),
-                  textAlign: TextAlign.center,
-                ),
+                Icon(MdiIcons.packageVariantClosed,
+                    size: 12, color: Colors.grey[600]),
+                const SizedBox(width: 4),
+                Text('${c.itemCount} ชิ้น',
+                    style:
+                        TextStyle(fontSize: 12, color: Colors.grey[700])),
+                Text('  ·  ',
+                    style:
+                        TextStyle(fontSize: 12, color: Colors.grey[400])),
+                Icon(MdiIcons.clipboardListOutline,
+                    size: 12, color: Colors.grey[600]),
+                const SizedBox(width: 4),
+                Text('${c.orderCount} Order',
+                    style:
+                        TextStyle(fontSize: 12, color: Colors.grey[700])),
               ],
             ),
-          ),
+            if (c.trackingId != null)
+              Text('TRK: ${c.trackingId}',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.secondary,
+                      fontWeight: FontWeight.w600)),
+          ],
         ),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _backToScan,
-            icon: Icon(MdiIcons.barcodeScan, size: 20),
-            label: const Text('สแกน Carton ต่อ',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
+        trailing: Text(
+          _formatTime(c.scannedAt),
+          style: TextStyle(fontSize: 11, color: Colors.grey[500]),
         ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.home_outlined, size: 18),
-          label: const Text('กลับหน้าหลัก'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppTheme.textGrey(context),
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
-  // ── 3-column pipeline (Pick / Pack / Check-IN) ──────────────
+  // ── Pipeline card ─────────────────────────────────────────
   Widget _buildPipelineCard(CheckInSlotDetail slot) {
     return Card(
       child: Padding(
@@ -789,8 +573,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
                     color: AppTheme.primary, size: 18),
                 const SizedBox(width: 6),
                 const Text('ความคืบหน้า Customer Order',
-                    style:
-                        TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                    style: TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w700)),
                 const Spacer(),
                 if (slot.customerOrderId != null)
                   Text(slot.customerOrderId!,
@@ -808,7 +592,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                   label: 'Pick',
                   icon: MdiIcons.handExtendedOutline,
                   done: slot.pickDone,
-                  total: slot.pickTotal,
+                  total: slot.pipelineTotal,
                   color: AppTheme.primary,
                 )),
                 const SizedBox(width: 8),
@@ -817,7 +601,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                   label: 'Pack',
                   icon: MdiIcons.packageVariantClosed,
                   done: slot.packDone,
-                  total: slot.packTotal,
+                  total: slot.pipelineTotal,
                   color: AppTheme.warning,
                 )),
                 const SizedBox(width: 8),
@@ -826,7 +610,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                   label: 'Check-IN',
                   icon: MdiIcons.checkboxMarkedCircleOutline,
                   done: slot.checkInDone,
-                  total: slot.checkInTotal,
+                  total: slot.pipelineTotal,
                   color: AppTheme.success,
                 )),
               ],
@@ -889,6 +673,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
       'READY' => AppTheme.secondary,
       'SHIPPED' => AppTheme.success,
       'OPEN' => AppTheme.warning,
+      'DONE' => AppTheme.primary,
+      'STAGED' => AppTheme.secondary,
       _ => Colors.grey,
     };
     return Container(

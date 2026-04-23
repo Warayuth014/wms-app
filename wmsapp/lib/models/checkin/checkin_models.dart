@@ -1,3 +1,47 @@
+// ── Preview (ยังไม่ commit) ──────────────────────────────────
+class PreviewCheckInResponse {
+  final String packingId;
+  final String owner;
+  final String? customerOrderId;
+  final String packStatus;
+  final int itemCount;
+  final int orderCount;
+  final String slotId;
+  final bool isNewSlot;
+  final bool isAlreadyCheckedIn;
+  final String? dispatchDestination;
+  final String message;
+
+  PreviewCheckInResponse({
+    required this.packingId,
+    required this.owner,
+    this.customerOrderId,
+    required this.packStatus,
+    required this.itemCount,
+    required this.orderCount,
+    required this.slotId,
+    required this.isNewSlot,
+    required this.isAlreadyCheckedIn,
+    this.dispatchDestination,
+    required this.message,
+  });
+
+  factory PreviewCheckInResponse.fromJson(Map<String, dynamic> json) =>
+      PreviewCheckInResponse(
+        packingId: json['packingId'],
+        owner: json['owner'] ?? '',
+        customerOrderId: json['customerOrderId'],
+        packStatus: json['packStatus'] ?? '',
+        itemCount: json['itemCount'] ?? 0,
+        orderCount: json['orderCount'] ?? 0,
+        slotId: json['slotId'],
+        isNewSlot: json['isNewSlot'] ?? false,
+        isAlreadyCheckedIn: json['isAlreadyCheckedIn'] ?? false,
+        dispatchDestination: json['dispatchDestination'],
+        message: json['message'] ?? '',
+      );
+}
+
 // ── Scan Carton ──────────────────────────────────
 class ScanCheckInResponse {
   final String slotId;
@@ -42,11 +86,9 @@ class CheckInSlotDetail {
   final bool isReadyToComplete;
   final List<CheckInCartonItem> cartons;
   final String? customerOrderId;
-  final int pickTotal;
+  final int pipelineTotal;
   final int pickDone;
-  final int packTotal;
   final int packDone;
-  final int checkInTotal;
   final int checkInDone;
 
   CheckInSlotDetail({
@@ -60,11 +102,9 @@ class CheckInSlotDetail {
     required this.isReadyToComplete,
     required this.cartons,
     this.customerOrderId,
-    this.pickTotal = 0,
+    this.pipelineTotal = 0,
     this.pickDone = 0,
-    this.packTotal = 0,
     this.packDone = 0,
-    this.checkInTotal = 0,
     this.checkInDone = 0,
   });
 
@@ -85,11 +125,9 @@ class CheckInSlotDetail {
             .map((c) => CheckInCartonItem.fromJson(c))
             .toList(),
         customerOrderId: json['customerOrderId'],
-        pickTotal: json['pickTotal'] ?? 0,
+        pipelineTotal: json['pipelineTotal'] ?? 0,
         pickDone: json['pickDone'] ?? 0,
-        packTotal: json['packTotal'] ?? 0,
         packDone: json['packDone'] ?? 0,
-        checkInTotal: json['checkInTotal'] ?? 0,
         checkInDone: json['checkInDone'] ?? 0,
       );
 }
