@@ -13,6 +13,10 @@ class PreviewCheckInResponse {
   final String? dispatchDestination;
   final List<PreviewCheckInItem> items;
   final String message;
+  final int pipelineTotal;
+  final int pickDone;
+  final int packDone;
+  final int checkInDone;
 
   PreviewCheckInResponse({
     required this.packingId,
@@ -28,6 +32,10 @@ class PreviewCheckInResponse {
     this.dispatchDestination,
     required this.items,
     required this.message,
+    this.pipelineTotal = 0,
+    this.pickDone = 0,
+    this.packDone = 0,
+    this.checkInDone = 0,
   });
 
   factory PreviewCheckInResponse.fromJson(Map<String, dynamic> json) =>
@@ -49,6 +57,10 @@ class PreviewCheckInResponse {
             .map((e) => PreviewCheckInItem.fromJson(e))
             .toList(),
         message: json['message'] ?? '',
+        pipelineTotal: json['pipelineTotal'] ?? 0,
+        pickDone: json['pickDone'] ?? 0,
+        packDone: json['packDone'] ?? 0,
+        checkInDone: json['checkInDone'] ?? 0,
       );
 
   int get skuCount => items.length;

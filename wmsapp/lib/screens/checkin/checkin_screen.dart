@@ -79,15 +79,37 @@ class _CheckInScreenState extends State<CheckInScreen> {
     if (!mounted) return;
 
     // ตั้ง pending pack แล้วโหลด slot เดิมถ้ามีจริงใน DB
+    // ถ้า slot ใหม่ → สร้าง synthetic slot จาก preview เพื่อให้ pipeline card แสดงได้เลย
     setState(() {
       _pendingPack = preview;
       _deliveryNotePack = null;
       _deliveryNoteCreatedAt = null;
+      if (preview.isNewSlot) {
+        _slotDetail = _syntheticSlotFromPreview(preview);
+      }
     });
     if (!preview.isNewSlot) {
       await _openSlot(preview.slotId);
     }
     _scanFocus.requestFocus();
+  }
+
+  CheckInSlotDetail _syntheticSlotFromPreview(PreviewCheckInResponse p) {
+    return CheckInSlotDetail(
+      slotId: p.slotId,
+      owner: p.owner,
+      status: 'OPEN',
+      createdAt: DateTime.now(),
+      cartonsInSlot: 0,
+      expectedCartons: 0,
+      isReadyToComplete: false,
+      cartons: const [],
+      customerOrderId: p.customerOrderId,
+      pipelineTotal: p.pipelineTotal,
+      pickDone: p.pickDone,
+      packDone: p.packDone,
+      checkInDone: p.checkInDone,
+    );
   }
 
   Future<void> _showDestinationDialog(PreviewCheckInResponse p) async {
@@ -587,6 +609,20 @@ class _CheckInScreenState extends State<CheckInScreen> {
 
   Widget _buildDeliveryNoteCard(PreviewCheckInResponse p) {
     final createdAt = _deliveryNoteCreatedAt ?? DateTime.now();
+    // ใช้ status จริงของ pack จาก slot ที่ refresh กลับมา (STAGED/SHIPPED)
+    final actualStatus = _slotDetail?.cartons
+            .firstWhere(
+              (c) => c.packingId == p.packingId,
+              orElse: () => CheckInCartonItem(
+                packingId: p.packingId,
+                status: 'STAGED',
+                scannedAt: createdAt,
+                itemCount: 0,
+                orderCount: 0,
+              ),
+            )
+            .status ??
+        'STAGED';
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -625,7 +661,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                     ],
                   ),
                 ),
-                _statusChip('STAGED'),
+                _statusChip(actualStatus),
               ],
             ),
             const SizedBox(height: 12),
