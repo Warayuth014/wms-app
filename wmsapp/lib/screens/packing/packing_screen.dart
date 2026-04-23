@@ -6,7 +6,7 @@ import '../../services/api_service.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 
-enum _PackState { scanPallet, packList, orderParts, success }
+enum _PackState { scanPallet, packList, orderList, orderParts, success }
 
 class PackingScreen extends StatefulWidget {
   final String userId;
@@ -36,16 +36,16 @@ class _PackingScreenState extends State<PackingScreen> {
 
   // data
   PackingPalletResponse? _palletResp;
+  PackingDetailResponse? _packDetail;
   PackingOrderResponse? _orderResp;
   ConfirmPackResponse? _confirmResult;
 
   // current selection
   String _currentPackingId = '';
   String _currentPickOrderId = '';
-
-  // qty controllers per Part (เหมือน Unload)
-  final Map<String, TextEditingController> _qtyCtrl = {};
   String? _selectedPartId;
+  // Serial numbers collected for each part (keyed by partId)
+  final Map<String, List<String>> _collectedSerials = {};
 
   @override
   void initState() {
@@ -67,9 +67,6 @@ class _PackingScreenState extends State<PackingScreen> {
     _scanFocus.dispose();
     _partScanCtrl.dispose();
     _partScanFocus.dispose();
-    for (final c in _qtyCtrl.values) {
-      c.dispose();
-    }
     super.dispose();
   }
 
@@ -110,9 +107,12 @@ class _PackingScreenState extends State<PackingScreen> {
 
     setState(() {
       _currentPackingId = packingId;
+      _packDetail = result.data;
       // ถ้ามี Order เดียว เข้า Order เลย
       if (result.data!.orders.length == 1) {
         _openOrder(result.data!.orders.first.pickOrderId);
+      } else {
+        _state = _PackState.orderList;
       }
     });
   }
@@ -161,18 +161,16 @@ class _PackingScreenState extends State<PackingScreen> {
       return;
     }
 
-    // select Part + เตรียม qty field
-    _qtyCtrl.putIfAbsent(partId, () => TextEditingController());
-    _qtyCtrl[partId]!.text = part.remaining.toString();
-
-    setState(() => _selectedPartId = partId);
     _partScanCtrl.clear();
+    setState(() => _selectedPartId = partId);
   }
 
-  Future<void> _confirmScanPart(String partId) async {
-    final qty = int.tryParse(_qtyCtrl[partId]?.text ?? '') ?? 0;
-    if (qty <= 0) {
-      showErrorDialog(context, message: 'จำนวนต้องมากกว่า 0');
+  Future<void> _confirmPart(String partId, int qty) async {
+    final serials = _collectedSerials[partId];
+    if (serials != null && serials.isNotEmpty && serials.length != qty) {
+      showErrorDialog(context,
+          message:
+              'จำนวน S/N (${serials.length}) ไม่ตรงกับจำนวนที่ต้อง Pack ($qty)');
       return;
     }
 
@@ -183,6 +181,8 @@ class _PackingScreenState extends State<PackingScreen> {
       partId: partId,
       qty: qty,
       operatorId: widget.userId,
+      serialNumbers:
+          (serials != null && serials.length == qty) ? serials : null,
     );
     if (!mounted) return;
     setState(() => _loading = false);
@@ -192,12 +192,58 @@ class _PackingScreenState extends State<PackingScreen> {
       return;
     }
 
+    final resp = result.data!;
+
+    // Pack auto-finalize เมื่อสแกนชิ้นสุดท้ายครบทุก Order → ไปหน้า Pack Complete
+    if (resp.packFinalized) {
+      setState(() {
+        _confirmResult = ConfirmPackResponse(
+          packingId: resp.packingId,
+          status: 'DONE',
+          trackingId: resp.trackingId,
+          palletShipped: resp.palletReleased,
+          completedAt: DateTime.now(),
+          message: resp.palletReleased
+              ? 'Pack สำเร็จ — Pallet เปล่าพร้อมใช้ใหม่'
+              : 'Pack สำเร็จ (ยังเหลือ Pack อื่นใน Pallet)',
+        );
+        _selectedPartId = null;
+        _collectedSerials.remove(partId);
+        _state = _PackState.success;
+      });
+      return;
+    }
+
     setState(() {
-      _orderResp = result.data;
+      _orderResp = resp;
       _selectedPartId = null;
-      _qtyCtrl.remove(partId);
+      _collectedSerials.remove(partId);
     });
     _partScanFocus.requestFocus();
+  }
+
+  Future<void> _openSerialScan(
+      String partId, int requiredQty, List<String> available) async {
+    if (available.isEmpty) {
+      showErrorDialog(context,
+          message: 'ไม่พบ S/N บน Pallet นี้สำหรับ $partId');
+      return;
+    }
+    final existing = _collectedSerials[partId] ?? [];
+    final result = await Navigator.push<List<String>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _SerialSelectPage(
+          partId: partId,
+          requiredQty: requiredQty,
+          available: available,
+          initial: existing,
+        ),
+      ),
+    );
+    if (result != null) {
+      setState(() => _collectedSerials[partId] = result);
+    }
   }
 
   Future<void> _refreshPackList() async {
@@ -217,96 +263,26 @@ class _PackingScreenState extends State<PackingScreen> {
 
     setState(() {
       _palletResp = result.data;
+      _packDetail = null;
+      _currentPackingId = '';
+      _currentPickOrderId = '';
       _orderResp = null;
       _selectedPartId = null;
+      _collectedSerials.clear();
       _state = _PackState.packList;
     });
   }
 
-  Future<void> _splitPack() async {
-    final confirm = await showConfirmDialog(
-      context,
-      title: 'ปิดกล่องนี้?',
-      message:
-          'ของที่สแกนแล้วจะถูกปิดในกล่องนี้ และเปิดกล่องใหม่สำหรับของที่เหลือ',
-      confirmLabel: 'ปิดกล่อง + เปิดใหม่',
-    );
-    if (!confirm || !mounted) return;
-
-    setState(() => _loading = true);
-    final result = await _api.splitPack(
-      packingId: _currentPackingId,
-      operatorId: widget.userId,
-    );
-    if (!mounted) return;
-    setState(() => _loading = false);
-
-    if (!result.success) {
-      showErrorDialog(context, message: result.error ?? 'แบ่งกล่องไม่สำเร็จ');
-      return;
-    }
-
-    // แสดง snackbar แจ้งผล
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.data!.message),
-          backgroundColor: AppTheme.success,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    }
-
-    // reload pallet data → จะเห็น Pack ใหม่ในลิสต์
-    await _refreshPackList();
-  }
-
-  Future<void> _confirmAllPacks() async {
-    final packs = _palletResp!.packs
-        .where((p) => p.status != 'DONE')
-        .toList();
-
-    setState(() => _loading = true);
-
-    ConfirmPackResponse? lastResult;
-    for (final pack in packs) {
-      final result = await _api.confirmPack(
-        packingId: pack.packingId,
-        operatorId: widget.userId,
-      );
-      if (!mounted) return;
-
-      if (!result.success) {
-        setState(() => _loading = false);
-        showErrorDialog(
-            context, message: result.error ?? 'ยืนยัน ${pack.packingId} ไม่สำเร็จ');
-        return;
-      }
-      lastResult = result.data;
-    }
-
-    setState(() => _loading = false);
-
-    if (lastResult != null) {
-      setState(() {
-        _confirmResult = lastResult;
-        _state = _PackState.success;
-      });
-    }
-  }
-
   void _resetAll() {
-    for (final c in _qtyCtrl.values) {
-      c.dispose();
-    }
-    _qtyCtrl.clear();
     setState(() {
       _palletResp = null;
+      _packDetail = null;
       _orderResp = null;
       _confirmResult = null;
       _currentPackingId = '';
       _currentPickOrderId = '';
       _selectedPartId = null;
+      _collectedSerials.clear();
       _scanCtrl.clear();
       _partScanCtrl.clear();
       _state = _PackState.scanPallet;
@@ -340,6 +316,7 @@ class _PackingScreenState extends State<PackingScreen> {
                 children: [
                   if (_state == _PackState.scanPallet) _buildScanPallet(),
                   if (_state == _PackState.packList) _buildPackList(),
+                  if (_state == _PackState.orderList) _buildOrderList(),
                   if (_state == _PackState.orderParts) _buildOrderParts(),
                   if (_state == _PackState.success) _buildSuccess(),
                   const SizedBox(height: 24),
@@ -358,9 +335,22 @@ class _PackingScreenState extends State<PackingScreen> {
         case _PackState.packList:
           _resetAll();
           break;
-        case _PackState.orderParts:
+        case _PackState.orderList:
           _state = _PackState.packList;
+          _packDetail = null;
+          _currentPackingId = '';
+          break;
+        case _PackState.orderParts:
+          // ถ้า Pack มีหลาย Order กลับไป orderList แทน packList
+          if (_packDetail != null && _packDetail!.orders.length > 1) {
+            _state = _PackState.orderList;
+          } else {
+            _state = _PackState.packList;
+            _packDetail = null;
+            _currentPackingId = '';
+          }
           _orderResp = null;
+          _currentPickOrderId = '';
           break;
         case _PackState.success:
           _resetAll();
@@ -374,52 +364,47 @@ class _PackingScreenState extends State<PackingScreen> {
   // ── State 1: Scan Pallet ──────────────────────────────────
 
   Widget _buildScanPallet() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(MdiIcons.packageVariantClosed,
-                    color: AppTheme.primary, size: 22),
-                const SizedBox(width: 8),
-                const Text('สแกน Pallet',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _scanCtrl,
-              focusNode: _scanFocus,
-              textCapitalization: TextCapitalization.characters,
-              decoration: InputDecoration(
-                labelText: 'Pallet ID',
-                prefixIcon: Icon(MdiIcons.barcodeScan),
-                border: const OutlineInputBorder(),
-              ),
-              onSubmitted: (_) => _scanPallet(),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _scanPallet,
-                icon: const Icon(Icons.search, size: 20),
-                label: const Text('ค้นหา'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+    return WmsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(MdiIcons.barcodeScan, color: AppTheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Scan Pallet',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.primary,
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'สแกน Pallet ที่ต้องการแพ็คสินค้า',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppTheme.textGrey(context),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 12),
+          ScanTextField(
+            label: 'Pallet ID',
+            hint: 'Scan Pallet ID',
+            controller: _scanCtrl,
+            focusNode: _scanFocus,
+            onSubmit: _scanPallet,
+          ),
+          const SizedBox(height: 12),
+          PrimaryButton(
+            label: 'Scan',
+            icon: Icons.search,
+            onPressed: _scanPallet,
+          ),
+        ],
       ),
     );
   }
@@ -462,42 +447,49 @@ class _PackingScreenState extends State<PackingScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        // Pack cards
-        ...pallet.packs.map((pack) => Card(
+        // Pack cards — เฉพาะที่ยัง OPEN (DONE = finalize แล้ว ไป Check-in ต่อ)
+        ...pallet.packs.where((p) => p.status == 'OPEN').map((pack) => Card(
               child: ListTile(
                 leading: CircleAvatar(
-                  backgroundColor:
-                      pack.isDone ? AppTheme.success : AppTheme.warning,
-                  child: Icon(
-                    pack.isDone ? Icons.check : Icons.inventory_2_outlined,
+                  backgroundColor: AppTheme.warning,
+                  child: const Icon(
+                    Icons.inventory_2_outlined,
                     color: Colors.white,
                     size: 20,
                   ),
                 ),
                 title: Text(pack.packingId,
                     style: const TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Text(
-                    'Orders: ${pack.orderDoneCount}/${pack.orderCount}  •  ${pack.status}'),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _statusChip(pack.status),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.chevron_right),
+                  ],
+                ),
                 onTap: () => _openPack(pack.packingId),
               ),
             )),
-        const SizedBox(height: 12),
-        // ยืนยัน Pack (เมื่อทุก Pack DONE)
-        if (pallet.packs.every((p) => p.isDone))
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _confirmAllPacks,
-              icon: const Icon(Icons.check_circle_outline, size: 20),
-              label: const Text('ยืนยัน Pack ทั้งหมด',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.success,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+        if (pallet.packs.every((p) => p.status != 'OPEN'))
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.check_circle_outline,
+                        color: AppTheme.success, size: 40),
+                    const SizedBox(height: 8),
+                    const Text('Pack ทุกกล่องเสร็จแล้ว',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    Text('ไปสแกน Check-in ต่อได้เลย',
+                        style:
+                            TextStyle(fontSize: 12, color: Colors.grey[600])),
+                  ],
+                ),
               ),
             ),
           ),
@@ -507,6 +499,104 @@ class _PackingScreenState extends State<PackingScreen> {
           onPressed: _resetAll,
           icon: const Icon(Icons.arrow_back, size: 18),
           label: const Text('สแกน Pallet อื่น'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppTheme.textGrey(context),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── State 3a: Order List (when Pack has multiple Orders) ──────────────────
+
+  Widget _buildOrderList() {
+    final pack = _packDetail!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(MdiIcons.packageVariantClosed,
+                        color: AppTheme.primary, size: 22),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        pack.packingId,
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    _statusChip(pack.status),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text('Pallet: ${pack.palletId}',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+                const SizedBox(height: 4),
+                Text('Orders: ${pack.orders.length}',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Text(
+            'เลือก Order เพื่อ Pack',
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textGrey(context)),
+          ),
+        ),
+        ...pack.orders.map((order) => Card(
+              color: order.isDone
+                  ? AppTheme.success.withValues(alpha: 0.06)
+                  : null,
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor:
+                      order.isDone ? AppTheme.success : AppTheme.secondary,
+                  child: Icon(
+                    order.isDone
+                        ? Icons.check
+                        : MdiIcons.clipboardListOutline,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                title: Text(order.pickOrderId,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(
+                    'Parts: ${order.partDoneCount}/${order.partCount}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _statusChip(order.status),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.chevron_right),
+                  ],
+                ),
+                onTap: () => _openOrder(order.pickOrderId),
+              ),
+            )),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: _handleBack,
+          icon: const Icon(Icons.arrow_back, size: 18),
+          label: const Text('กลับ'),
           style: OutlinedButton.styleFrom(
             foregroundColor: AppTheme.textGrey(context),
             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -603,6 +693,7 @@ class _PackingScreenState extends State<PackingScreen> {
         // Part list
         ...order.parts.map((part) {
           final isSelected = _selectedPartId == part.partId && !part.isDone;
+          final collected = _collectedSerials[part.partId] ?? const [];
           return Card(
             color: part.isDone
                 ? AppTheme.success.withValues(alpha: 0.06)
@@ -687,61 +778,76 @@ class _PackingScreenState extends State<PackingScreen> {
                       ),
                     ],
                   ),
-                  // ── qty input row (เมื่อ Part ถูกเลือก) ──
                   if (isSelected) ...[
-                    const SizedBox(height: 10),
+                    const Divider(height: 20),
                     Row(
                       children: [
                         Text('บน Pallet: ${part.requiredQty} ชิ้น',
-                            style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey[600])),
                         const Spacer(),
-                        Text('เหลือ: ${part.remaining}',
+                        Text('ต้องการ: ${part.remaining} ชิ้น',
                             style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                                 color: AppTheme.warning)),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
-                        const Text('จำนวน Pack: ',
-                            style: TextStyle(fontSize: 13)),
-                        SizedBox(
-                          width: 70,
-                          child: TextField(
-                            controller: _qtyCtrl[part.partId],
-                            keyboardType: TextInputType.number,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.w700),
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 10),
-                              border: OutlineInputBorder(),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _openSerialScan(
+                                part.partId,
+                                part.remaining,
+                                part.availableSerials),
+                            icon: Icon(MdiIcons.barcodeScan, size: 16),
+                            label: Text(
+                              collected.length == part.remaining
+                                  ? 'S/N ครบ (${collected.length})'
+                                  : 'เก็บ S/N (${collected.length}/${part.remaining})',
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w600),
                             ),
-                            onSubmitted: (_) => _confirmScanPart(part.partId),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: collected.length ==
+                                      part.remaining
+                                  ? AppTheme.success
+                                  : AppTheme.secondary,
+                              side: BorderSide(
+                                color: collected.length == part.remaining
+                                    ? AppTheme.success
+                                    : AppTheme.secondary,
+                              ),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () =>
+                                _confirmPart(part.partId, part.remaining),
+                            icon: const Icon(Icons.check, size: 16),
+                            label: const Text('ยืนยัน',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.success,
+                              foregroundColor: Colors.white,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                            ),
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () => _confirmScanPart(part.partId),
-                        icon: const Icon(Icons.check, size: 18),
-                        label: const Text('ยืนยัน',
-                            style: TextStyle(fontWeight: FontWeight.w600)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.success,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                        ),
-                      ),
                     ),
                   ],
                 ],
@@ -769,28 +875,6 @@ class _PackingScreenState extends State<PackingScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ),
-
-        // ปุ่มแบ่งกล่อง (แสดงเมื่อยังสแกนไม่ครบ + มีของสแกนแล้วอย่างน้อย 1 ชิ้น)
-        if (!allDone && order.parts.any((p) => p.scannedQty > 0))
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _splitPack,
-                icon: Icon(MdiIcons.packageVariantPlus, size: 18),
-                label: const Text('ปิดกล่องนี้ + เปิดกล่องใหม่',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.warning,
-                  side: const BorderSide(color: AppTheme.warning),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
               ),
             ),
           ),
@@ -898,10 +982,19 @@ class _PackingScreenState extends State<PackingScreen> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: _resetAll,
-            icon: Icon(MdiIcons.barcodeScan, size: 20),
-            label: const Text('Pack Pallet ถัดไป',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            onPressed: result.palletShipped ? _resetAll : _refreshPackList,
+            icon: Icon(
+              result.palletShipped
+                  ? MdiIcons.barcodeScan
+                  : MdiIcons.packageVariantClosed,
+              size: 20,
+            ),
+            label: Text(
+              result.palletShipped
+                  ? 'Pack Pallet ถัดไป'
+                  : 'แพ็คกล่องถัดไปของ Pallet นี้',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primary,
               foregroundColor: Colors.white,
@@ -931,7 +1024,9 @@ class _PackingScreenState extends State<PackingScreen> {
 
   Widget _statusChip(String status) {
     final color = switch (status) {
-      'DONE' || 'SHIPPED' => AppTheme.success,
+      'SHIPPED' => AppTheme.success,
+      'DONE' => AppTheme.primary,
+      'STAGED' => AppTheme.secondary,
       'OPEN' || 'PACKED' => AppTheme.warning,
       _ => Colors.grey,
     };
@@ -944,6 +1039,311 @@ class _PackingScreenState extends State<PackingScreen> {
       child: Text(status,
           style:
               TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+    );
+  }
+}
+
+// ── Serial Select Page ──────────────────────────────────
+
+class _SerialSelectPage extends StatefulWidget {
+  final String partId;
+  final int requiredQty;
+  final List<String> available;
+  final List<String> initial;
+
+  const _SerialSelectPage({
+    required this.partId,
+    required this.requiredQty,
+    required this.available,
+    required this.initial,
+  });
+
+  @override
+  State<_SerialSelectPage> createState() => _SerialSelectPageState();
+}
+
+class _SerialSelectPageState extends State<_SerialSelectPage> {
+  final _scanCtrl = TextEditingController();
+  final _scanFocus = FocusNode();
+  late List<String> _scanned;
+  late Set<String> _availableSet;
+
+  @override
+  void initState() {
+    super.initState();
+    _scanned = List.of(widget.initial);
+    _availableSet = widget.available.toSet();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scanFocus.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _scanCtrl.dispose();
+    _scanFocus.dispose();
+    super.dispose();
+  }
+
+  void _onScan() {
+    final sn = _scanCtrl.text.trim();
+    if (sn.isEmpty) return;
+
+    if (_scanned.length >= widget.requiredQty) {
+      showErrorDialog(context,
+          message: 'สแกนครบ ${widget.requiredQty} ชิ้นแล้ว');
+      _scanCtrl.clear();
+      _scanFocus.requestFocus();
+      return;
+    }
+
+    if (!_availableSet.contains(sn)) {
+      showErrorDialog(context,
+          message: 'S/N "$sn" ไม่อยู่บน Pallet นี้สำหรับ ${widget.partId}');
+      _scanCtrl.clear();
+      _scanFocus.requestFocus();
+      return;
+    }
+
+    if (_scanned.contains(sn)) {
+      showErrorDialog(context, message: 'S/N "$sn" ถูกสแกนไปแล้ว');
+      _scanCtrl.clear();
+      _scanFocus.requestFocus();
+      return;
+    }
+
+    setState(() => _scanned.add(sn));
+    _scanCtrl.clear();
+    _scanFocus.requestFocus();
+  }
+
+  void _remove(String sn) {
+    setState(() => _scanned.remove(sn));
+    _scanFocus.requestFocus();
+  }
+
+  void _clearAll() {
+    setState(() => _scanned.clear());
+    _scanFocus.requestFocus();
+  }
+
+  // DEV: mock autofill ทั้งหมด (long-press ที่ title เพื่อเรียก)
+  void _mockFillAll() {
+    final take = widget.available.take(widget.requiredQty).toList();
+    setState(() {
+      _scanned
+        ..clear()
+        ..addAll(take);
+    });
+  }
+
+  Future<void> _save() async {
+    if (_scanned.isEmpty) {
+      Navigator.pop(context, <String>[]);
+      return;
+    }
+
+    if (_scanned.length != widget.requiredQty) {
+      showErrorDialog(context,
+          message:
+              'ต้องสแกนครบ ${widget.requiredQty} ชิ้น (สแกนแล้ว ${_scanned.length})');
+      return;
+    }
+
+    Navigator.pop(context, List.of(_scanned));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isComplete = _scanned.length >= widget.requiredQty;
+    return Scaffold(
+      appBar: AppBar(
+        title: GestureDetector(
+          onLongPress: _mockFillAll,
+          behavior: HitTestBehavior.opaque,
+          child: Text('สแกน S/N: ${widget.partId}'),
+        ),
+        backgroundColor: AppTheme.primary,
+        foregroundColor: Colors.white,
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              WmsCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text('S/N ที่สแกน',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.primary,
+                            )),
+                        const Spacer(),
+                        Text('${_scanned.length} / ${widget.requiredQty}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: isComplete
+                                  ? AppTheme.success
+                                  : AppTheme.primary,
+                            )),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: widget.requiredQty > 0
+                            ? _scanned.length / widget.requiredQty
+                            : 0,
+                        minHeight: 6,
+                        backgroundColor: Colors.grey[300],
+                        valueColor: AlwaysStoppedAnimation(
+                            isComplete ? AppTheme.success : AppTheme.primary),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _scanCtrl,
+                            focusNode: _scanFocus,
+                            enabled: !isComplete,
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: InputDecoration(
+                              labelText: 'สแกน S/N',
+                              prefixIcon: Icon(MdiIcons.barcodeScan),
+                              border: const OutlineInputBorder(),
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
+                            ),
+                            onSubmitted: (_) => _onScan(),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: isComplete ? null : _onScan,
+                          icon: const Icon(Icons.send,
+                              color: AppTheme.primary),
+                          style: IconButton.styleFrom(
+                            backgroundColor:
+                                AppTheme.primary.withValues(alpha: 0.1),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_scanned.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: _clearAll,
+                          icon: const Icon(Icons.clear_all, size: 16),
+                          label: const Text('ล้างทั้งหมด',
+                              style: TextStyle(fontSize: 13)),
+                          style: TextButton.styleFrom(
+                              foregroundColor: AppTheme.warning),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: _scanned.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(MdiIcons.barcodeScan,
+                                size: 48, color: Colors.grey[400]),
+                            const SizedBox(height: 8),
+                            Text('ยังไม่มี S/N ที่สแกน',
+                                style:
+                                    TextStyle(color: Colors.grey[600])),
+                            const SizedBox(height: 4),
+                            Text(
+                                'สแกนให้ครบ ${widget.requiredQty} ชิ้น หรือกดกลับเพื่อข้าม',
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.grey[500])),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: _scanned.length,
+                        itemBuilder: (_, i) {
+                          final sn = _scanned[i];
+                          return Card(
+                            margin: const EdgeInsets.symmetric(vertical: 3),
+                            color:
+                                AppTheme.primary.withValues(alpha: 0.06),
+                            child: ListTile(
+                              dense: true,
+                              leading: CircleAvatar(
+                                radius: 14,
+                                backgroundColor: AppTheme.primary,
+                                child: Text('${i + 1}',
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700)),
+                              ),
+                              title: Text(sn,
+                                  style: const TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600)),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.close,
+                                    color: AppTheme.warning, size: 20),
+                                onPressed: () => _remove(sn),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _save,
+                  icon: const Icon(Icons.check, size: 18),
+                  label: Text(
+                    isComplete
+                        ? 'ยืนยัน (${_scanned.length} ชิ้น)'
+                        : _scanned.isEmpty
+                            ? 'ข้าม (ไม่เก็บ S/N)'
+                            : 'ยืนยัน (${_scanned.length}/${widget.requiredQty})',
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isComplete
+                        ? AppTheme.success
+                        : _scanned.isEmpty
+                            ? AppTheme.textGrey(context)
+                            : AppTheme.secondary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

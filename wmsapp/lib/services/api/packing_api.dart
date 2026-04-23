@@ -33,13 +33,14 @@ extension PackingApi on ApiService {
     return ApiResult.success(PackingOrderResponse.fromJson(response.data!));
   }
 
-  /// สแกน Part (เพิ่ม scanned qty)
+  /// สแกน Part (เพิ่ม scanned qty) — ส่ง serialNumbers ได้ (optional)
   Future<ApiResult<PackingOrderResponse>> scanPackPart({
     required String packingId,
     required String pickOrderId,
     required String partId,
     required int qty,
     required String operatorId,
+    List<String>? serialNumbers,
   }) async {
     final response = await _post('/packing/scan-part', {
       'packingId': packingId,
@@ -47,26 +48,13 @@ extension PackingApi on ApiService {
       'partId': partId,
       'qty': qty,
       'operatorId': operatorId,
+      if (serialNumbers != null && serialNumbers.isNotEmpty)
+        'serialNumbers': serialNumbers,
     });
     if (!response.success) {
       return ApiResult.error(response.error, statusCode: response.statusCode);
     }
     return ApiResult.success(PackingOrderResponse.fromJson(response.data!));
-  }
-
-  /// แบ่งกล่อง → ปิดกล่องปัจจุบัน + เปิดกล่องใหม่
-  Future<ApiResult<SplitPackResponse>> splitPack({
-    required String packingId,
-    required String operatorId,
-  }) async {
-    final response = await _post('/packing/split-pack', {
-      'packingId': packingId,
-      'operatorId': operatorId,
-    });
-    if (!response.success) {
-      return ApiResult.error(response.error, statusCode: response.statusCode);
-    }
-    return ApiResult.success(SplitPackResponse.fromJson(response.data!));
   }
 
   /// ยืนยัน Pack → DONE

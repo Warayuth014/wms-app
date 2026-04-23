@@ -14,6 +14,7 @@ import 'package:wmsapp/screens/picking/picking_session/picking_session_screen.da
 import 'package:wmsapp/screens/packing/packing_screen.dart';
 import 'package:wmsapp/screens/checkin/checkin_screen.dart';
 import 'home/widgets/cards/home_flow_card.dart';
+import 'package:wmsapp/screens/test/test_pick_order_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -421,22 +422,37 @@ class _HomeScreenState extends State<HomeScreen> {
     return WmsCard(
       child: Row(
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1565C0), Color(0xFF1E88E5)],
+          GestureDetector(
+            onLongPress: () async {
+              if (!await _requireLogin()) return;
+              if (!mounted) return;
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TestPickOrderScreen(
+                    userId: _userId!,
+                    fullName: _fullName!,
+                  ),
+                ),
+              );
+            },
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1565C0), Color(0xFF1E88E5)],
+                ),
+                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
               ),
-              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-            ),
-            child: Center(
-              child: Text(
-                (_fullName ?? '?')[0],
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
+              child: Center(
+                child: Text(
+                  (_fullName ?? '?')[0],
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ),

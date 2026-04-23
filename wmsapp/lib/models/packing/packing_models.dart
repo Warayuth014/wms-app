@@ -127,12 +127,18 @@ class PackingOrderResponse {
   final String pickOrderId;
   final String status;
   final List<PackingPartItem> parts;
+  final bool packFinalized;
+  final String? trackingId;
+  final bool palletReleased;
 
   PackingOrderResponse({
     required this.packingId,
     required this.pickOrderId,
     required this.status,
     required this.parts,
+    this.packFinalized = false,
+    this.trackingId,
+    this.palletReleased = false,
   });
 
   factory PackingOrderResponse.fromJson(Map<String, dynamic> json) =>
@@ -143,6 +149,9 @@ class PackingOrderResponse {
         parts: (json['parts'] as List)
             .map((p) => PackingPartItem.fromJson(p))
             .toList(),
+        packFinalized: json['packFinalized'] ?? false,
+        trackingId: json['trackingId'],
+        palletReleased: json['palletReleased'] ?? false,
       );
 
   bool get isDone => status == 'DONE';
@@ -156,6 +165,7 @@ class PackingPartItem {
   final String? imageUrl;
   final int requiredQty; // qty บน Pallet นี้ (จาก ReceiptLines)
   final int scannedQty;
+  final List<String> availableSerials;
 
   PackingPartItem({
     required this.partId,
@@ -165,6 +175,7 @@ class PackingPartItem {
     this.imageUrl,
     required this.requiredQty,
     required this.scannedQty,
+    this.availableSerials = const [],
   });
 
   factory PackingPartItem.fromJson(Map<String, dynamic> json) =>
@@ -176,36 +187,14 @@ class PackingPartItem {
         imageUrl: json['imageUrl'],
         requiredQty: json['requiredQty'] ?? 0,
         scannedQty: json['scannedQty'] ?? 0,
+        availableSerials: (json['availableSerials'] as List?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const [],
       );
 
   bool get isDone => scannedQty >= requiredQty;
   int get remaining => (requiredQty - scannedQty).clamp(0, requiredQty);
-}
-
-// ── Split Pack response ──────────────────────────────────
-class SplitPackResponse {
-  final String closedPackingId;
-  final String newPackingId;
-  final int itemsInClosedPack;
-  final int remainingItems;
-  final String message;
-
-  SplitPackResponse({
-    required this.closedPackingId,
-    required this.newPackingId,
-    required this.itemsInClosedPack,
-    required this.remainingItems,
-    required this.message,
-  });
-
-  factory SplitPackResponse.fromJson(Map<String, dynamic> json) =>
-      SplitPackResponse(
-        closedPackingId: json['closedPackingId'],
-        newPackingId: json['newPackingId'],
-        itemsInClosedPack: json['itemsInClosedPack'] ?? 0,
-        remainingItems: json['remainingItems'] ?? 0,
-        message: json['message'] ?? '',
-      );
 }
 
 // ── Confirm response ──────────────────────────────────

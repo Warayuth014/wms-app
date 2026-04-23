@@ -35,25 +35,37 @@ class CheckInSlotDetail {
   final String slotId;
   final String owner;
   final String status;
-  final String? trackingId;
   final DateTime createdAt;
   final DateTime? completedAt;
   final int cartonsInSlot;
   final int expectedCartons;
   final bool isReadyToComplete;
   final List<CheckInCartonItem> cartons;
+  final String? customerOrderId;
+  final int pickTotal;
+  final int pickDone;
+  final int packTotal;
+  final int packDone;
+  final int checkInTotal;
+  final int checkInDone;
 
   CheckInSlotDetail({
     required this.slotId,
     required this.owner,
     required this.status,
-    this.trackingId,
     required this.createdAt,
     this.completedAt,
     required this.cartonsInSlot,
     required this.expectedCartons,
     required this.isReadyToComplete,
     required this.cartons,
+    this.customerOrderId,
+    this.pickTotal = 0,
+    this.pickDone = 0,
+    this.packTotal = 0,
+    this.packDone = 0,
+    this.checkInTotal = 0,
+    this.checkInDone = 0,
   });
 
   factory CheckInSlotDetail.fromJson(Map<String, dynamic> json) =>
@@ -61,7 +73,6 @@ class CheckInSlotDetail {
         slotId: json['slotId'],
         owner: json['owner'],
         status: json['status'],
-        trackingId: json['trackingId'],
         createdAt:
             DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
         completedAt: json['completedAt'] != null
@@ -73,29 +84,42 @@ class CheckInSlotDetail {
         cartons: (json['cartons'] as List)
             .map((c) => CheckInCartonItem.fromJson(c))
             .toList(),
+        customerOrderId: json['customerOrderId'],
+        pickTotal: json['pickTotal'] ?? 0,
+        pickDone: json['pickDone'] ?? 0,
+        packTotal: json['packTotal'] ?? 0,
+        packDone: json['packDone'] ?? 0,
+        checkInTotal: json['checkInTotal'] ?? 0,
+        checkInDone: json['checkInDone'] ?? 0,
       );
 }
 
 class CheckInCartonItem {
   final String packingId;
-  final String palletId;
+  final String? trackingId;
   final String status;
   final DateTime scannedAt;
+  final int itemCount;
+  final int orderCount;
 
   CheckInCartonItem({
     required this.packingId,
-    required this.palletId,
+    this.trackingId,
     required this.status,
     required this.scannedAt,
+    required this.itemCount,
+    required this.orderCount,
   });
 
   factory CheckInCartonItem.fromJson(Map<String, dynamic> json) =>
       CheckInCartonItem(
         packingId: json['packingId'],
-        palletId: json['palletId'] ?? '',
+        trackingId: json['trackingId'],
         status: json['status'] ?? '',
         scannedAt:
             DateTime.tryParse(json['scannedAt'] ?? '') ?? DateTime.now(),
+        itemCount: json['itemCount'] ?? 0,
+        orderCount: json['orderCount'] ?? 0,
       );
 }
 
@@ -137,7 +161,7 @@ class CheckInSlotSummary {
 class CompleteCheckInResponse {
   final String slotId;
   final String owner;
-  final String trackingId;
+  final List<PackTrackingItem> trackings;
   final DateTime completedAt;
   final int cartonsCount;
   final String message;
@@ -145,7 +169,7 @@ class CompleteCheckInResponse {
   CompleteCheckInResponse({
     required this.slotId,
     required this.owner,
-    required this.trackingId,
+    required this.trackings,
     required this.completedAt,
     required this.cartonsCount,
     required this.message,
@@ -155,11 +179,26 @@ class CompleteCheckInResponse {
       CompleteCheckInResponse(
         slotId: json['slotId'],
         owner: json['owner'],
-        trackingId: json['trackingId'],
+        trackings: ((json['trackings'] ?? []) as List)
+            .map((t) => PackTrackingItem.fromJson(t))
+            .toList(),
         completedAt:
             DateTime.tryParse(json['completedAt'] ?? '') ?? DateTime.now(),
         cartonsCount: json['cartonsCount'] ?? 0,
         message: json['message'] ?? '',
+      );
+}
+
+class PackTrackingItem {
+  final String packingId;
+  final String? trackingId;
+
+  PackTrackingItem({required this.packingId, this.trackingId});
+
+  factory PackTrackingItem.fromJson(Map<String, dynamic> json) =>
+      PackTrackingItem(
+        packingId: json['packingId'],
+        trackingId: json['trackingId'],
       );
 }
 

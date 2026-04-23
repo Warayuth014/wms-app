@@ -35,7 +35,7 @@ class ApiService {
 
   ApiService._internal();
 
-  static const _physicalIp = '192.168.1.42';
+  static const _physicalIp = '192.168.1.124';
   static const _port = 5000;
   static String? _cachedBase;
 

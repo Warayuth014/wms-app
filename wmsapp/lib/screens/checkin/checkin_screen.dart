@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
@@ -7,6 +9,19 @@ import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 
 enum _CheckInState { scan, slotDetail, trackingReady, dispatchDone }
+
+// สถานที่ปลายทางให้สุ่มแจ้ง operator ตอนสแกน (mock สำหรับเทสต์)
+const _kDispatchDestinations = [
+  'ประตู 1',
+  'ประตู 2',
+  'ประตู 3',
+  'ประตู VIP',
+  'ท่า A',
+  'ท่า B',
+  'ท่า C',
+  'Dock 1',
+  'Dock 2',
+];
 
 class CheckInScreen extends StatefulWidget {
   final String userId;
@@ -84,27 +99,117 @@ class _CheckInScreenState extends State<CheckInScreen> {
     final r = res.data!;
     _scanCtrl.clear();
 
-    // เด้งข้อความให้เห็นชัด ๆ ว่าวางช่องไหน
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Expanded(child: Text(r.message)),
-            ],
-          ),
-          backgroundColor: r.isReadyToComplete
-              ? AppTheme.success
-              : AppTheme.primary,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+    // popup สุ่มปลายทาง — ให้ operator รู้ว่าจะเอากล่องนี้ไปวางช่องไหน
+    final dest = _kDispatchDestinations[
+        Random().nextInt(_kDispatchDestinations.length)];
+    await _showDestinationDialog(
+      packingId: packingId,
+      destination: dest,
+      slotId: r.slotId,
+      ready: r.isReadyToComplete,
+    );
+    if (!mounted) return;
+
+    // ครบกล่อง → auto complete slot เงียบๆ (ไม่มีปุ่มให้กดแล้ว)
+    if (r.isReadyToComplete) {
+      await _autoCompleteSlot(r.slotId);
+      if (!mounted) return;
     }
 
-    // เปิดหน้า slot detail
     await _openSlot(r.slotId);
+  }
+
+  Future<void> _showDestinationDialog({
+    required String packingId,
+    required String destination,
+    required String slotId,
+    required bool ready,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(MdiIcons.truckDeliveryOutline,
+                color: AppTheme.primary, size: 24),
+            const SizedBox(width: 8),
+            const Text('ส่งปลายทาง',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(packingId,
+                style:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: AppTheme.primary.withValues(alpha: 0.3)),
+              ),
+              child: Center(
+                child: Text(
+                  destination,
+                  style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.primary),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text('ช่อง $slotId', style: TextStyle(color: Colors.grey[600])),
+            if (ready) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.check_circle,
+                      color: AppTheme.success, size: 18),
+                  const SizedBox(width: 6),
+                  const Text('ครบทุกกล่องแล้ว',
+                      style: TextStyle(
+                          color: AppTheme.success,
+                          fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+            ),
+            child: const Text('รับทราบ',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _autoCompleteSlot(String slotId) async {
+    final res = await _api.completeCheckIn(
+      slotId: slotId,
+      operatorId: widget.userId,
+    );
+    if (!mounted) return;
+    if (!res.success) {
+      showErrorDialog(context, message: res.error ?? 'Complete ไม่สำเร็จ');
+    }
   }
 
   Future<void> _openSlot(String slotId) async {
@@ -121,29 +226,6 @@ class _CheckInScreenState extends State<CheckInScreen> {
     setState(() {
       _slotDetail = res.data;
       _state = _CheckInState.slotDetail;
-    });
-  }
-
-  Future<void> _completeSlot() async {
-    final slot = _slotDetail;
-    if (slot == null) return;
-
-    setState(() => _loading = true);
-    final res = await _api.completeCheckIn(
-      slotId: slot.slotId,
-      operatorId: widget.userId,
-    );
-    if (!mounted) return;
-    setState(() => _loading = false);
-
-    if (!res.success) {
-      showErrorDialog(context, message: res.error ?? 'Complete ไม่สำเร็จ');
-      return;
-    }
-
-    setState(() {
-      _completeResult = res.data;
-      _state = _CheckInState.trackingReady;
     });
   }
 
@@ -415,6 +497,10 @@ class _CheckInScreenState extends State<CheckInScreen> {
         ),
         const SizedBox(height: 8),
 
+        // ── 3-column pipeline: Pick / Pack / Check-IN ──
+        _buildPipelineCard(slot),
+        const SizedBox(height: 8),
+
         // ── scan field (ถ้ายังไม่ READY) ──
         if (slot.status == 'OPEN')
           Card(
@@ -449,8 +535,36 @@ class _CheckInScreenState extends State<CheckInScreen> {
                 title: Text(c.packingId,
                     style: const TextStyle(
                         fontWeight: FontWeight.w600, fontSize: 14)),
-                subtitle: Text('Pallet: ${c.palletId}',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(MdiIcons.packageVariantClosed,
+                            size: 12, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        Text('${c.itemCount} ชิ้น',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey[700])),
+                        Text('  ·  ',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey[400])),
+                        Icon(MdiIcons.clipboardListOutline,
+                            size: 12, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        Text('${c.orderCount} Order',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey[700])),
+                      ],
+                    ),
+                    if (c.trackingId != null)
+                      Text('TRK: ${c.trackingId}',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.secondary,
+                              fontWeight: FontWeight.w600)),
+                  ],
+                ),
                 trailing: Text(
                   _formatTime(c.scannedAt),
                   style: TextStyle(fontSize: 11, color: Colors.grey[500]),
@@ -459,78 +573,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
             )),
         const SizedBox(height: 12),
 
-        // ── Complete button (เมื่อครบ) ──
-        if (slot.status == 'OPEN' && slot.isReadyToComplete)
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _completeSlot,
-              icon: const Icon(Icons.check_circle_outline, size: 20),
-              label: const Text('ยืนยันครบ — ปริ้น Tracking',
-                  style:
-                      TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.success,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ),
-
         // ── ถ้า READY แล้ว → แสดงปุ่ม dispatch ──
         if (slot.status == 'READY') ...[
-          if (slot.trackingId != null)
-            Card(
-              color: AppTheme.secondary.withValues(alpha: 0.06),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Icon(MdiIcons.barcodeScan,
-                            color: AppTheme.secondary, size: 18),
-                        const SizedBox(width: 6),
-                        const Text('Tracking ID',
-                            style: TextStyle(
-                                fontSize: 12, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(slot.trackingId!,
-                        style: const TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w700)),
-                  ],
-                ),
-              ),
-            ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('กำลังปริ้น Tracking...'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.print, size: 20),
-              label: const Text('Print Tracking + ใบส่งของ',
-                  style:
-                      TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.secondary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ),
           const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
@@ -596,51 +640,47 @@ class _CheckInScreenState extends State<CheckInScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        Card(
-          color: AppTheme.secondary.withValues(alpha: 0.06),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Icon(MdiIcons.barcodeScan,
-                    color: AppTheme.secondary, size: 28),
-                const SizedBox(height: 6),
-                const Text('Tracking ID',
-                    style: TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text(r.trackingId,
-                    style: const TextStyle(
-                        fontSize: 17, fontWeight: FontWeight.w800)),
-              ],
+        if (r.trackings.isNotEmpty)
+          Card(
+            color: AppTheme.secondary.withValues(alpha: 0.06),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(MdiIcons.barcodeScan,
+                          color: AppTheme.secondary, size: 18),
+                      const SizedBox(width: 6),
+                      Text('Tracking (${r.trackings.length} กล่อง)',
+                          style: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ...r.trackings.map((t) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          children: [
+                            Text('${t.packingId}:  ',
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.grey[700])),
+                            Expanded(
+                              child: Text(t.trackingId ?? '—',
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      fontFamily: 'monospace')),
+                            ),
+                          ],
+                        ),
+                      )),
+                ],
+              ),
             ),
           ),
-        ),
         const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('กำลังปริ้น Tracking + ใบส่งของ...'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            },
-            icon: const Icon(Icons.print, size: 20),
-            label: const Text('Print Tracking + ใบส่งของ',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.secondary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
@@ -732,6 +772,113 @@ class _CheckInScreenState extends State<CheckInScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  // ── 3-column pipeline (Pick / Pack / Check-IN) ──────────────
+  Widget _buildPipelineCard(CheckInSlotDetail slot) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(MdiIcons.progressClock,
+                    color: AppTheme.primary, size: 18),
+                const SizedBox(width: 6),
+                const Text('ความคืบหน้า Customer Order',
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                if (slot.customerOrderId != null)
+                  Text(slot.customerOrderId!,
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[600],
+                          fontFamily: 'monospace')),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                    child: _pipelineColumn(
+                  label: 'Pick',
+                  icon: MdiIcons.handExtendedOutline,
+                  done: slot.pickDone,
+                  total: slot.pickTotal,
+                  color: AppTheme.primary,
+                )),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: _pipelineColumn(
+                  label: 'Pack',
+                  icon: MdiIcons.packageVariantClosed,
+                  done: slot.packDone,
+                  total: slot.packTotal,
+                  color: AppTheme.warning,
+                )),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: _pipelineColumn(
+                  label: 'Check-IN',
+                  icon: MdiIcons.checkboxMarkedCircleOutline,
+                  done: slot.checkInDone,
+                  total: slot.checkInTotal,
+                  color: AppTheme.success,
+                )),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pipelineColumn({
+    required String label,
+    required IconData icon,
+    required int done,
+    required int total,
+    required Color color,
+  }) {
+    final pct = total > 0 ? done / total : 0.0;
+    final complete = total > 0 && done >= total;
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: complete ? 0.12 : 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+            color: color.withValues(alpha: complete ? 0.5 : 0.2)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 20, color: color),
+          const SizedBox(height: 4),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: color)),
+          const SizedBox(height: 4),
+          Text('$done/$total',
+              style: const TextStyle(
+                  fontSize: 15, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: LinearProgressIndicator(
+              value: pct,
+              minHeight: 3,
+              backgroundColor: color.withValues(alpha: 0.15),
+              valueColor: AlwaysStoppedAnimation(color),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

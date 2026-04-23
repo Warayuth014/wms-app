@@ -31,6 +31,9 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
   // lineId → qty controller
   final Map<int, TextEditingController> _qtyCtrl = {};
 
+  // Hidden dev shortcut — long-press title to reveal Quick Create
+  bool _showQuickCreate = false;
+
   @override
   void initState() {
     super.initState();
@@ -125,6 +128,42 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
     await _loadLines(); // reload
   }
 
+  Future<void> _quickCreate() async {
+    if (_lines.isEmpty) {
+      showErrorDialog(context, message: 'ไม่มีรายการให้สร้าง');
+      return;
+    }
+
+    final items = <Map<String, dynamic>>[];
+    for (final line in _lines) {
+      final lineId = line['lineId'] as int;
+      final qty = int.tryParse(_qtyCtrl[lineId]?.text.trim() ?? '') ??
+          (line['availableQty'] as int);
+      items.add({
+        'lineId': lineId,
+        'partId': line['partId'],
+        'qty': qty,
+      });
+    }
+
+    setState(() => _loading = true);
+    final result = await _api.createTestOrder(
+      operatorId: widget.userId,
+      items: items,
+    );
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (!result.success) {
+      showErrorDialog(context, message: result.error ?? 'สร้างไม่สำเร็จ');
+      return;
+    }
+
+    final orderId = result.data!['pickOrderId'] as String;
+    showSuccessSnackbar(context, 'Quick: สร้าง $orderId');
+    await _loadLines();
+  }
+
   void _toggleAll() {
     setState(() {
       if (_selected.length == _lines.length) {
@@ -149,7 +188,7 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
           message: 'กำลังโหลด...',
           child: Column(
             children: [
-              // ── Header ──
+              // ── Header ── (long-press icon to toggle hidden Quick Create)
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -158,10 +197,23 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
                 color: AppTheme.primary.withValues(alpha: 0.05),
                 child: Row(
                   children: [
-                    Icon(
-                      MdiIcons.flaskOutline,
-                      color: AppTheme.primary,
-                      size: 20,
+                    GestureDetector(
+                      onLongPress: () {
+                        setState(() => _showQuickCreate = !_showQuickCreate);
+                        showSuccessSnackbar(
+                          context,
+                          _showQuickCreate
+                              ? 'Quick Create: ON'
+                              : 'Quick Create: OFF',
+                        );
+                      },
+                      child: Icon(
+                        MdiIcons.flaskOutline,
+                        color: _showQuickCreate
+                            ? AppTheme.warning
+                            : AppTheme.primary,
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -211,6 +263,30 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
                       label: 'สร้าง Pick Order (${_selected.length} รายการ)',
                       icon: MdiIcons.playlistPlus,
                       onPressed: _createOrder,
+                    ),
+                  ),
+                ),
+
+              // ── Quick Create (hidden) — long-press flask icon to toggle ──
+              if (_showQuickCreate && _selected.isEmpty && _lines.isNotEmpty)
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: ElevatedButton.icon(
+                      onPressed: _quickCreate,
+                      icon: const Icon(Icons.flash_on, size: 18),
+                      label: Text(
+                        'Quick Create (${_lines.length} lines)',
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w700),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.warning,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
                     ),
                   ),
                 ),

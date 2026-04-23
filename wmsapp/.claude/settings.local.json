@@ -70,7 +70,12 @@
       "Bash(find ./lib -type f -name \"*.dart\" -exec grep -H -i \"sort\" {} \\\\;)",
       "Bash(find ./lib -type f -name \"*.dart\" -exec wc -l {} +)",
       "Bash(xargs -0 grep -l \"sort\")",
-      "Bash(find . -name \"*.dart\" -exec grep -l \"sort\" {} \\\\;)"
+      "Bash(find . -name \"*.dart\" -exec grep -l \"sort\" {} \\\\;)",
+      "Bash(ipconfig)",
+      "Bash(adb devices *)",
+      "PowerShell(Get-NetFirewallPortFilter -Protocol TCP | Where-Object { $_.LocalPort -eq 5000 } | ForEach-Object { $_ | Get-NetFirewallRule | Select-Object DisplayName, Enabled, Direction, Action } | Format-Table -AutoSize)",
+      "Bash(\"/c/Users/Admin/AppData/Local/Android/Sdk/platform-tools/adb.exe\" devices *)",
+      "Bash(\"/c/Users/Admin/AppData/Local/Android/Sdk/platform-tools/adb.exe\" shell *)"
     ]
   }
 }

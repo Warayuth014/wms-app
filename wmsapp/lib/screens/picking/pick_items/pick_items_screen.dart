@@ -8,7 +8,6 @@ import '../../../theme/theme.dart';
 import '../../../widgets/common_widgets.dart';
 import '../../../widgets/part_thumbnail.dart';
 import 'widgets/after_pick/picking_after_pick_success_banner.dart';
-import 'widgets/after_pick/picking_remaining_items_card.dart';
 import 'widgets/pick_view/picking_dest_pallet_banner.dart';
 import 'widgets/pick_view/picking_order_info_banner.dart';
 import 'widgets/pick_view/picking_station_banner.dart';
@@ -449,7 +448,8 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
     final orderItem = _assignment.pickOrderItems
         .where((pickOrderItem) => pickOrderItem.partId == item.partId)
         .firstOrNull;
-    final needed = orderItem?.remainingQty ?? 0;
+    // "ต้องการ" = จำนวนที่หยิบจาก pallet นี้ (cap ตาม allocation + คงเหลือบน pallet)
+    final needed = orderItem == null ? 0 : item.qtyToPickSuggested;
     final isSelected = _selectedPartIds.contains(item.partId);
 
     return GestureDetector(
@@ -669,10 +669,6 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
             destPalletId: _destPalletId,
           ),
           const SizedBox(height: 16),
-          if (!isComplete) ...[
-            PickingRemainingItemsCard(remainingItems: result.remainingItems),
-            const SizedBox(height: 16),
-          ],
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
