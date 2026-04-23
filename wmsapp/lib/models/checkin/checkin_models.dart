@@ -6,10 +6,12 @@ class PreviewCheckInResponse {
   final String packStatus;
   final int itemCount;
   final int orderCount;
+  final List<String> pickOrderIds;
   final String slotId;
   final bool isNewSlot;
   final bool isAlreadyCheckedIn;
   final String? dispatchDestination;
+  final List<PreviewCheckInItem> items;
   final String message;
 
   PreviewCheckInResponse({
@@ -19,10 +21,12 @@ class PreviewCheckInResponse {
     required this.packStatus,
     required this.itemCount,
     required this.orderCount,
+    required this.pickOrderIds,
     required this.slotId,
     required this.isNewSlot,
     required this.isAlreadyCheckedIn,
     this.dispatchDestination,
+    required this.items,
     required this.message,
   });
 
@@ -34,11 +38,44 @@ class PreviewCheckInResponse {
         packStatus: json['packStatus'] ?? '',
         itemCount: json['itemCount'] ?? 0,
         orderCount: json['orderCount'] ?? 0,
+        pickOrderIds: ((json['pickOrderIds'] ?? []) as List)
+            .map((e) => e.toString())
+            .toList(),
         slotId: json['slotId'],
         isNewSlot: json['isNewSlot'] ?? false,
         isAlreadyCheckedIn: json['isAlreadyCheckedIn'] ?? false,
         dispatchDestination: json['dispatchDestination'],
+        items: ((json['items'] ?? []) as List)
+            .map((e) => PreviewCheckInItem.fromJson(e))
+            .toList(),
         message: json['message'] ?? '',
+      );
+
+  int get skuCount => items.length;
+}
+
+class PreviewCheckInItem {
+  final String partId;
+  final String itemDesc;
+  final String brand;
+  final String? imageUrl;
+  final int qty;
+
+  PreviewCheckInItem({
+    required this.partId,
+    required this.itemDesc,
+    required this.brand,
+    this.imageUrl,
+    required this.qty,
+  });
+
+  factory PreviewCheckInItem.fromJson(Map<String, dynamic> json) =>
+      PreviewCheckInItem(
+        partId: json['partId'] ?? '',
+        itemDesc: json['itemDesc'] ?? '',
+        brand: json['brand'] ?? '',
+        imageUrl: json['imageUrl'],
+        qty: json['qty'] ?? 0,
       );
 }
 

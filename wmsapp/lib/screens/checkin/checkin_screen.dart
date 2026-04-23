@@ -5,6 +5,7 @@ import '../../models/wms_models.dart';
 import '../../services/api_service.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/part_thumbnail.dart';
 
 class CheckInScreen extends StatefulWidget {
   final String userId;
@@ -29,6 +30,10 @@ class _CheckInScreenState extends State<CheckInScreen> {
 
   // Pack ที่สแกนไว้รอกด Check-IN (ยังไม่เข้า DB)
   PreviewCheckInResponse? _pendingPack;
+
+  // Pack ล่าสุดที่ Check-IN แล้ว ใช้แสดงปุ่มปริ้นใบส่งสินค้าแบบ mock
+  PreviewCheckInResponse? _deliveryNotePack;
+  DateTime? _deliveryNoteCreatedAt;
 
   // Slot ที่กำลังดูอยู่ (null = ยังไม่ได้สแกน, อยู่หน้าเริ่ม)
   CheckInSlotDetail? _slotDetail;
@@ -74,7 +79,11 @@ class _CheckInScreenState extends State<CheckInScreen> {
     if (!mounted) return;
 
     // ตั้ง pending pack แล้วโหลด slot เดิมถ้ามีจริงใน DB
-    setState(() => _pendingPack = preview);
+    setState(() {
+      _pendingPack = preview;
+      _deliveryNotePack = null;
+      _deliveryNoteCreatedAt = null;
+    });
     if (!preview.isNewSlot) {
       await _openSlot(preview.slotId);
     }
@@ -217,8 +226,12 @@ class _CheckInScreenState extends State<CheckInScreen> {
       if (!mounted) return;
     }
 
-    // เคลียร์ pending + refresh slot
-    setState(() => _pendingPack = null);
+    // เคลียร์ pending + เก็บข้อมูลไว้แสดงปุ่มปริ้นใบส่งสินค้า + refresh slot
+    setState(() {
+      _pendingPack = null;
+      _deliveryNotePack = pack;
+      _deliveryNoteCreatedAt = DateTime.now();
+    });
     await _openSlot(scanResult.slotId);
     _scanFocus.requestFocus();
   }
@@ -249,6 +262,8 @@ class _CheckInScreenState extends State<CheckInScreen> {
     setState(() {
       _slotDetail = null;
       _pendingPack = null;
+      _deliveryNotePack = null;
+      _deliveryNoteCreatedAt = null;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scanFocus.requestFocus();
@@ -259,7 +274,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final onSlotPage = _slotDetail != null || _pendingPack != null;
+    final onSlotPage = _slotDetail != null ||
+        _pendingPack != null ||
+        _deliveryNotePack != null;
     return PopScope(
       canPop: !onSlotPage,
       onPopInvokedWithResult: (didPop, _) {
@@ -352,12 +369,16 @@ class _CheckInScreenState extends State<CheckInScreen> {
   Widget _buildSlotDetail() {
     final slot = _slotDetail;
     final pending = _pendingPack;
+    final deliveryNote = _deliveryNotePack;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // 1) Pack details card (บนสุด) — มีเฉพาะเมื่อมี pending
         if (pending != null) ...[
           _buildPendingPackCard(pending),
+          const SizedBox(height: 12),
+        ] else if (deliveryNote != null) ...[
+          _buildDeliveryNoteCard(deliveryNote),
           const SizedBox(height: 12),
         ],
 
@@ -411,6 +432,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
   Widget _buildPendingPackCard(PreviewCheckInResponse p) {
     final disabled = p.isAlreadyCheckedIn;
     final badgeColor = disabled ? AppTheme.warning : AppTheme.primary;
+    final orderLabel = p.pickOrderIds.length == 1 ? 'Pick Order' : 'Pick Orders';
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -435,26 +457,82 @@ class _CheckInScreenState extends State<CheckInScreen> {
                 _statusChip(p.packStatus),
               ],
             ),
-            const SizedBox(height: 6),
-            Text('ลูกค้า: ${p.owner}',
-                style: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 10),
+            _infoLine(
+              icon: MdiIcons.accountBoxOutline,
+              label: 'ลูกค้า',
+              value: p.owner.isEmpty ? '-' : p.owner,
+            ),
+            if (p.customerOrderId != null) ...[
+              const SizedBox(height: 6),
+              _infoLine(
+                icon: MdiIcons.clipboardTextClockOutline,
+                label: 'Customer Order',
+                value: p.customerOrderId!,
+                monospace: true,
+              ),
+            ],
+            if (p.pickOrderIds.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              _infoLine(
+                icon: MdiIcons.clipboardListOutline,
+                label: orderLabel,
+                value: _formatOrderIds(p.pickOrderIds),
+                monospace: true,
+              ),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _destinationTile(
+                    label: 'ปลายทาง',
+                    value: p.dispatchDestination ?? '-',
+                    icon: MdiIcons.truckDeliveryOutline,
+                    color: AppTheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _destinationTile(
+                    label: 'ช่อง',
+                    value: p.slotId,
+                    icon: MdiIcons.viewGridOutline,
+                    color: AppTheme.teal,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 10),
             Row(
               children: [
-                Icon(MdiIcons.packageVariantClosed,
-                    size: 14, color: Colors.grey[600]),
-                const SizedBox(width: 4),
-                Text('${p.itemCount} ชิ้น',
-                    style: TextStyle(fontSize: 13, color: Colors.grey[700])),
-                const SizedBox(width: 12),
-                Icon(MdiIcons.clipboardListOutline,
-                    size: 14, color: Colors.grey[600]),
-                const SizedBox(width: 4),
-                Text('${p.orderCount} Order',
-                    style: TextStyle(fontSize: 13, color: Colors.grey[700])),
+                Expanded(
+                  child: _metricChip(
+                    icon: MdiIcons.packageVariantClosed,
+                    label: 'ชิ้น',
+                    value: '${p.itemCount}',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _metricChip(
+                    icon: MdiIcons.clipboardListOutline,
+                    label: 'Order',
+                    value: '${p.orderCount}',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _metricChip(
+                    icon: MdiIcons.shapeOutline,
+                    label: 'SKU',
+                    value: '${p.skuCount}',
+                  ),
+                ),
               ],
             ),
+            const SizedBox(height: 12),
+            _buildItemPreview(p),
             if (disabled) ...[
               const SizedBox(height: 10),
               Container(
@@ -505,6 +583,553 @@ class _CheckInScreenState extends State<CheckInScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildDeliveryNoteCard(PreviewCheckInResponse p) {
+    final createdAt = _deliveryNoteCreatedAt ?? DateTime.now();
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: AppTheme.success.withValues(alpha: 0.45),
+          width: 1.2,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: AppTheme.success.withValues(alpha: 0.12),
+                  child: const Icon(Icons.check,
+                      color: AppTheme.success, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Check-IN เรียบร้อย',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w900)),
+                      Text(p.packingId,
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+                _statusChip('STAGED'),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.success.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: AppTheme.success.withValues(alpha: 0.22)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _deliverySummaryLine('เลขที่ใบส่งสินค้า',
+                      _deliveryNoteNo(p, createdAt)),
+                  const SizedBox(height: 6),
+                  _deliverySummaryLine('ลูกค้า', p.owner.isEmpty ? '-' : p.owner),
+                  const SizedBox(height: 6),
+                  _deliverySummaryLine(
+                      'Customer Order', p.customerOrderId ?? '-'),
+                  const SizedBox(height: 6),
+                  _deliverySummaryLine(
+                      'ปลายทาง', '${p.dispatchDestination ?? '-'} / ${p.slotId}'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _showDeliveryNoteSheet(p, createdAt),
+                icon: const Icon(Icons.print_outlined, size: 20),
+                label: const Text('ปริ้นใบส่งสินค้า',
+                    style: TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w900)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _deliverySummaryLine(String label, String value) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 112,
+          child: Text(label,
+              style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w700)),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showDeliveryNoteSheet(
+    PreviewCheckInResponse p,
+    DateTime createdAt,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.description_outlined,
+                        color: AppTheme.primary, size: 24),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text('ใบส่งสินค้า',
+                          style: TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.w900)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _mockNoteHeader(p, createdAt),
+                const SizedBox(height: 14),
+                const Text('รายการสินค้า',
+                    style:
+                        TextStyle(fontSize: 14, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 8),
+                if (p.items.isEmpty)
+                  Text('ไม่มีข้อมูลสินค้า',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]))
+                else
+                  ...p.items.map(_buildDeliveryItemRow),
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.border(context)),
+                  ),
+                  child: Text(
+                    'เอกสารตัวอย่างสำหรับทดสอบหน้าจอ ไม่ได้บันทึกลงฐานข้อมูล',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    icon: const Icon(Icons.check_circle_outline, size: 20),
+                    label: const Text('ปริ้นแล้ว',
+                        style: TextStyle(fontWeight: FontWeight.w900)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.success,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _mockNoteHeader(PreviewCheckInResponse p, DateTime createdAt) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.border(context)),
+      ),
+      child: Column(
+        children: [
+          _deliverySummaryLine('เลขที่เอกสาร', _deliveryNoteNo(p, createdAt)),
+          const SizedBox(height: 6),
+          _deliverySummaryLine('วันที่', _formatDateTime(createdAt)),
+          const SizedBox(height: 6),
+          _deliverySummaryLine('Packing ID', p.packingId),
+          const SizedBox(height: 6),
+          _deliverySummaryLine('ลูกค้า', p.owner.isEmpty ? '-' : p.owner),
+          const SizedBox(height: 6),
+          _deliverySummaryLine('Customer Order', p.customerOrderId ?? '-'),
+          const SizedBox(height: 6),
+          _deliverySummaryLine('Pick Order', _formatOrderIds(p.pickOrderIds)),
+          const SizedBox(height: 6),
+          _deliverySummaryLine(
+              'ปลายทาง', '${p.dispatchDestination ?? '-'} / ${p.slotId}'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeliveryItemRow(PreviewCheckInItem item) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.border(context)),
+      ),
+      child: Row(
+        children: [
+          PartThumbnail(imageUrl: item.imageUrl, size: 44),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(item.partId,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w900)),
+                if (item.itemDesc.isNotEmpty)
+                  Text(item.itemDesc,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          TextStyle(fontSize: 11, color: Colors.grey[600])),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text('x${item.qty}',
+              style:
+                  const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+        ],
+      ),
+    );
+  }
+
+  String _deliveryNoteNo(PreviewCheckInResponse p, DateTime createdAt) {
+    final digits = p.packingId.replaceAll(RegExp(r'[^0-9]'), '');
+    final suffix = digits.length > 6
+        ? digits.substring(digits.length - 6)
+        : digits.padLeft(6, '0');
+    final hh = createdAt.hour.toString().padLeft(2, '0');
+    final mm = createdAt.minute.toString().padLeft(2, '0');
+    return 'DN-$suffix-$hh$mm';
+  }
+
+  String _formatDateTime(DateTime dt) {
+    final local = dt.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$day/$month/${local.year} $hour:$minute';
+  }
+
+  Widget _infoLine({
+    required IconData icon,
+    required String label,
+    required String value,
+    bool monospace = false,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: Colors.grey[600]),
+        const SizedBox(width: 6),
+        Text('$label: ',
+            style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w600)),
+        Expanded(
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              color: AppTheme.textPrimary(context),
+              fontWeight: FontWeight.w800,
+              fontFamily: monospace ? 'monospace' : null,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _destinationTile({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 70),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 5),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: color,
+                      fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 19,
+              height: 1.05,
+              color: color,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _metricChip({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.border(context)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 14, color: Colors.grey[600]),
+          const SizedBox(width: 5),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w900)),
+          const SizedBox(width: 3),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemPreview(PreviewCheckInResponse p) {
+    final items = p.items;
+    final visibleItems = items.take(2).toList();
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppTheme.surface(context),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.border(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(MdiIcons.formatListBulletedSquare,
+                  size: 16, color: AppTheme.primary),
+              const SizedBox(width: 6),
+              const Expanded(
+                child: Text('รายการสินค้า',
+                    style: TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w800)),
+              ),
+              if (items.length > visibleItems.length)
+                TextButton(
+                  onPressed: () => _showPackItemsSheet(p),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                  ),
+                  child: Text('+${items.length - visibleItems.length} ดูทั้งหมด'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (visibleItems.isEmpty)
+            Text('ไม่มีข้อมูลสินค้า',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]))
+          else
+            ...visibleItems.map((item) => _buildPreviewItemRow(item)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreviewItemRow(PreviewCheckInItem item) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          PartThumbnail(imageUrl: item.imageUrl, size: 42),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(item.partId,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w900)),
+                if (item.itemDesc.isNotEmpty)
+                  Text(item.itemDesc,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          TextStyle(fontSize: 11, color: Colors.grey[600])),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text('x${item.qty}',
+              style: const TextStyle(
+                  fontSize: 14, fontWeight: FontWeight.w900)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showPackItemsSheet(PreviewCheckInResponse p) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(p.packingId,
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 4),
+              Text('Customer Order: ${p.customerOrderId ?? '-'}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+              const SizedBox(height: 12),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: p.items.length,
+                  separatorBuilder: (_, __) => const Divider(height: 12),
+                  itemBuilder: (_, index) {
+                    final item = p.items[index];
+                    return Row(
+                      children: [
+                        PartThumbnail(imageUrl: item.imageUrl, size: 52),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(item.partId,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w900)),
+                              if (item.itemDesc.isNotEmpty)
+                                Text(item.itemDesc,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600])),
+                              if (item.brand.isNotEmpty)
+                                Text(item.brand,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey[500])),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text('x${item.qty}',
+                            style: const TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w900)),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatOrderIds(List<String> orderIds) {
+    if (orderIds.isEmpty) return '-';
+    if (orderIds.length <= 2) return orderIds.join(', ');
+    return '${orderIds.take(2).join(', ')} +${orderIds.length - 2}';
   }
 
   // ── Carton list item (ของที่ check-in ไปแล้ว) ─────────────
