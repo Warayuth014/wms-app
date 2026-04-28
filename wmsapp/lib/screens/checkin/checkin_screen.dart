@@ -108,6 +108,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
       pipelineTotal: p.pipelineTotal,
       pickDone: p.pickDone,
       packDone: p.packDone,
+      sortingDone: p.sortingDone,
       checkInDone: p.checkInDone,
     );
   }
@@ -1256,7 +1257,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
                   total: slot.pipelineTotal,
                   color: AppTheme.primary,
                 )),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Expanded(
                     child: _pipelineColumn(
                   label: 'Pack',
@@ -1265,7 +1266,16 @@ class _CheckInScreenState extends State<CheckInScreen> {
                   total: slot.pipelineTotal,
                   color: AppTheme.warning,
                 )),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
+                Expanded(
+                    child: _pipelineColumn(
+                  label: 'Sort',
+                  icon: Icons.pallet,
+                  done: slot.sortingDone,
+                  total: slot.pipelineTotal,
+                  color: AppTheme.teal,
+                )),
+                const SizedBox(width: 6),
                 Expanded(
                     child: _pipelineColumn(
                   label: 'Check-IN',

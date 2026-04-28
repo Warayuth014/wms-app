@@ -13,8 +13,10 @@ import 'package:wmsapp/screens/putaway/putaway_prework/putaway_prework_screen.da
 import 'package:wmsapp/screens/picking/picking_session/picking_session_screen.dart';
 import 'package:wmsapp/screens/packing/packing_screen.dart';
 import 'package:wmsapp/screens/checkin/checkin_screen.dart';
+import 'package:wmsapp/screens/sorting/sorting_screen.dart';
 import 'home/widgets/cards/home_flow_card.dart';
 import 'package:wmsapp/screens/test/test_pick_order_screen.dart';
+import 'package:wmsapp/screens/test/test_sorting_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -64,6 +66,68 @@ class _HomeScreenState extends State<HomeScreen> {
 
     await _openLogin();
     return _userId != null;
+  }
+
+  // ── Hidden dev tools menu (long-press avatar) ──
+  void _openDevToolsMenu() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Row(
+                children: [
+                  Icon(MdiIcons.flaskOutline,
+                      color: AppTheme.warning, size: 20),
+                  const SizedBox(width: 8),
+                  const Text('Dev Tools',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w800)),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: Icon(MdiIcons.cartArrowDown, color: AppTheme.primary),
+              title: const Text('Test Pick Order'),
+              subtitle: const Text('สร้าง pick order จาก inventory'),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => TestPickOrderScreen(
+                      userId: _userId!,
+                      fullName: _fullName!,
+                    ),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.pallet, color: AppTheme.secondary),
+              title: const Text('Test Sorting Batch'),
+              subtitle: const Text('group packs → assign สู่ station'),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => TestSortingScreen(
+                      userId: _userId!,
+                      fullName: _fullName!,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _logout() async {
@@ -334,6 +398,31 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           Expanded(
                             child: HomeFlowCard(
+                              icon: Icons.pallet,
+                              title: 'Sorting',
+                              subtitle: 'จัด Carton ลง Pallet',
+                              gradient: const [
+                                Color(0xFF006064),
+                                Color(0xFF26C6DA),
+                              ],
+                              onTap: () async {
+                                if (!await _requireLogin()) return;
+                                if (!context.mounted) return;
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => SortingScreen(
+                                      userId: _userId!,
+                                      fullName: _fullName!,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: HomeFlowCard(
                               icon: MdiIcons.clipboardCheckOutline,
                               title: 'Check-in',
                               subtitle: 'จัดกลุ่มกล่อง + ปริ้น Tracking',
@@ -356,8 +445,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               },
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          const Expanded(child: SizedBox()),
                         ],
                       ),
                     ),
@@ -426,15 +513,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onLongPress: () async {
               if (!await _requireLogin()) return;
               if (!mounted) return;
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => TestPickOrderScreen(
-                    userId: _userId!,
-                    fullName: _fullName!,
-                  ),
-                ),
-              );
+              _openDevToolsMenu();
             },
             child: Container(
               width: 48,

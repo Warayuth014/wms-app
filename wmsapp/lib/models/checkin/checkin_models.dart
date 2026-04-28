@@ -16,6 +16,7 @@ class PreviewCheckInResponse {
   final int pipelineTotal;
   final int pickDone;
   final int packDone;
+  final int sortingDone;
   final int checkInDone;
 
   PreviewCheckInResponse({
@@ -35,6 +36,7 @@ class PreviewCheckInResponse {
     this.pipelineTotal = 0,
     this.pickDone = 0,
     this.packDone = 0,
+    this.sortingDone = 0,
     this.checkInDone = 0,
   });
 
@@ -60,6 +62,7 @@ class PreviewCheckInResponse {
         pipelineTotal: json['pipelineTotal'] ?? 0,
         pickDone: json['pickDone'] ?? 0,
         packDone: json['packDone'] ?? 0,
+        sortingDone: json['sortingDone'] ?? 0,
         checkInDone: json['checkInDone'] ?? 0,
       );
 
@@ -138,6 +141,7 @@ class CheckInSlotDetail {
   final int pipelineTotal;
   final int pickDone;
   final int packDone;
+  final int sortingDone;
   final int checkInDone;
 
   CheckInSlotDetail({
@@ -154,6 +158,7 @@ class CheckInSlotDetail {
     this.pipelineTotal = 0,
     this.pickDone = 0,
     this.packDone = 0,
+    this.sortingDone = 0,
     this.checkInDone = 0,
   });
 
@@ -177,6 +182,7 @@ class CheckInSlotDetail {
         pipelineTotal: json['pipelineTotal'] ?? 0,
         pickDone: json['pickDone'] ?? 0,
         packDone: json['packDone'] ?? 0,
+        sortingDone: json['sortingDone'] ?? 0,
         checkInDone: json['checkInDone'] ?? 0,
       );
 }

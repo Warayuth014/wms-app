@@ -7,3 +7,4 @@ export 'picking/picking_models.dart';
 export 'packing/packing_models.dart';
 export 'basket/basket_models.dart';
 export 'checkin/checkin_models.dart';
+export 'sorting/sorting_models.dart';

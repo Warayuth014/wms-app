@@ -14,6 +14,7 @@ part 'api/picking_api.dart';
 part 'api/packing_api.dart';
 part 'api/basket_api.dart';
 part 'api/checkin_api.dart';
+part 'api/sorting_api.dart';
 
 class ApiResult<T> {
   final bool success;
