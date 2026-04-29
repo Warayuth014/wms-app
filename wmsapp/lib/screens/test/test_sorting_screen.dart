@@ -89,7 +89,7 @@ class _TestSortingScreenState extends State<TestSortingScreen> {
       context,
       r.isQueued
           ? 'Queued (Station เต็มหมด — รอคิว)'
-          : 'Batch ${r.batchSize} packs → SP-${r.stationId.toString().padLeft(2, '0')}',
+          : 'Batch ${r.batchSize} packs → STN-${r.stationId.toString().padLeft(2, '0')}',
     );
     await _load();
   }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
 import '../../models/wms_models.dart';
 import '../../services/api_service.dart';
@@ -114,6 +113,8 @@ class _SortingScreenState extends State<SortingScreen> {
   }
 
   void _showAvailableMenu(SortingStationView s) {
+    final stationLabel = _formatSortingStationId(s.stationId);
+
     showModalBottomSheet<void>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -121,9 +122,12 @@ class _SortingScreenState extends State<SortingScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.toggle_off_outlined),
+              leading: const Icon(
+                Icons.toggle_off,
+                color: Color.fromRGBO(46, 125, 50, 1),
+              ),
               title: const Text('ปิดใช้งาน Station'),
-              subtitle: Text('SP-${s.stationId.toString().padLeft(2, '0')}'),
+              subtitle: Text(stationLabel),
               onTap: () {
                 Navigator.pop(ctx);
                 _confirmToggle(s, enable: false);
@@ -136,6 +140,8 @@ class _SortingScreenState extends State<SortingScreen> {
   }
 
   void _showDisabledMenu(SortingStationView s) {
+    final stationLabel = _formatSortingStationId(s.stationId);
+
     showModalBottomSheet<void>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -143,11 +149,13 @@ class _SortingScreenState extends State<SortingScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.toggle_on, color: AppTheme.success),
+              leading: const Icon(
+                Icons.toggle_on,
+                color: Color.fromRGBO(0, 0, 0, 1),
+              ),
               title: const Text('เปิดใช้งาน Station'),
               subtitle: Text(
-                'SP-${s.stationId.toString().padLeft(2, '0')}'
-                '${s.disableReason != null ? "  ·  เหตุผลปิด: ${s.disableReason}" : ""}',
+                '$stationLabel${s.disableReason != null ? "  ·  เหตุผลปิด: ${s.disableReason}" : ""}',
               ),
               onTap: () {
                 Navigator.pop(ctx);
@@ -160,12 +168,16 @@ class _SortingScreenState extends State<SortingScreen> {
     );
   }
 
-  Future<void> _confirmToggle(SortingStationView s, {required bool enable}) async {
+  Future<void> _confirmToggle(
+    SortingStationView s, {
+    required bool enable,
+  }) async {
+    final stationLabel = _formatSortingStationId(s.stationId);
     final confirm = await showConfirmDialog(
       context,
       title: enable ? 'เปิดใช้งาน Station' : 'ปิดใช้งาน Station',
       message:
-          'SP-${s.stationId.toString().padLeft(2, '0')} จะ ${enable ? "พร้อมรับ batch" : "หยุดรับ batch ใหม่"}',
+          '$stationLabel จะ ${enable ? "พร้อมรับ batch" : "หยุดรับ batch ใหม่"}',
       confirmLabel: enable ? 'เปิดใช้งาน' : 'ปิดใช้งาน',
       isDanger: !enable,
     );
@@ -200,12 +212,12 @@ class _SortingScreenState extends State<SortingScreen> {
             onRefresh: _loadStations,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(12, 14, 12, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildHeader(),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   _buildGrid(),
                   const SizedBox(height: 24),
                 ],
@@ -223,26 +235,86 @@ class _SortingScreenState extends State<SortingScreen> {
     final free = _stations.length - busy - disabled;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _stat('ว่าง', free, AppTheme.success),
-            _stat('กำลังใช้', busy, AppTheme.warning),
-            _stat('ปิด', disabled, Colors.grey),
+            Row(
+              children: [
+                Icon(Icons.sort, color: AppTheme.primary, size: 20),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'ภาพรวมสถานี Sorting',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _statTile(
+                    'ว่าง',
+                    free,
+                    AppTheme.success,
+                    Icons.inbox_outlined,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _statTile(
+                    'กำลังใช้',
+                    busy,
+                    AppTheme.warning,
+                    Icons.inventory_2_outlined,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _statTile('ปิด', disabled, Colors.grey, Icons.block),
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _stat(String label, int n, Color color) => Column(
-        children: [
-          Text('$n',
+  Widget _statTile(String label, int n, Color color, IconData icon) =>
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.22)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 4),
+            Text(
+              '$n',
               style: TextStyle(
-                  fontSize: 22, fontWeight: FontWeight.w900, color: color)),
-          Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
-        ],
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
+                color: color,
+              ),
+            ),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Colors.grey[700],
+              ),
+            ),
+          ],
+        ),
       );
 
   Widget _buildGrid() {
@@ -254,7 +326,7 @@ class _SortingScreenState extends State<SortingScreen> {
         crossAxisCount: 2,
         mainAxisSpacing: 10,
         crossAxisSpacing: 10,
-        childAspectRatio: 1.45,
+        childAspectRatio: 1.08,
       ),
       itemBuilder: (_, i) => _StationCard(
         station: _stations[i],
@@ -276,7 +348,7 @@ class _StationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = station;
-    final stationLabel = 'SP-${s.stationId.toString().padLeft(2, '0')}';
+    final stationLabel = _formatSortingStationId(s.stationId);
 
     final isDisabled = s.status == 'DISABLED';
     final isBusy = s.status == 'BUSY';
@@ -285,14 +357,16 @@ class _StationCard extends StatelessWidget {
     final accent = isDisabled
         ? Colors.grey
         : isFull
-            ? AppTheme.success
-            : isBusy
-                ? AppTheme.warning
-                : AppTheme.primary;
+        ? AppTheme.success
+        : isBusy
+        ? AppTheme.warning
+        : AppTheme.primary;
 
     final bg = isDisabled
         ? Colors.grey.withValues(alpha: 0.08)
-        : accent.withValues(alpha: 0.06);
+        : isBusy
+        ? accent.withValues(alpha: 0.09)
+        : accent.withValues(alpha: 0.07);
 
     return InkWell(
       onTap: onTap,
@@ -303,8 +377,8 @@ class _StationCard extends StatelessWidget {
           color: bg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: accent.withValues(alpha: isDisabled ? 0.25 : 0.5),
-            width: 1.2,
+            color: accent.withValues(alpha: isDisabled ? 0.22 : 0.58),
+            width: isBusy || isFull ? 1.6 : 1.2,
           ),
         ),
         child: Column(
@@ -312,44 +386,106 @@ class _StationCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.pallet,
-                    size: 18,
-                    color: isDisabled ? Colors.grey : accent),
-                const SizedBox(width: 6),
-                Text(stationLabel,
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: isDisabled
+                        ? Colors.grey.withValues(alpha: 0.12)
+                        : accent.withValues(alpha: 0.13),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.pallet,
+                    size: 22,
+                    color: isDisabled ? Colors.grey : accent,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    stationLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        color: isDisabled ? Colors.grey : null)),
-                const Spacer(),
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: isDisabled ? Colors.grey[500] : null,
+                    ),
+                  ),
+                ),
                 _statusPill(s.status, accent),
               ],
             ),
-            const Spacer(),
+            const SizedBox(height: 10),
             if (isBusy && s.cartonsCount != null && s.maxCapacity != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.78),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(color: accent.withValues(alpha: 0.18)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.local_shipping_outlined,
+                      size: 14,
+                      color: accent,
+                    ),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        s.palletId == null
+                            ? 'กำลังรับ batch'
+                            : _formatSortingPalletId(s.palletId!),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.grey[700],
+                          fontFamily: s.palletId != null ? 'monospace' : null,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text('${s.cartonsCount}',
-                      style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
-                          color: accent)),
-                  Text('/${s.maxCapacity}',
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.grey[600])),
+                  Text(
+                    '${s.cartonsCount}',
+                    style: TextStyle(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w900,
+                      color: accent,
+                    ),
+                  ),
+                  Text(
+                    '/${s.maxCapacity}',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'กล่อง',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.grey[600],
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 4),
-              if (s.palletId != null)
-                Text(s.palletId!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 11, color: Colors.grey[600])),
-              const SizedBox(height: 4),
+              const SizedBox(height: 8),
               ClipRRect(
                 borderRadius: BorderRadius.circular(3),
                 child: LinearProgressIndicator(
@@ -362,22 +498,48 @@ class _StationCard extends StatelessWidget {
                 ),
               ),
             ] else if (isDisabled) ...[
-              Text('ปิดใช้งาน',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.grey[600])),
+              const Spacer(),
+              Icon(Icons.power_settings_new, color: Colors.grey[400], size: 28),
+              const SizedBox(height: 8),
+              Text(
+                'ปิดใช้งาน',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.grey[600],
+                ),
+              ),
               if (s.disableReason != null)
-                Text(s.disableReason!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                Text(
+                  s.disableReason!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                ),
             ] else ...[
-              Text('ว่าง — รอ batch',
-                  style: TextStyle(
-                      fontSize: 12, color: AppTheme.textGrey(context))),
-              const SizedBox(height: 4),
-              Icon(MdiIcons.gestureTap, size: 14, color: Colors.grey[400]),
+              const Spacer(),
+              const Icon(
+                Icons.move_to_inbox,
+                size: 30,
+                color: AppTheme.success,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'ว่าง',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: AppTheme.success,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                'รอ batch เข้า',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textGrey(context),
+                ),
+              ),
             ],
           ],
         ),
@@ -387,19 +549,24 @@ class _StationCard extends StatelessWidget {
 
   Widget _statusPill(String status, Color color) {
     final label = switch (status) {
-      'BUSY' => 'BUSY',
-      'DISABLED' => 'OFF',
-      _ => 'FREE',
+      'BUSY' => 'ใช้งาน',
+      'DISABLED' => 'ปิด',
+      _ => 'ว่าง',
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(label,
-          style: TextStyle(
-              fontSize: 9, fontWeight: FontWeight.w800, color: color)),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+          color: color,
+        ),
+      ),
     );
   }
 }
@@ -459,11 +626,12 @@ class _StationDetailSheetState extends State<_StationDetailSheet> {
   }
 
   Future<void> _clear() async {
+    final stationLabel = _formatSortingStationId(widget.stationId);
     final confirm = await showConfirmDialog(
       context,
       title: 'Clear Station',
       message:
-          'ส่ง Pallet ${_detail!.palletId} ไป Docking Area\nstation จะกลับมาว่าง',
+          'ส่ง ${_formatSortingPalletId(_detail!.palletId!)} ออกจาก $stationLabel\nstation จะกลับมาว่าง',
       confirmLabel: 'Clear',
     );
     if (!confirm) return;
@@ -493,7 +661,7 @@ class _StationDetailSheetState extends State<_StationDetailSheet> {
       builder: (_, scroll) => Container(
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
         ),
         child: _loading || _detail == null
             ? const Center(child: CircularProgressIndicator())
@@ -504,72 +672,148 @@ class _StationDetailSheetState extends State<_StationDetailSheet> {
 
   Widget _buildContent(ScrollController scroll) {
     final d = _detail!;
-    final stationLabel = 'SP-${d.stationId.toString().padLeft(2, '0')}';
+    final stationLabel = _formatSortingStationId(d.stationId);
     final pct = d.maxCapacity > 0 ? d.cartonsCount / d.maxCapacity : 0.0;
 
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(Icons.pallet, color: AppTheme.primary, size: 26),
-                  const SizedBox(width: 8),
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.pallet,
+                      color: AppTheme.primary,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: Text(stationLabel,
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.w900)),
+                    child: Text(
+                      stationLabel,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   ),
                   if (d.isFull)
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.success.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Text('FULL',
+                      child: const Text(
+                        'FULL',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.success,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              if (d.palletId != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.grey.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.local_shipping_outlined,
+                        size: 16,
+                        color: Colors.grey[700],
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _formatSortingPalletId(d.palletId!),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.grey[700],
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  RichText(
+                    text: TextSpan(
+                      style: DefaultTextStyle.of(context).style,
+                      children: [
+                        TextSpan(
+                          text: '${d.cartonsCount}',
                           style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.success)),
+                            fontSize: 34,
+                            fontWeight: FontWeight.w900,
+                            color: pct >= 1.0
+                                ? AppTheme.success
+                                : AppTheme.warning,
+                          ),
+                        ),
+                        TextSpan(
+                          text: ' / ${d.maxCapacity} กล่อง',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (d.pendingCount > 0)
+                    Text(
+                      '+ ${d.pendingCount} กำลังเข้า…',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.grey[600],
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
                 ],
               ),
               const SizedBox(height: 8),
-              if (d.palletId != null)
-                Text(d.palletId!,
-                    style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[600],
-                        fontFamily: 'monospace')),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('${d.cartonsCount} / ${d.maxCapacity} cartons',
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w900)),
-                  if (d.pendingCount > 0)
-                    Text('+ ${d.pendingCount} กำลังเข้า…',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                            fontStyle: FontStyle.italic)),
-                ],
-              ),
-              const SizedBox(height: 6),
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
                   value: pct,
-                  minHeight: 8,
+                  minHeight: 10,
                   backgroundColor: Colors.grey[300],
                   valueColor: AlwaysStoppedAnimation(
-                      pct >= 1.0 ? AppTheme.success : AppTheme.warning),
+                    pct >= 1.0 ? AppTheme.success : AppTheme.warning,
+                  ),
                 ),
               ),
             ],
@@ -579,33 +823,48 @@ class _StationDetailSheetState extends State<_StationDetailSheet> {
         Expanded(
           child: ListView.separated(
             controller: scroll,
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: 10),
             itemCount: d.cartons.length,
             separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (_, i) {
               final c = d.cartons[i];
               final kg = (c.weightGram / 1000).toStringAsFixed(2);
               return ListTile(
-                dense: true,
+                minVerticalPadding: 10,
                 leading: CircleAvatar(
-                  radius: 14,
+                  radius: 18,
                   backgroundColor: AppTheme.success.withValues(alpha: 0.15),
-                  child: Text('${c.sequenceNo}',
-                      style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: AppTheme.success)),
+                  child: Text(
+                    '${c.sequenceNo}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.success,
+                    ),
+                  ),
                 ),
-                title: Text(c.packingId,
-                    style:
-                        const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                title: Text(
+                  c.packingId,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                  ),
+                ),
                 subtitle: Text(
                   '${c.owner}  ·  $kg kg  ·  ${c.itemCount} ชิ้น',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[600],
+                  ),
                 ),
                 trailing: Text(
                   _formatTime(c.sortedAt),
-                  style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey[500],
+                  ),
                 ),
               );
             },
@@ -620,15 +879,17 @@ class _StationDetailSheetState extends State<_StationDetailSheet> {
                 child: ElevatedButton.icon(
                   onPressed: _clear,
                   icon: const Icon(Icons.cleaning_services, size: 20),
-                  label: const Text('Clear Station',
-                      style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w800)),
+                  label: const Text(
+                    'Clear Station',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.success,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
@@ -645,3 +906,8 @@ class _StationDetailSheetState extends State<_StationDetailSheet> {
         '${l.second.toString().padLeft(2, '0')}';
   }
 }
+
+String _formatSortingStationId(int stationId) =>
+    'STN-${stationId.toString().padLeft(2, '0')}';
+
+String _formatSortingPalletId(String palletId) => 'Pallet $palletId';
