@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../services/api_service.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
 class PartImageScreen extends StatefulWidget {
   final String userId;
@@ -84,12 +85,12 @@ class _PartImageScreenState extends State<PartImageScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.camera_alt),
+              leading: Icon(MdiIcons.camera),
               title: const Text('ถ่ายรูป'),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library),
+              leading: Icon(MdiIcons.imageMultipleOutline),
               title: const Text('เลือกจากแกลเลอรี'),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
@@ -294,15 +295,15 @@ class _PartImageScreenState extends State<PartImageScreen> {
                             return Image.network(
                               snap.data!,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                Icons.broken_image,
+                              errorBuilder: (_, __, ___) => Icon(
+                                MdiIcons.imageOff,
                                 color: Colors.grey,
                               ),
                             );
                           },
                         )
                       : Icon(
-                          Icons.add_a_photo,
+                          MdiIcons.cameraPlus,
                           color: AppTheme.textGrey(context),
                           size: 24,
                         ),
@@ -333,7 +334,7 @@ class _PartImageScreenState extends State<PartImageScreen> {
                           )
                         else
                           Icon(
-                            Icons.image_not_supported,
+                            MdiIcons.imageOffOutline,
                             color: AppTheme.textGrey(context),
                             size: 16,
                           ),
@@ -362,7 +363,7 @@ class _PartImageScreenState extends State<PartImageScreen> {
               // ── Upload button ──
               IconButton(
                 icon: Icon(
-                  hasImg ? Icons.edit : Icons.add_a_photo,
+                  hasImg ? Icons.edit : MdiIcons.cameraPlus,
                   color: AppTheme.primary,
                 ),
                 onPressed: () => _pickAndUpload(part),

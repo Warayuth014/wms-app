@@ -1,16 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:wmsapp/screens/home_screen.dart';
-import 'package:wmsapp/services/connectivity_service.dart';
-import 'package:wmsapp/services/offline_service.dart';
 import 'theme/theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // initialize services
-  await OfflineService().initialize();
-  ConnectivityService().initialize();
   runApp(const WmsApp());
 }
 

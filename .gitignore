@@ -1,0 +1,11 @@
+wmsapp/.claude/settings.local.json
+wmsapp/.vscode/launch.json
+
+# Generated plugin registrants only
+wmsapp/linux/flutter/generated_plugin_registrant.cc
+wmsapp/linux/flutter/generated_plugin_registrant.h
+wmsapp/linux/flutter/generated_plugins.cmake
+wmsapp/macos/Flutter/GeneratedPluginRegistrant.swift
+wmsapp/windows/flutter/generated_plugin_registrant.cc
+wmsapp/windows/flutter/generated_plugin_registrant.h
+wmsapp/windows/flutter/generated_plugins.cmake
