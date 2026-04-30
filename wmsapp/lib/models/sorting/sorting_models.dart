@@ -1,3 +1,25 @@
+// ── Dashboard data: stations + counters ──────────────
+class SortingDashboardData {
+  final List<SortingStationView> stations;
+  final int completedCount;
+  final int queuedCount;
+
+  SortingDashboardData({
+    required this.stations,
+    required this.completedCount,
+    required this.queuedCount,
+  });
+
+  factory SortingDashboardData.fromJson(Map<String, dynamic> json) =>
+      SortingDashboardData(
+        stations: ((json['stations'] ?? []) as List)
+            .map((e) => SortingStationView.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        completedCount: json['completedCount'] ?? 0,
+        queuedCount: json['queuedCount'] ?? 0,
+      );
+}
+
 // ── Station view (10 cards) ──────────────────────────
 class SortingStationView {
   final int stationId;

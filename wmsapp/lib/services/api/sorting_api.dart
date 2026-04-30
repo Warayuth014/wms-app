@@ -1,16 +1,13 @@
 part of '../api_service.dart';
 
 extension SortingApi on ApiService {
-  /// Grid 10 stations
-  Future<ApiResult<List<SortingStationView>>> getSortingStations() async {
+  /// Dashboard: 10 stations + completed/queued counters
+  Future<ApiResult<SortingDashboardData>> getSortingDashboard() async {
     final response = await _get('/sorting/stations');
     if (!response.success) {
       return ApiResult.error(response.error, statusCode: response.statusCode);
     }
-    final items = (response.data!['items'] as List? ?? [])
-        .map((e) => SortingStationView.fromJson(e as Map<String, dynamic>))
-        .toList();
-    return ApiResult.success(items);
+    return ApiResult.success(SortingDashboardData.fromJson(response.data!));
   }
 
   /// Station detail (sheet)

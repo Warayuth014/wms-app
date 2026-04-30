@@ -26,6 +26,8 @@ class _SortingScreenState extends State<SortingScreen> {
 
   bool _loading = false;
   List<SortingStationView> _stations = [];
+  int _completedCount = 0;
+  int _queuedCount = 0;
 
   @override
   void initState() {
@@ -78,7 +80,7 @@ class _SortingScreenState extends State<SortingScreen> {
   // ── API ──────────────────────────────────────────────────
   Future<void> _loadStations() async {
     setState(() => _loading = true);
-    final res = await _api.getSortingStations();
+    final res = await _api.getSortingDashboard();
     if (!mounted) return;
     setState(() => _loading = false);
 
@@ -86,7 +88,11 @@ class _SortingScreenState extends State<SortingScreen> {
       showErrorDialog(context, message: res.error ?? 'โหลด stations ไม่สำเร็จ');
       return;
     }
-    setState(() => _stations = res.data!);
+    setState(() {
+      _stations = res.data!.stations;
+      _completedCount = res.data!.completedCount;
+      _queuedCount = res.data!.queuedCount;
+    });
   }
 
   Future<void> _openStation(SortingStationView s) async {
@@ -249,6 +255,30 @@ class _SortingScreenState extends State<SortingScreen> {
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
                   ),
                 ),
+                if (_queuedCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.warning.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.hourglass_top,
+                            size: 12, color: AppTheme.warning),
+                        const SizedBox(width: 4),
+                        Text(
+                          'รอคิว $_queuedCount',
+                          style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.warning),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 10),
@@ -258,11 +288,11 @@ class _SortingScreenState extends State<SortingScreen> {
                   child: _statTile(
                     'ว่าง',
                     free,
-                    AppTheme.success,
+                    AppTheme.primary,
                     Icons.inbox_outlined,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Expanded(
                   child: _statTile(
                     'กำลังใช้',
@@ -271,7 +301,16 @@ class _SortingScreenState extends State<SortingScreen> {
                     Icons.inventory_2_outlined,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _statTile(
+                    'เสร็จ',
+                    _completedCount,
+                    AppTheme.success,
+                    Icons.check_circle_outline,
+                  ),
+                ),
+                const SizedBox(width: 6),
                 Expanded(
                   child: _statTile('ปิด', disabled, Colors.grey, Icons.block),
                 ),
@@ -285,7 +324,7 @@ class _SortingScreenState extends State<SortingScreen> {
 
   Widget _statTile(String label, int n, Color color, IconData icon) =>
       Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(10),
@@ -293,14 +332,15 @@ class _SortingScreenState extends State<SortingScreen> {
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(height: 4),
+            Icon(icon, color: color, size: 16),
+            const SizedBox(height: 2),
             Text(
               '$n',
               style: TextStyle(
-                fontSize: 26,
+                fontSize: 22,
                 fontWeight: FontWeight.w900,
                 color: color,
+                height: 1.1,
               ),
             ),
             Text(
@@ -308,7 +348,7 @@ class _SortingScreenState extends State<SortingScreen> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: Colors.grey[700],
               ),
@@ -318,20 +358,16 @@ class _SortingScreenState extends State<SortingScreen> {
       );
 
   Widget _buildGrid() {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _stations.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.92,
-      ),
-      itemBuilder: (_, i) => _StationCard(
-        station: _stations[i],
-        onTap: () => _openStation(_stations[i]),
-      ),
+    return Column(
+      children: [
+        for (var i = 0; i < _stations.length; i++) ...[
+          _StationCard(
+            station: _stations[i],
+            onTap: () => _openStation(_stations[i]),
+          ),
+          if (i != _stations.length - 1) const SizedBox(height: 10),
+        ],
+      ],
     );
   }
 }
@@ -387,223 +423,283 @@ class _StationCard extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ── Top accent bar ──
-              Container(height: 4, color: accent),
-
-              // ── Header: STN-XX + status pill ──
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 10, 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        stationLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 19,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.3,
-                          color: isDisabled ? Colors.grey[500] : null,
-                        ),
-                      ),
-                    ),
-                    _statusPill(s.status, accent, full: isFull),
-                  ],
-                ),
-              ),
-
-              // ── Body: switches per state ──
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                  child: isBusy
-                      ? _buildBusyBody(s, accent, isFull)
-                      : isDisabled
-                          ? _buildDisabledBody(s)
-                          : _buildAvailableBody(),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── BUSY body: counter + progress + pallet ───────────
-  Widget _buildBusyBody(SortingStationView s, Color accent, bool isFull) {
-    final count = s.cartonsCount ?? 0;
-    final total = s.maxCapacity ?? 0;
-    final pct = total > 0 ? count / total : 0.0;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Big counter, centered
-        Expanded(
-          child: Center(
+          child: IntrinsicHeight(
             child: Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  '$count',
-                  style: TextStyle(
-                    fontSize: 44,
-                    fontWeight: FontWeight.w900,
-                    height: 1.0,
-                    color: accent,
-                  ),
-                ),
-                Text(
-                  '/$total',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    height: 1.0,
-                    color: Colors.grey[500],
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text(
-                    'กล่อง',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.grey[600],
-                    ),
+                // ── Left accent bar (full height) ──
+                Container(width: 5, color: accent),
+
+                // ── Body: horizontal layout for wide card ──
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    child: isBusy
+                        ? _buildBusyRow(s, accent, isFull, stationLabel)
+                        : isDisabled
+                            ? _buildDisabledRow(s, stationLabel)
+                            : _buildAvailableRow(stationLabel),
                   ),
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
 
-        // Progress bar
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: pct,
-            minHeight: 7,
-            backgroundColor: accent.withValues(alpha: 0.14),
-            valueColor: AlwaysStoppedAnimation(accent),
-          ),
-        ),
-        const SizedBox(height: 8),
+  // ── BUSY/FULL: wide horizontal row ───────────────────
+  Widget _buildBusyRow(
+    SortingStationView s,
+    Color accent,
+    bool isFull,
+    String stationLabel,
+  ) {
+    final count = s.cartonsCount ?? 0;
+    final total = s.maxCapacity ?? 0;
+    final pct = total > 0 ? count / total : 0.0;
 
-        // Pallet id chip
-        if (s.palletId != null)
-          Row(
+    return Row(
+      children: [
+        // Left side: station ID + pallet
+        SizedBox(
+          width: 110,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.inventory_2_outlined,
-                  size: 13, color: Colors.grey[500]),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
+              Text(
+                stationLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(height: 4),
+              _statusPill(s.status, accent, full: isFull),
+              if (s.palletId != null) ...[
+                const SizedBox(height: 6),
+                Text(
                   s.palletId!,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.w800,
                     color: Colors.grey[600],
                     fontFamily: 'monospace',
                     letterSpacing: 0.2,
                   ),
                 ),
+              ],
+            ],
+          ),
+        ),
+
+        // Right side: counter big + progress bar
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    '$count',
+                    style: TextStyle(
+                      fontSize: 38,
+                      fontWeight: FontWeight.w900,
+                      height: 1.0,
+                      color: accent,
+                    ),
+                  ),
+                  Text(
+                    '/$total',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      height: 1.0,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      'กล่อง',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              if (isFull)
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: pct,
+                  minHeight: 7,
+                  backgroundColor: accent.withValues(alpha: 0.14),
+                  valueColor: AlwaysStoppedAnimation(accent),
+                ),
+              ),
+              if (isFull) ...[
+                const SizedBox(height: 6),
                 Text(
-                  'ครบแล้ว!',
+                  'ครบแล้ว — กดเพื่อ Clear',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w900,
                     color: accent,
                   ),
                 ),
+              ],
             ],
           ),
+        ),
       ],
     );
   }
 
-  // ── AVAILABLE body: clean waiting state ──────────────
-  Widget _buildAvailableBody() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: AppTheme.primary.withValues(alpha: 0.08),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.move_to_inbox,
-              color: AppTheme.primary,
-              size: 28,
-            ),
+  // ── AVAILABLE: compact row ───────────────────────────
+  Widget _buildAvailableRow(String stationLabel) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 110,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                stationLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(height: 4),
+              _statusPill('AVAILABLE', AppTheme.primary),
+            ],
           ),
-          const SizedBox(height: 10),
-          const Text(
-            'พร้อมรับ batch',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.primary,
-            ),
+        ),
+        Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.move_to_inbox,
+                    color: AppTheme.primary, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'พร้อมรับ batch',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.primary,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  // ── DISABLED body: muted, with reason ────────────────
-  Widget _buildDisabledBody(SortingStationView s) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: Colors.grey.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.do_not_disturb_alt,
-                color: Colors.grey[500], size: 28),
+  // ── DISABLED: compact row ────────────────────────────
+  Widget _buildDisabledRow(SortingStationView s, String stationLabel) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 110,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                stationLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.3,
+                  color: Colors.grey[500],
+                ),
+              ),
+              const SizedBox(height: 4),
+              _statusPill('DISABLED', Colors.grey),
+            ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            'ปิดใช้งาน',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: Colors.grey[700],
-            ),
+        ),
+        Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.do_not_disturb_alt,
+                    color: Colors.grey[500], size: 20),
+              ),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'ปิดใช้งาน',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    if (s.disableReason != null &&
+                        s.disableReason!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        s.disableReason!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style:
+                            TextStyle(fontSize: 11, color: Colors.grey[500]),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
-          if (s.disableReason != null && s.disableReason!.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              s.disableReason!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-            ),
-          ],
-        ],
-      ),
+        ),
+      ],
     );
   }
 
