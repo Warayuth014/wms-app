@@ -1,5 +1,7 @@
 // lib/screens/receiving/scan_part/scan_part_screen.dart
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
@@ -33,12 +35,21 @@ class ScanPartScreen extends StatefulWidget {
   State<ScanPartScreen> createState() => _ScanPartScreenState();
 }
 
+enum _ScanStatusTone { success, duplicate }
+
 class _ScanPartScreenState extends State<ScanPartScreen> {
+  static const double _serialHeaderHeight = 32;
+  static const double _serialRowHeight = 42;
+  static const int _serialVisibleRowLimit = 5;
+
   final _partController = TextEditingController();
   final _partFocus = FocusNode();
   final _qtyController = TextEditingController();
+  final _serialController = TextEditingController();
+  final _serialFocus = FocusNode();
   final _palletController = TextEditingController();
   final _palletFocus = FocusNode();
+  final _serialListController = ScrollController();
   final _api = ApiService();
 
   bool _loading = false;
@@ -50,6 +61,14 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
 
   final List<AssignedReceivingLine> _assignedLines = [];
   final List<ReceiptLineResponse> _resumedPendingLines = [];
+  final List<String> _serialNumbers = [];
+  String? _serialPartId;
+  POItem? _scanningItem;
+  String? _highlightedSerial;
+  bool _highlightedSerialDuplicate = false;
+  Timer? _scanStatusTimer;
+  String? _scanStatusMessage;
+  _ScanStatusTone _scanStatusTone = _ScanStatusTone.success;
 
   @override
   void initState() {
@@ -100,10 +119,76 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
     );
   }
 
+  void _clearSerialScan() {
+    _serialPartId = null;
+    _scanningItem = null;
+    _highlightedSerial = null;
+    _highlightedSerialDuplicate = false;
+    _serialController.clear();
+    _serialNumbers.clear();
+    if (_serialListController.hasClients) {
+      _serialListController.jumpTo(0);
+    }
+  }
+
+  void _markScannedSerial(String serialNo, {bool duplicate = false}) {
+    setState(() {
+      _highlightedSerial = serialNo;
+      _highlightedSerialDuplicate = duplicate;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final index = _serialNumbers.indexOf(serialNo);
+      if (index < 0 || !_serialListController.hasClients) return;
+
+      final target = (index * _serialRowHeight).clamp(
+        0.0,
+        _serialListController.position.maxScrollExtent,
+      ).toDouble();
+      _serialListController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  void _showScanStatus(
+    String message, {
+    _ScanStatusTone tone = _ScanStatusTone.success,
+  }) {
+    _scanStatusTimer?.cancel();
+    setState(() {
+      _scanStatusMessage = message;
+      _scanStatusTone = tone;
+    });
+    _scanStatusTimer = Timer(const Duration(seconds: 5), _hideScanStatus);
+  }
+
+  void _holdScanStatus() {
+    _scanStatusTimer?.cancel();
+    _scanStatusTimer = null;
+  }
+
+  void _hideScanStatus() {
+    _scanStatusTimer?.cancel();
+    _scanStatusTimer = null;
+    if (!mounted || _scanStatusMessage == null) return;
+    setState(() => _scanStatusMessage = null);
+  }
+
   Future<void> _scanPart() async {
     final partId = _partController.text.trim().toUpperCase();
     if (partId.isEmpty) {
       showErrorDialog(context, message: 'กรุณาใส่ Part ID');
+      _partFocus.requestFocus();
+      return;
+    }
+
+    final serialNo = _serialController.text.trim().toUpperCase();
+    if (serialNo.isEmpty) {
+      showErrorDialog(context, message: 'กรุณาใส่ S/N');
+      _serialFocus.requestFocus();
       return;
     }
 
@@ -113,17 +198,75 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
         context,
         message: 'Part $partId ไม่อยู่ใน PO ${_currentPo.poId}',
       );
+      _partFocus.requestFocus();
+      return;
+    }
+if (_serialPartId != null &&
+        _serialPartId != partId &&
+        _serialNumbers.isNotEmpty) {
+      showErrorDialog(
+        context,
+        message: 'กำลังสแกน Part $_serialPartId อยู่ กรุณาบันทึกหรือล้างก่อน',
+      );
+      _partController.text = _serialPartId!;
+      _serialFocus.requestFocus();
+      return;
+    }
+
+    final existingSerialIndex = _serialNumbers.indexOf(serialNo);
+    if (existingSerialIndex >= 0) {
+      _markScannedSerial(serialNo, duplicate: true);
+      _showScanStatus(
+        'S/N "$serialNo" สแกนแล้ว อยู่รายการที่ ${existingSerialIndex + 1}',
+        tone: _ScanStatusTone.duplicate,
+      );
+      _serialController.clear();
+      _serialFocus.requestFocus();
       return;
     }
 
     final poItem = _currentPo.items.firstWhere((item) => item.partId == partId);
-    _qtyController.text =
-        (poItem.qtyRemaining > 0 ? poItem.qtyRemaining : poItem.qtyOrdered)
-            .toString();
-    _showPartForm(poItem);
+    final maxQty =
+        poItem.qtyRemaining > 0 ? poItem.qtyRemaining : poItem.qtyOrdered;
+    if (_serialNumbers.length >= maxQty) {
+      showErrorDialog(context, message: 'สแกนครบ $maxQty ชิ้นแล้ว');
+      _serialController.clear();
+      _serialFocus.requestFocus();
+      return;
+    }
+
+    setState(() => _loading = true);
+    final serialResult = await _api.validateReceivingSerial(
+      partId: partId,
+      serialNo: serialNo,
+    );
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (!serialResult.success) {
+      showErrorDialog(
+        context,
+        message: serialResult.error ?? 'S/N ไม่ถูกต้อง',
+      );
+      _serialFocus.requestFocus();
+      return;
+    }
+
+    setState(() {
+      _scanningItem = poItem;
+      _serialPartId = partId;
+      _serialNumbers.add(serialNo);
+      _qtyController.text = _serialNumbers.length.toString();
+      _serialController.clear();
+    });
+    _markScannedSerial(serialNo);
+    _showScanStatus(
+      'เพิ่ม S/N "$serialNo" แล้ว อยู่รายการที่ ${_serialNumbers.length}',
+    );
+    _serialFocus.requestFocus();
   }
 
-  void _showPartForm(POItem poItem) {
+  void showPartForm(POItem poItem) {
     final condColor =
         poItem.condition == 'FG' ? AppTheme.success : AppTheme.warning;
 
@@ -132,6 +275,9 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.9,
+        ),
         padding: EdgeInsets.only(
           bottom:
               MediaQuery.of(ctx).viewInsets.bottom +
@@ -141,7 +287,8 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        child: Padding(
+        child: SingleChildScrollView(
+          child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -228,10 +375,18 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
               TextField(
                 controller: _qtyController,
                 keyboardType: TextInputType.number,
+                readOnly: true,
                 decoration: InputDecoration(
                   labelText: 'จำนวนที่รับจริง',
                   prefixIcon: Icon(MdiIcons.numeric),
                 ),
+              ),
+              const SizedBox(height: 8),
+              InfoRow(
+                label: 'S/N',
+                value: _serialNumbers.isNotEmpty ? _serialNumbers.first : '-',
+                valueColor: AppTheme.primary,
+                bold: true,
               ),
               const SizedBox(height: 16),
               PrimaryButton(
@@ -244,6 +399,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                 },
               ),
             ],
+          ),
           ),
         ),
       ),
@@ -267,6 +423,20 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       return;
     }
 
+    final serialNumbers =
+        _serialPartId == poItem.partId && _serialNumbers.length == qty
+            ? List<String>.of(_serialNumbers)
+            : null;
+    if (serialNumbers == null) {
+      showErrorDialog(
+        context,
+        message: _serialNumbers.isEmpty
+            ? 'กรุณาสแกน S/N'
+            : 'จำนวน S/N (${_serialNumbers.length}) ไม่ตรงกับจำนวนรับ ($qty)',
+      );
+      return;
+    }
+
     setState(() => _loading = true);
 
     final result = await _api.scanReceiptPart(
@@ -275,6 +445,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       partId: poItem.partId,
       qtyReceived: qty,
       operatorId: widget.userId,
+      serialNumbers: serialNumbers,
     );
 
     if (!mounted) return;
@@ -294,6 +465,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
     }
 
     _clearFormFields();
+    _clearSerialScan();
 
     setState(() {
       _pendingLine = line;
@@ -446,9 +618,396 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
     _palletFocus.requestFocus();
   }
 
+  Future<void> _saveScannedSerials() async {
+    final item = _scanningItem;
+    if (item == null || _serialNumbers.isEmpty) {
+      showErrorDialog(context, message: 'กรุณาสแกน Part และ S/N ก่อน');
+      _serialFocus.requestFocus();
+      return;
+    }
+
+    _qtyController.text = _serialNumbers.length.toString();
+    await _confirmPart(item);
+  }
+
+  void _removeScannedSerial(String serialNo) {
+    setState(() {
+      _serialNumbers.remove(serialNo);
+      if (_highlightedSerial == serialNo) {
+        _highlightedSerial = null;
+        _highlightedSerialDuplicate = false;
+      }
+      _qtyController.text = _serialNumbers.length.toString();
+      if (_serialNumbers.isEmpty) {
+        _clearSerialScan();
+      }
+    });
+    _serialFocus.requestFocus();
+  }
+
+  Future<bool> _confirmRemoveScannedSerial(String serialNo) async {
+    final index = _serialNumbers.indexOf(serialNo);
+    final positionText = index >= 0 ? 'รายการที่ ${index + 1}' : 'รายการนี้';
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'ลบ S/N?',
+      message: 'ต้องการลบ S/N "$serialNo" ($positionText) ออกจากรายการสแกนหรือไม่',
+      confirmLabel: 'ลบ',
+      cancelLabel: 'ยกเลิก',
+      isDanger: true,
+    );
+    if (mounted) {
+      _serialFocus.requestFocus();
+    }
+    return mounted && confirmed;
+  }
+
+  Future<void> _requestRemoveScannedSerial(String serialNo) async {
+    final confirmed = await _confirmRemoveScannedSerial(serialNo);
+    if (!confirmed) return;
+    _removeScannedSerial(serialNo);
+  }
+
   void _clearFormFields() {
     _partController.clear();
     _qtyController.clear();
+  }
+
+  Widget _buildSerialTable() {
+    final visibleRows = _serialNumbers.length > _serialVisibleRowLimit
+        ? _serialVisibleRowLimit
+        : _serialNumbers.length;
+    final rowCount = visibleRows == 0 ? 1 : visibleRows;
+
+    return Container(
+      height: _serialHeaderHeight + (rowCount * _serialRowHeight),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppTheme.primary.withValues(alpha: 0.14),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          Container(
+            height: _serialHeaderHeight,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            color: AppTheme.primary.withValues(alpha: 0.06),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 34,
+                  child: Text(
+                    '#',
+                    style: TextStyle(
+                      color: AppTheme.textGrey(context),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    'S/N',
+                    style: TextStyle(
+                      color: AppTheme.textGrey(context),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 44),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              controller: _serialListController,
+              padding: EdgeInsets.zero,
+              itemExtent: _serialRowHeight,
+              itemCount: _serialNumbers.length,
+              itemBuilder: (context, index) {
+                final serialNo = _serialNumbers[index];
+                final highlighted = serialNo == _highlightedSerial;
+                final highlightColor = _highlightedSerialDuplicate
+                    ? AppTheme.warning
+                    : AppTheme.success;
+
+                return Dismissible(
+                  key: ValueKey('serial-$serialNo'),
+                  direction: DismissDirection.endToStart,
+                  confirmDismiss: (_) => _confirmRemoveScannedSerial(serialNo),
+                  background: Container(
+                    color: AppTheme.danger.withValues(alpha: 0.1),
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 14),
+                    child: const Icon(
+                      Icons.delete_outline,
+                      color: AppTheme.danger,
+                      size: 22,
+                    ),
+                  ),
+                  onDismissed: (_) => _removeScannedSerial(serialNo),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: highlighted
+                          ? highlightColor.withValues(alpha: 0.16)
+                          : Colors.white,
+                      border: Border(
+                        left: BorderSide(
+                          color: highlighted ? highlightColor : Colors.transparent,
+                          width: 3,
+                        ),
+                        bottom: BorderSide(
+                          color: AppTheme.textGrey(context)
+                              .withValues(alpha: 0.08),
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 34,
+                          child: Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              color: highlighted
+                                  ? highlightColor
+                                  : AppTheme.textGrey(context),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            serialNo,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: highlighted
+                                  ? highlightColor
+                                  : AppTheme.textPrimary(context),
+                              fontSize: 12.5,
+                              fontWeight: highlighted
+                                  ? FontWeight.w800
+                                  : FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 44,
+                          height: _serialRowHeight,
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 44,
+                              minHeight: _serialRowHeight,
+                            ),
+                            iconSize: 20,
+                            tooltip: 'ลบ S/N',
+                            onPressed: () {
+                              _requestRemoveScannedSerial(serialNo);
+                            },
+                            icon: Icon(
+                              Icons.close,
+                              color: AppTheme.textGrey(context),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScannedSerialSummary(POItem item) {
+    final maxQty =
+        item.qtyRemaining > 0 ? item.qtyRemaining : item.qtyOrdered;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  item.partId,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.primary,
+                  ),
+                ),
+              ),
+              StatusBadge(item.condition),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            item.itemDesc,
+            style: TextStyle(
+              color: AppTheme.textGrey(context),
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 10),
+          InfoRow(
+            label: 'จำนวน',
+            value: '${_serialNumbers.length} / $maxQty ชิ้น',
+            valueColor: AppTheme.primary,
+            bold: true,
+          ),
+          if (item.lotNumber != null && item.lotNumber!.isNotEmpty)
+            InfoRow(label: 'Batch No.', value: item.lotNumber!),
+          const SizedBox(height: 8),
+          _buildSerialTable(),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => setState(_clearSerialScan),
+                  icon: const Icon(Icons.clear, size: 18),
+                  label: const Text('ล้าง'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _saveScannedSerials,
+                  icon: const Icon(Icons.save, size: 18),
+                  label: Text('บันทึก (${_serialNumbers.length})'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFloatingScanStatus() {
+    final message = _scanStatusMessage;
+    if (message == null) return const SizedBox.shrink();
+    final isDuplicate = _scanStatusTone == _ScanStatusTone.duplicate;
+    final statusColor = isDuplicate ? AppTheme.warning : AppTheme.success;
+    final statusIcon =
+        isDuplicate ? Icons.error_outline_rounded : Icons.check_rounded;
+    final statusTitle = isDuplicate ? 'สแกนซ้ำ' : 'สถานะสแกน';
+
+    return Positioned(
+      left: 16,
+      right: 16,
+      bottom: 16,
+      child: SafeArea(
+        top: false,
+        child: Dismissible(
+          key: ValueKey('scan-status-$_scanStatusTone-$message'),
+          direction: DismissDirection.horizontal,
+          onDismissed: (_) => _hideScanStatus(),
+          child: MouseRegion(
+            onEnter: (_) => _holdScanStatus(),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (_) => _holdScanStatus(),
+              child: Material(
+                color: statusColor,
+                elevation: 8,
+                shadowColor: Colors.black.withValues(alpha: 0.24),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 58),
+                  padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.18),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          statusIcon,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              statusTitle,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              message,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          tooltip: 'ปิด',
+                          onPressed: _hideScanStatus,
+                          icon: const Icon(
+                            Icons.close,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -470,9 +1029,11 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       },
       child: Scaffold(
         appBar: WmsAppBar(title: 'รับสินค้า', userName: widget.fullName),
-        body: SafeArea(
-          top: false,
-          child: Column(
+        body: Stack(
+          children: [
+            SafeArea(
+              top: false,
+              child: Column(
             children: [
               Expanded(
                 child: LoadingOverlay(
@@ -534,14 +1095,26 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                                   hint: 'เช่น PT-9821',
                                   controller: _partController,
                                   focusNode: _partFocus,
+                                  onSubmit: () => _serialFocus.requestFocus(),
+                                ),
+                                const SizedBox(height: 12),
+                                ScanTextField(
+                                  label: 'S/N',
+                                  hint: 'สแกน Serial Number',
+                                  controller: _serialController,
+                                  focusNode: _serialFocus,
                                   onSubmit: _scanPart,
                                 ),
                                 const SizedBox(height: 12),
                                 PrimaryButton(
-                                  label: 'สแกน',
+                                  label: 'เพิ่ม S/N',
                                   icon: MdiIcons.barcodeScan,
                                   onPressed: _scanPart,
                                 ),
+                                if (_scanningItem != null) ...[
+                                  const SizedBox(height: 16),
+                                  _buildScannedSerialSummary(_scanningItem!),
+                                ],
                               ],
                             ),
                           ),
@@ -578,7 +1151,10 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
                 ),
               ),
             ],
-          ),
+              ),
+            ),
+            _buildFloatingScanStatus(),
+          ],
         ),
       ),
     );
@@ -586,9 +1162,13 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
 
   @override
   void dispose() {
+    _scanStatusTimer?.cancel();
     _partController.dispose();
     _partFocus.dispose();
     _qtyController.dispose();
+    _serialController.dispose();
+    _serialFocus.dispose();
+    _serialListController.dispose();
     _palletController.dispose();
     _palletFocus.dispose();
     super.dispose();

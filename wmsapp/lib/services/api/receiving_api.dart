@@ -42,12 +42,28 @@ extension ReceivingApi on ApiService {
     }
   }
 
+  Future<ApiResult<Map<String, dynamic>>> validateReceivingSerial({
+    required String partId,
+    required String serialNo,
+  }) async {
+    final path = Uri(
+      path: '/receiving/validate-serial',
+      queryParameters: {
+        'partId': partId,
+        'serialNo': serialNo,
+      },
+    ).toString();
+
+    return _get(path);
+  }
+
   Future<ApiResult<ReceiptLineResponse>> scanReceiptPart({
     required int sessionId,
     required String poId,
     required String partId,
     required int qtyReceived,
     required String operatorId,
+    List<String>? serialNumbers,
   }) async {
     final response = await _post('/receiving/scan-part', {
       'sessionId': sessionId,
@@ -55,6 +71,8 @@ extension ReceivingApi on ApiService {
       'partId': partId,
       'qtyReceived': qtyReceived,
       'operatorId': operatorId,
+      if (serialNumbers != null && serialNumbers.isNotEmpty)
+        'serialNumbers': serialNumbers,
     });
     if (!response.success) return ApiResult.error(response.error);
 

@@ -143,6 +143,7 @@ class PickItemOnPallet {
   final int qtyOnPallet;
   final int qtyToPickSuggested;
   final String condition;
+  final List<String> availableSerials;
 
   PickItemOnPallet({
     required this.partId,
@@ -154,6 +155,7 @@ class PickItemOnPallet {
     required this.qtyOnPallet,
     required this.qtyToPickSuggested,
     required this.condition,
+    this.availableSerials = const [],
   });
 
   factory PickItemOnPallet.fromJson(Map<String, dynamic> json) => PickItemOnPallet(
@@ -166,6 +168,9 @@ class PickItemOnPallet {
     qtyOnPallet: json['qtyOnPallet'],
     qtyToPickSuggested: json['qtyToPickSuggested'],
     condition: json['condition'],
+    availableSerials: (json['availableSerials'] as List? ?? [])
+        .map((serial) => serial.toString())
+        .toList(),
   );
 }
 

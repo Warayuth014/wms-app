@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
 import '../../models/wms_models.dart';
 import '../../services/api_service.dart';
 import '../../theme/theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/part_thumbnail.dart';
 
 enum _PackState { scanPallet, packList, orderList, orderParts, success }
 
@@ -25,11 +27,22 @@ class PackingScreen extends StatefulWidget {
 }
 
 class _PackingScreenState extends State<PackingScreen> {
+  static const Color _packBorder = Color(0xFFDCE6F2);
+  static const Color _packTextDark = Color(0xFF1F2937);
+  static const Color _packTextMuted = Color(0xFF6B7280);
+  static const Color _packChipBg = Color(0xFFEAF3FF);
+  static const Color _packSuccess = Color(0xFF22A06B);
+  static const double _packSerialHeaderHeight = 32;
+  static const double _packSerialRowHeight = 42;
+  static const int _packSerialVisibleRowLimit = 5;
+
   final _api = ApiService();
   final _scanCtrl = TextEditingController();
   final _scanFocus = FocusNode();
   final _partScanCtrl = TextEditingController();
   final _partScanFocus = FocusNode();
+  final _serialScanCtrl = TextEditingController();
+  final _serialScanFocus = FocusNode();
 
   _PackState _state = _PackState.scanPallet;
   bool _loading = false;
@@ -46,6 +59,7 @@ class _PackingScreenState extends State<PackingScreen> {
   String? _selectedPartId;
   // Serial numbers collected for each part (keyed by partId)
   final Map<String, List<String>> _collectedSerials = {};
+  final Set<String> _expandedSerialPartIds = {};
 
   @override
   void initState() {
@@ -67,6 +81,8 @@ class _PackingScreenState extends State<PackingScreen> {
     _scanFocus.dispose();
     _partScanCtrl.dispose();
     _partScanFocus.dispose();
+    _serialScanCtrl.dispose();
+    _serialScanFocus.dispose();
     super.dispose();
   }
 
@@ -135,6 +151,11 @@ class _PackingScreenState extends State<PackingScreen> {
     setState(() {
       _orderResp = result.data;
       _currentPickOrderId = pickOrderId;
+      _selectedPartId = null;
+      _collectedSerials.clear();
+      _expandedSerialPartIds.clear();
+      _partScanCtrl.clear();
+      _serialScanCtrl.clear();
       _state = _PackState.orderParts;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -161,13 +182,316 @@ class _PackingScreenState extends State<PackingScreen> {
       return;
     }
 
-    _partScanCtrl.clear();
-    setState(() => _selectedPartId = partId);
+    setState(() {
+      _selectedPartId = partId;
+      _partScanCtrl.text = partId;
+    });
+    _serialScanFocus.requestFocus();
+  }
+
+  void _scanSerial() {
+    final partId = _partScanCtrl.text.trim().toUpperCase();
+    final serialNo = _serialScanCtrl.text.trim().toUpperCase();
+    if (partId.isEmpty) {
+      showWarningSnackbar(context, 'กรุณาสแกน Part ก่อน');
+      _partScanFocus.requestFocus();
+      return;
+    }
+    if (serialNo.isEmpty) {
+      showWarningSnackbar(context, 'กรุณาสแกน S/N');
+      _serialScanFocus.requestFocus();
+      return;
+    }
+
+    final part = _orderResp?.parts.where((p) => p.partId == partId).firstOrNull;
+    if (part == null) {
+      showErrorDialog(context, message: 'ไม่พบ Part "$partId" ใน Order นี้');
+      _partScanCtrl.clear();
+      _serialScanCtrl.clear();
+      _partScanFocus.requestFocus();
+      return;
+    }
+
+    if (part.isDone) {
+      showWarningSnackbar(context, 'Part $partId แพ็คครบแล้ว');
+      _serialScanCtrl.clear();
+      _partScanFocus.requestFocus();
+      return;
+    }
+
+    final serials = _collectedSerials.putIfAbsent(partId, () => <String>[]);
+    if (serials.contains(serialNo)) {
+      showWarningSnackbar(context, 'S/N "$serialNo" สแกนไปแล้ว');
+      _serialScanCtrl.clear();
+      _serialScanFocus.requestFocus();
+      return;
+    }
+
+    if (!part.availableSerials.contains(serialNo)) {
+      showErrorDialog(
+        context,
+        message: 'S/N "$serialNo" ไม่อยู่บน Pallet นี้สำหรับ Part "$partId"',
+      );
+      _serialScanCtrl.clear();
+      _serialScanFocus.requestFocus();
+      return;
+    }
+
+    if (serials.length >= part.remaining) {
+      showWarningSnackbar(
+        context,
+        'Part $partId สแกนครบ ${part.remaining} ชิ้นแล้ว',
+      );
+      _serialScanCtrl.clear();
+      _serialScanFocus.requestFocus();
+      return;
+    }
+
+    setState(() {
+      _selectedPartId = partId;
+      serials.add(serialNo);
+    });
+    _serialScanCtrl.clear();
+    _serialScanFocus.requestFocus();
+  }
+
+  void _selectPartForPackScan(String partId) {
+    final part = _orderResp?.parts.where((p) => p.partId == partId).firstOrNull;
+    if (part == null || part.isDone) return;
+
+    setState(() {
+      _selectedPartId = partId;
+      _partScanCtrl.text = partId;
+    });
+    _serialScanFocus.requestFocus();
+  }
+
+  void _removeCollectedSerial(String partId, String serialNo) {
+    setState(() {
+      final serials = _collectedSerials[partId];
+      serials?.remove(serialNo);
+      if (serials == null || serials.isEmpty) {
+        _collectedSerials.remove(partId);
+        _expandedSerialPartIds.remove(partId);
+        if (_selectedPartId == partId) {
+          _selectedPartId = null;
+        }
+      }
+    });
+    _serialScanFocus.requestFocus();
+  }
+
+  void _toggleCollectedSerials(String partId) {
+    final serials = _collectedSerials[partId] ?? const <String>[];
+    if (serials.isEmpty) return;
+
+    setState(() {
+      if (_expandedSerialPartIds.contains(partId)) {
+        _expandedSerialPartIds.remove(partId);
+      } else {
+        _expandedSerialPartIds.add(partId);
+      }
+    });
+  }
+
+  Future<void> _copyAndFillSerialForTest(
+    String partId,
+    String serialNo,
+  ) async {
+    await Clipboard.setData(ClipboardData(text: serialNo));
+    if (!mounted) return;
+    setState(() {
+      _selectedPartId = partId;
+      _partScanCtrl.text = partId;
+      _serialScanCtrl.text = serialNo;
+    });
+    _serialScanFocus.requestFocus();
+    showSuccessSnackbar(context, 'คัดลอก S/N "$serialNo" แล้ว');
+  }
+
+  void _showAvailableSerialsSheet() {
+    final parts = _orderResp?.parts
+            .where((part) => part.availableSerials.isNotEmpty && !part.isDone)
+            .toList() ??
+        const <PackingPartItem>[];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.72,
+          minChildSize: 0.35,
+          maxChildSize: 0.92,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(18)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 8, 6),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'S/N สำหรับทดสอบ',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'ปิด',
+                            onPressed: () => Navigator.pop(sheetContext),
+                            icon: const Icon(Icons.close),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: parts.isEmpty
+                          ? Center(
+                              child: Text(
+                                'ยังไม่มี S/N ที่พร้อมแพ็ค',
+                                style: TextStyle(
+                                  color: AppTheme.textGrey(context),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              controller: scrollController,
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                              itemCount: parts.length,
+                              itemBuilder: (context, index) {
+                                final part = parts[index];
+                                final collected =
+                                    _collectedSerials[part.partId] ??
+                                        const <String>[];
+
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primary
+                                        .withValues(alpha: 0.04),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: AppTheme.primary
+                                          .withValues(alpha: 0.14),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              part.partId,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                color: AppTheme.primary,
+                                              ),
+                                            ),
+                                          ),
+                                          Text(
+                                            '${collected.length}/${part.remaining}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w800,
+                                              color: AppTheme.warning,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      ...part.availableSerials.map((serialNo) {
+                                        final alreadyCollected =
+                                            collected.contains(serialNo);
+                                        return Container(
+                                          margin:
+                                              const EdgeInsets.only(bottom: 6),
+                                          decoration: BoxDecoration(
+                                            color: alreadyCollected
+                                                ? _packSuccess
+                                                    .withValues(alpha: 0.1)
+                                                : Colors.white,
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: alreadyCollected
+                                                  ? _packSuccess.withValues(
+                                                      alpha: 0.45,
+                                                    )
+                                                  : _packBorder,
+                                            ),
+                                          ),
+                                          child: ListTile(
+                                            dense: true,
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            title: Text(
+                                              serialNo,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                            trailing: IconButton(
+                                              tooltip: 'คัดลอก',
+                                              icon: const Icon(
+                                                Icons.copy,
+                                                size: 18,
+                                              ),
+                                              onPressed: () {
+                                                Navigator.pop(sheetContext);
+                                                _copyAndFillSerialForTest(
+                                                  part.partId,
+                                                  serialNo,
+                                                );
+                                              },
+                                            ),
+                                            onTap: () {
+                                              Navigator.pop(sheetContext);
+                                              _copyAndFillSerialForTest(
+                                                part.partId,
+                                                serialNo,
+                                              );
+                                            },
+                                          ),
+                                        );
+                                      }),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _confirmPart(String partId, int qty) async {
-    final serials = _collectedSerials[partId];
-    if (serials != null && serials.isNotEmpty && serials.length != qty) {
+    final serials = _collectedSerials[partId] ?? const <String>[];
+    if (serials.length != qty) {
       showErrorDialog(context,
           message:
               'จำนวน S/N (${serials.length}) ไม่ตรงกับจำนวนที่ต้อง Pack ($qty)');
@@ -181,8 +505,7 @@ class _PackingScreenState extends State<PackingScreen> {
       partId: partId,
       qty: qty,
       operatorId: widget.userId,
-      serialNumbers:
-          (serials != null && serials.length == qty) ? serials : null,
+      serialNumbers: List<String>.of(serials),
     );
     if (!mounted) return;
     setState(() => _loading = false);
@@ -209,6 +532,9 @@ class _PackingScreenState extends State<PackingScreen> {
         );
         _selectedPartId = null;
         _collectedSerials.remove(partId);
+        _expandedSerialPartIds.remove(partId);
+        _partScanCtrl.clear();
+        _serialScanCtrl.clear();
         _state = _PackState.success;
       });
       return;
@@ -218,31 +544,36 @@ class _PackingScreenState extends State<PackingScreen> {
       _orderResp = resp;
       _selectedPartId = null;
       _collectedSerials.remove(partId);
+      _expandedSerialPartIds.remove(partId);
+      _partScanCtrl.clear();
+      _serialScanCtrl.clear();
     });
     _partScanFocus.requestFocus();
   }
 
-  Future<void> _openSerialScan(
-      String partId, int requiredQty, List<String> available) async {
-    if (available.isEmpty) {
-      showErrorDialog(context,
-          message: 'ไม่พบ S/N บน Pallet นี้สำหรับ $partId');
+  Future<void> _confirmCollectedPack() async {
+    final order = _orderResp;
+    if (order == null) return;
+
+    final readyParts = order.parts
+        .where((part) =>
+            !part.isDone &&
+            part.remaining > 0 &&
+            (_collectedSerials[part.partId]?.length ?? 0) == part.remaining)
+        .toList();
+
+    if (readyParts.isEmpty) {
+      showWarningSnackbar(
+        context,
+        'กรุณาสแกน S/N ให้ครบอย่างน้อย 1 รายการก่อนยืนยัน',
+      );
+      _serialScanFocus.requestFocus();
       return;
     }
-    final existing = _collectedSerials[partId] ?? [];
-    final result = await Navigator.push<List<String>>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => _SerialSelectPage(
-          partId: partId,
-          requiredQty: requiredQty,
-          available: available,
-          initial: existing,
-        ),
-      ),
-    );
-    if (result != null) {
-      setState(() => _collectedSerials[partId] = result);
+
+    for (final part in readyParts) {
+      await _confirmPart(part.partId, part.remaining);
+      if (!mounted || _state != _PackState.orderParts) return;
     }
   }
 
@@ -269,6 +600,7 @@ class _PackingScreenState extends State<PackingScreen> {
       _orderResp = null;
       _selectedPartId = null;
       _collectedSerials.clear();
+      _expandedSerialPartIds.clear();
       _state = _PackState.packList;
     });
   }
@@ -283,8 +615,10 @@ class _PackingScreenState extends State<PackingScreen> {
       _currentPickOrderId = '';
       _selectedPartId = null;
       _collectedSerials.clear();
+      _expandedSerialPartIds.clear();
       _scanCtrl.clear();
       _partScanCtrl.clear();
+      _serialScanCtrl.clear();
       _state = _PackState.scanPallet;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -309,20 +643,22 @@ class _PackingScreenState extends State<PackingScreen> {
           child: LoadingOverlay(
             loading: _loading,
             message: 'กำลังประมวลผล...',
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_state == _PackState.scanPallet) _buildScanPallet(),
-                  if (_state == _PackState.packList) _buildPackList(),
-                  if (_state == _PackState.orderList) _buildOrderList(),
-                  if (_state == _PackState.orderParts) _buildOrderParts(),
-                  if (_state == _PackState.success) _buildSuccess(),
-                  const SizedBox(height: 24),
-                ],
-              ),
-            ),
+            child: _state == _PackState.orderParts
+                ? _buildOrderParts()
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (_state == _PackState.scanPallet)
+                          _buildScanPallet(),
+                        if (_state == _PackState.packList) _buildPackList(),
+                        if (_state == _PackState.orderList) _buildOrderList(),
+                        if (_state == _PackState.success) _buildSuccess(),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
           ),
         ),
       ),
@@ -351,6 +687,11 @@ class _PackingScreenState extends State<PackingScreen> {
           }
           _orderResp = null;
           _currentPickOrderId = '';
+          _selectedPartId = null;
+          _collectedSerials.clear();
+          _expandedSerialPartIds.clear();
+          _partScanCtrl.clear();
+          _serialScanCtrl.clear();
           break;
         case _PackState.success:
           _resetAll();
@@ -613,317 +954,691 @@ class _PackingScreenState extends State<PackingScreen> {
   Widget _buildOrderParts() {
     final order = _orderResp!;
     final allDone = order.parts.every((p) => p.isDone);
+    final totalNeeded =
+        order.parts.fold<int>(0, (sum, part) => sum + part.requiredQty);
+    final totalPacked = order.parts.fold<int>(
+      0,
+      (sum, part) {
+        final collected = _collectedSerials[part.partId]?.length ?? 0;
+        final packedForPart =
+            (part.scannedQty + collected).clamp(0, part.requiredQty).toInt();
+        return sum + packedForPart;
+      },
+    );
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // header
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    Icon(MdiIcons.clipboardListOutline,
-                        color: AppTheme.secondary, size: 22),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Pack: $_currentPackingId',
-                        style: const TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w700),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text('Order: $_currentPickOrderId',
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-                Text('Pallet: ${_palletResp?.palletId ?? ""}',
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+                _buildPackContextCard(order, totalPacked, totalNeeded),
+                const SizedBox(height: 12),
+                if (order.status != 'DONE') _buildPackScannerCard(),
+                const SizedBox(height: 14),
+                _buildPackListHeader(totalPacked, totalNeeded),
                 const SizedBox(height: 8),
-                // progress
-                _buildProgress(order),
+                ...order.parts.map(_buildPackItemCard),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        _buildPackBottomAction(allDone),
+      ],
+    );
+  }
 
-        // scan Part field (ถ้ายังไม่ DONE)
-        if (order.status != 'DONE')
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _partScanCtrl,
-                      focusNode: _partScanFocus,
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: InputDecoration(
-                        labelText: 'สแกน Part ID',
-                        prefixIcon: Icon(MdiIcons.barcodeScan),
-                        border: const OutlineInputBorder(),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
-                      ),
-                      onSubmitted: (_) => _scanPart(),
-                    ),
+  Widget _buildPackContextCard(
+    PackingOrderResponse order,
+    int totalPacked,
+    int totalNeeded,
+  ) {
+    final palletId = _packDetail?.palletId ?? _palletResp?.palletId ?? '-';
+    final pct = totalNeeded > 0 ? totalPacked / totalNeeded : 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: _packCardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                MdiIcons.clipboardListOutline,
+                color: AppTheme.primary,
+                size: 22,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Pack: $_currentPackingId',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: _packTextDark,
                   ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: _scanPart,
-                    icon: const Icon(Icons.send, color: AppTheme.primary),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
-                    ),
-                  ),
-                ],
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              _packStatusPill(order.status),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Order: $_currentPickOrderId',
+            style: const TextStyle(fontSize: 13, color: _packTextMuted),
+          ),
+          Text(
+            'Pallet: $palletId',
+            style: const TextStyle(fontSize: 13, color: _packTextMuted),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Text(
+                '$totalPacked / $totalNeeded',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: _packTextDark,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${(pct * 100).toStringAsFixed(0)}%',
+                style: const TextStyle(fontSize: 13, color: _packTextMuted),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: LinearProgressIndicator(
+              value: pct,
+              minHeight: 6,
+              backgroundColor: const Color(0xFFE2E8F0),
+              valueColor: AlwaysStoppedAnimation(
+                pct >= 1 ? _packSuccess : AppTheme.primary,
               ),
             ),
           ),
-        const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
 
-        // Part list
-        ...order.parts.map((part) {
-          final isSelected = _selectedPartId == part.partId && !part.isDone;
-          final collected = _collectedSerials[part.partId] ?? const [];
-          return Card(
-            color: part.isDone
-                ? AppTheme.success.withValues(alpha: 0.06)
-                : isSelected
-                    ? AppTheme.primary.withValues(alpha: 0.06)
-                    : null,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-              side: isSelected
-                  ? const BorderSide(color: AppTheme.primary, width: 2)
-                  : BorderSide.none,
+  Widget _buildPackScannerCard() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: _packCardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'สแกน Part',
+            style: TextStyle(
+              fontSize: 12,
+              color: _packTextMuted,
+              fontWeight: FontWeight.w700,
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      // image or icon
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: part.imageUrl != null
-                            ? FutureBuilder<String>(
-                                future: _api.getImageFullUrl(part.imageUrl!),
-                                builder: (_, snap) {
-                                  if (!snap.hasData) return const SizedBox();
-                                  return ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.network(snap.data!,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) =>
-                                            const Icon(Icons.image_not_supported)),
-                                  );
-                                },
-                              )
-                            : const Icon(Icons.inventory_2_outlined,
-                                color: Colors.grey),
-                      ),
-                      const SizedBox(width: 12),
-                      // info
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(part.partId,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600, fontSize: 14)),
-                            Text(part.itemDesc,
-                                style: TextStyle(
-                                    fontSize: 12, color: Colors.grey[600]),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis),
-                            Text('${part.owner} / ${part.brand}',
-                                style: TextStyle(
-                                    fontSize: 11, color: Colors.grey[500])),
-                          ],
-                        ),
-                      ),
-                      // qty
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            '${part.scannedQty} / ${part.requiredQty}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15,
-                              color: part.isDone
-                                  ? AppTheme.success
-                                  : AppTheme.primary,
-                            ),
-                          ),
-                          if (part.isDone)
-                            const Icon(Icons.check_circle,
-                                color: AppTheme.success, size: 18),
-                        ],
-                      ),
-                    ],
-                  ),
-                  if (isSelected) ...[
-                    const Divider(height: 20),
-                    Row(
-                      children: [
-                        Text('บน Pallet: ${part.requiredQty} ชิ้น',
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey[600])),
-                        const Spacer(),
-                        Text('ต้องการ: ${part.remaining} ชิ้น',
-                            style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.warning)),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _openSerialScan(
-                                part.partId,
-                                part.remaining,
-                                part.availableSerials),
-                            icon: Icon(MdiIcons.barcodeScan, size: 16),
-                            label: Text(
-                              collected.length == part.remaining
-                                  ? 'S/N ครบ (${collected.length})'
-                                  : 'เก็บ S/N (${collected.length}/${part.remaining})',
-                              style: const TextStyle(
-                                  fontSize: 13, fontWeight: FontWeight.w600),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: collected.length ==
-                                      part.remaining
-                                  ? AppTheme.success
-                                  : AppTheme.secondary,
-                              side: BorderSide(
-                                color: collected.length == part.remaining
-                                    ? AppTheme.success
-                                    : AppTheme.secondary,
-                              ),
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 10),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () =>
-                                _confirmPart(part.partId, part.remaining),
-                            icon: const Icon(Icons.check, size: 16),
-                            label: const Text('ยืนยัน',
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.success,
-                              foregroundColor: Colors.white,
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 10),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _partScanCtrl,
+            focusNode: _partScanFocus,
+            textCapitalization: TextCapitalization.characters,
+            decoration: _packScanInputDecoration(
+              label: 'Part No.',
+              hint: 'เช่น PT-1001',
+              icon: Icons.qr_code_scanner,
             ),
-          );
-        }),
-        const SizedBox(height: 16),
-
-        // เมื่อ Part ครบใน Order นี้ → กลับไปหน้า packList
-        if (allDone)
+            onSubmitted: (_) => _scanPart(),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'สแกน S/N',
+            style: TextStyle(
+              fontSize: 12,
+              color: _packTextMuted,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _serialScanCtrl,
+            focusNode: _serialScanFocus,
+            textCapitalization: TextCapitalization.characters,
+            decoration: _packScanInputDecoration(
+              label: 'Serial Number',
+              hint: 'กรอกหรือสแกน S/N สินค้า',
+              icon: Icons.confirmation_number,
+            ),
+            onSubmitted: (_) => _scanSerial(),
+          ),
+          const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
+            height: 48,
             child: ElevatedButton.icon(
-              onPressed: () async {
-                // reload pack data แล้วกลับ packList
-                await _refreshPackList();
-              },
-              icon: const Icon(Icons.check_circle_outline, size: 20),
-              label: const Text('Order นี้เสร็จแล้ว',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              onPressed: _scanSerial,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text(
+                'เพิ่ม S/N',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.success,
+                backgroundColor: AppTheme.primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                elevation: 0,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
 
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: _handleBack,
-          icon: const Icon(Icons.arrow_back, size: 18),
-          label: const Text('กลับ'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppTheme.textGrey(context),
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
+  InputDecoration _packScanInputDecoration({
+    required String label,
+    required String hint,
+    required IconData icon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: Icon(icon, size: 20),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _packBorder),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          color: AppTheme.primary,
+          width: 1.5,
+        ),
+      ),
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    );
+  }
+
+  Widget _buildPackListHeader(int totalPacked, int totalNeeded) {
+    return Row(
+      children: [
+        const Icon(
+          Icons.inventory_2_outlined,
+          color: _packTextDark,
+          size: 20,
+        ),
+        const SizedBox(width: 8),
+        const Expanded(
+          child: Text(
+            'รายการใน Pack',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: _packTextDark,
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: _packChipBg,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            'แพ็คแล้ว $totalPacked/$totalNeeded',
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppTheme.primary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        IconButton(
+          tooltip: 'แสดง S/N สำหรับทดสอบ',
+          visualDensity: VisualDensity.compact,
+          onPressed: _showAvailableSerialsSheet,
+          icon: Icon(
+            Icons.visibility_outlined,
+            size: 20,
+            color: AppTheme.textGrey(context),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildProgress(PackingOrderResponse order) {
-    final total = order.parts.fold<int>(0, (s, p) => s + p.requiredQty);
-    final scanned = order.parts.fold<int>(0, (s, p) => s + p.scannedQty);
-    final pct = total > 0 ? scanned / total : 0.0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('$scanned / $total',
-                style:
-                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-            Text('${(pct * 100).toStringAsFixed(0)}%',
-                style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+  Widget _buildPackItemCard(PackingPartItem part) {
+    final collected = _collectedSerials[part.partId] ?? const <String>[];
+    final currentPacked =
+        (part.scannedQty + collected.length).clamp(0, part.requiredQty).toInt();
+    final isSelected = _selectedPartId == part.partId || collected.isNotEmpty;
+    final isComplete = part.isDone || currentPacked >= part.requiredQty;
+    final progress = part.requiredQty > 0
+        ? (currentPacked / part.requiredQty).clamp(0.0, 1.0)
+        : 0.0;
+    final showSerials = _expandedSerialPartIds.contains(part.partId);
+    final selectedColor = isComplete ? _packSuccess : AppTheme.primary;
+    final bodyTextColor =
+        isSelected || part.isDone ? _packTextDark : _packTextMuted;
+
+    return GestureDetector(
+      onTap: () => _selectPartForPackScan(part.partId),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isSelected || part.isDone
+                ? selectedColor.withValues(alpha: 0.55)
+                : _packBorder,
+            width: isSelected || part.isDone ? 1.5 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isSelected || part.isDone
+                  ? selectedColor.withValues(alpha: 0.1)
+                  : Colors.black.withValues(alpha: 0.04),
+              blurRadius: isSelected || part.isDone ? 12 : 16,
+              offset: const Offset(0, 6),
+            ),
           ],
         ),
-        const SizedBox(height: 4),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: pct,
-            minHeight: 6,
-            backgroundColor: Colors.grey[300],
-            valueColor:
-                AlwaysStoppedAnimation(pct >= 1.0 ? AppTheme.success : AppTheme.primary),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            if (isSelected || part.isDone)
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: Container(width: 4, color: selectedColor),
+              ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                isSelected || part.isDone ? 18 : 12,
+                12,
+                12,
+                12,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: Icon(
+                          isSelected || part.isDone
+                              ? Icons.check_circle
+                              : Icons.radio_button_unchecked,
+                          color: isSelected || part.isDone
+                              ? selectedColor
+                              : AppTheme.textGrey(context),
+                          size: isSelected || part.isDone ? 24 : 22,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      PartThumbnail(imageUrl: part.imageUrl, size: 40),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          part.partId,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                            color: _packTextDark,
+                          ),
+                        ),
+                      ),
+                      _packStatusPill(part.isDone ? 'DONE' : 'PACK'),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 34),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          part.itemDesc,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: bodyTextColor,
+                            fontWeight:
+                                isSelected ? FontWeight.w600 : FontWeight.w400,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          '${part.owner} / ${part.brand}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: bodyTextColor,
+                            fontWeight:
+                                isSelected ? FontWeight.w600 : FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'บน Pallet: ${part.requiredQty}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: bodyTextColor,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                              ),
+                            ),
+                            Text(
+                              'ต้องการ: ${part.remaining}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.warning,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(999),
+                        onTap: collected.isEmpty
+                            ? null
+                            : () => _toggleCollectedSerials(part.partId),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isComplete
+                                ? _packSuccess.withValues(alpha: 0.12)
+                                : _packChipBg,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '$currentPacked/${part.requiredQty}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                  color: isComplete
+                                      ? AppTheme.success
+                                      : AppTheme.primary,
+                                ),
+                              ),
+                              if (collected.isNotEmpty) ...[
+                                const SizedBox(width: 3),
+                                Icon(
+                                  showSerials
+                                      ? Icons.keyboard_arrow_up
+                                      : Icons.keyboard_arrow_down,
+                                  size: 16,
+                                  color: isComplete
+                                      ? AppTheme.success
+                                      : AppTheme.primary,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 6,
+                      backgroundColor: const Color(0xFFE2E8F0),
+                      valueColor: const AlwaysStoppedAnimation(_packSuccess),
+                    ),
+                  ),
+                  if (showSerials) ...[
+                    const SizedBox(height: 8),
+                    _buildPackSerialTable(
+                      partId: part.partId,
+                      serials: collected,
+                      actionColor: selectedColor,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPackSerialTable({
+    required String partId,
+    required List<String> serials,
+    required Color actionColor,
+  }) {
+    final visibleRows = serials.length > _packSerialVisibleRowLimit
+        ? _packSerialVisibleRowLimit
+        : serials.length;
+    final rowCount = visibleRows == 0 ? 1 : visibleRows;
+
+    return Container(
+      height: _packSerialHeaderHeight + (rowCount * _packSerialRowHeight),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _packBorder),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          Container(
+            height: _packSerialHeaderHeight,
+            color: const Color(0xFFF3F7FC),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: const Row(
+              children: [
+                SizedBox(
+                  width: 34,
+                  child: Text(
+                    '#',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: _packTextMuted,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    'S/N',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: _packTextMuted,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 42),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: EdgeInsets.zero,
+              itemExtent: _packSerialRowHeight,
+              physics: serials.length > _packSerialVisibleRowLimit
+                  ? const ClampingScrollPhysics()
+                  : const NeverScrollableScrollPhysics(),
+              itemCount: serials.length,
+              itemBuilder: (context, index) {
+                final serialNo = serials[index];
+                final isLast = index == serials.length - 1;
+
+                return Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: isLast ? Colors.transparent : _packBorder,
+                      ),
+                    ),
+                  ),
+                  padding: const EdgeInsets.only(left: 10),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 34,
+                        child: Text(
+                          '${index + 1}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: _packTextMuted,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          serialNo,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: _packTextDark,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 42,
+                        height: _packSerialRowHeight,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          tooltip: 'ลบ S/N',
+                          onPressed: () =>
+                              _removeCollectedSerial(partId, serialNo),
+                          icon: Icon(
+                            Icons.close,
+                            size: 18,
+                            color: actionColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPackBottomAction(bool allDone) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF5F7FA),
+        border: Border(
+          top: BorderSide(color: Color(0xFFE4EAF2)),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          width: double.infinity,
+          height: 54,
+          child: ElevatedButton.icon(
+            onPressed: allDone ? _refreshPackList : _confirmCollectedPack,
+            icon: Icon(
+              allDone ? Icons.check_circle_outline : Icons.check_rounded,
+            ),
+            label: Text(
+              allDone ? 'Order นี้เสร็จแล้ว' : 'ยืนยัน Pack',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: allDone ? _packSuccess : AppTheme.primary,
+              foregroundColor: Colors.white,
+              elevation: 2,
+              shadowColor: AppTheme.primary.withValues(alpha: 0.25),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  BoxDecoration _packCardDecoration() {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: _packBorder),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.04),
+          blurRadius: 16,
+          offset: const Offset(0, 6),
+        ),
       ],
+    );
+  }
+
+  Widget _packStatusPill(String text) {
+    final isDone = text == 'DONE';
+    final color = isDone ? _packSuccess : AppTheme.primary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11,
+          color: color,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
     );
   }
 
