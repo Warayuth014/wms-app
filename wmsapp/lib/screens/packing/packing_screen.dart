@@ -282,9 +282,6 @@ class _PackingScreenState extends State<PackingScreen> {
   }
 
   void _toggleCollectedSerials(String partId) {
-    final serials = _collectedSerials[partId] ?? const <String>[];
-    if (serials.isEmpty) return;
-
     setState(() {
       if (_expandedSerialPartIds.contains(partId)) {
         _expandedSerialPartIds.remove(partId);
@@ -1369,7 +1366,7 @@ class _PackingScreenState extends State<PackingScreen> {
                       ),
                       InkWell(
                         borderRadius: BorderRadius.circular(999),
-                        onTap: collected.isEmpty
+                        onTap: part.availableSerials.isEmpty
                             ? null
                             : () => _toggleCollectedSerials(part.partId),
                         child: Container(
@@ -1396,7 +1393,7 @@ class _PackingScreenState extends State<PackingScreen> {
                                       : AppTheme.primary,
                                 ),
                               ),
-                              if (collected.isNotEmpty) ...[
+                              if (part.availableSerials.isNotEmpty) ...[
                                 const SizedBox(width: 3),
                                 Icon(
                                   showSerials
@@ -1428,7 +1425,8 @@ class _PackingScreenState extends State<PackingScreen> {
                     const SizedBox(height: 8),
                     _buildPackSerialTable(
                       partId: part.partId,
-                      serials: collected,
+                      availableSerials: part.availableSerials,
+                      collectedSerials: collected,
                       actionColor: selectedColor,
                     ),
                   ],
@@ -1441,14 +1439,22 @@ class _PackingScreenState extends State<PackingScreen> {
     );
   }
 
+  /// แสดง S/N pool ทั้งหมดของ part บน pallet + highlight อันที่ scan แล้ว
+  /// - Picked: bg เขียวอ่อน + ✓ icon + text เขียวเข้ม
+  /// - Unpicked: bg ขาว + text grey
+  /// - Tap row ที่ picked = ยกเลิก scan (ลบออก)
   Widget _buildPackSerialTable({
     required String partId,
-    required List<String> serials,
+    required List<String> availableSerials,
+    required List<String> collectedSerials,
     required Color actionColor,
   }) {
-    final visibleRows = serials.length > _packSerialVisibleRowLimit
+    final collectedSet = collectedSerials.toSet();
+    final total = availableSerials.length;
+    final collected = collectedSet.length;
+    final visibleRows = total > _packSerialVisibleRowLimit
         ? _packSerialVisibleRowLimit
-        : serials.length;
+        : total;
     final rowCount = visibleRows == 0 ? 1 : visibleRows;
 
     return Container(
@@ -1461,13 +1467,14 @@ class _PackingScreenState extends State<PackingScreen> {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
+          // ── Header ──
           Container(
             height: _packSerialHeaderHeight,
             color: const Color(0xFFF3F7FC),
             padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: const Row(
+            child: Row(
               children: [
-                SizedBox(
+                const SizedBox(
                   width: 34,
                   child: Text(
                     '#',
@@ -1478,7 +1485,7 @@ class _PackingScreenState extends State<PackingScreen> {
                     ),
                   ),
                 ),
-                Expanded(
+                const Expanded(
                   child: Text(
                     'S/N',
                     style: TextStyle(
@@ -1488,77 +1495,109 @@ class _PackingScreenState extends State<PackingScreen> {
                     ),
                   ),
                 ),
-                SizedBox(width: 42),
+                Text(
+                  'แพ็คแล้ว $collected/$total',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: collected > 0 ? _packSuccess : _packTextMuted,
+                  ),
+                ),
+                const SizedBox(width: 6),
               ],
             ),
           ),
-          Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.zero,
-              itemExtent: _packSerialRowHeight,
-              physics: serials.length > _packSerialVisibleRowLimit
-                  ? const ClampingScrollPhysics()
-                  : const NeverScrollableScrollPhysics(),
-              itemCount: serials.length,
-              itemBuilder: (context, index) {
-                final serialNo = serials[index];
-                final isLast = index == serials.length - 1;
 
-                return Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border(
-                      bottom: BorderSide(
-                        color: isLast ? Colors.transparent : _packBorder,
-                      ),
+          // ── Rows ──
+          Expanded(
+            child: total == 0
+                ? const Center(
+                    child: Text(
+                      'ไม่มี S/N pool',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: _packTextMuted,
+                          fontWeight: FontWeight.w600),
                     ),
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.zero,
+                    itemExtent: _packSerialRowHeight,
+                    physics: total > _packSerialVisibleRowLimit
+                        ? const ClampingScrollPhysics()
+                        : const NeverScrollableScrollPhysics(),
+                    itemCount: total,
+                    itemBuilder: (context, index) {
+                      final serialNo = availableSerials[index];
+                      final isCollected = collectedSet.contains(serialNo);
+                      final isLast = index == total - 1;
+
+                      return InkWell(
+                        onTap: isCollected
+                            ? () => _removeCollectedSerial(partId, serialNo)
+                            : null,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isCollected
+                                ? _packSuccess.withValues(alpha: 0.10)
+                                : Colors.white,
+                            border: Border(
+                              bottom: BorderSide(
+                                color: isLast
+                                    ? Colors.transparent
+                                    : _packBorder,
+                              ),
+                            ),
+                          ),
+                          padding: const EdgeInsets.only(left: 10),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 34,
+                                child: Text(
+                                  '${index + 1}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isCollected
+                                        ? _packSuccess
+                                        : _packTextMuted,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  serialNo,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isCollected
+                                        ? _packSuccess
+                                        : _packTextDark,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              SizedBox(
+                                width: 42,
+                                height: _packSerialRowHeight,
+                                child: isCollected
+                                    ? Icon(Icons.check_circle,
+                                        size: 18, color: _packSuccess)
+                                    : Icon(
+                                        Icons.radio_button_unchecked,
+                                        size: 16,
+                                        color: AppTheme.textGrey(context)
+                                            .withValues(alpha: 0.4),
+                                      ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                  padding: const EdgeInsets.only(left: 10),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 34,
-                        child: Text(
-                          '${index + 1}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: _packTextMuted,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          serialNo,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: _packTextDark,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 42,
-                        height: _packSerialRowHeight,
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          tooltip: 'ลบ S/N',
-                          onPressed: () =>
-                              _removeCollectedSerial(partId, serialNo),
-                          icon: Icon(
-                            Icons.close,
-                            size: 18,
-                            color: actionColor,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
           ),
         ],
       ),

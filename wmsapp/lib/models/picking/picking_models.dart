@@ -1,3 +1,230 @@
+// ── New flow: 2-page picking entry ─────────────────
+// หน้า 1: list orders summary
+class PickOrderListItem {
+  final String pickOrderId;
+  final String status;          // WAITING | PICKING
+  final String owner;
+  final String? customerOrderId;
+  final int partCount;
+  final int totalRequiredQty;
+  final int palletCount;
+  final DateTime createdAt;
+
+  PickOrderListItem({
+    required this.pickOrderId,
+    required this.status,
+    required this.owner,
+    this.customerOrderId,
+    required this.partCount,
+    required this.totalRequiredQty,
+    required this.palletCount,
+    required this.createdAt,
+  });
+
+  factory PickOrderListItem.fromJson(Map<String, dynamic> json) =>
+      PickOrderListItem(
+        pickOrderId: json['pickOrderId'],
+        status: json['status'] ?? 'WAITING',
+        owner: json['owner'] ?? '',
+        customerOrderId: json['customerOrderId'],
+        partCount: json['partCount'] ?? 0,
+        totalRequiredQty: json['totalRequiredQty'] ?? 0,
+        palletCount: json['palletCount'] ?? 0,
+        createdAt:
+            DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
+      );
+
+  bool get isWaiting => status == 'WAITING';
+  bool get isPicking => status == 'PICKING';
+}
+
+// หน้า 2: order detail (pallets + parts)
+class PickOrderDetailFull {
+  final String pickOrderId;
+  final String status;
+  final String owner;
+  final String? customerOrderId;
+  final DateTime createdAt;
+  final List<PickOrderPalletInfo> pallets;
+  final List<PickOrderPartInfo> parts;
+
+  PickOrderDetailFull({
+    required this.pickOrderId,
+    required this.status,
+    required this.owner,
+    this.customerOrderId,
+    required this.createdAt,
+    required this.pallets,
+    required this.parts,
+  });
+
+  factory PickOrderDetailFull.fromJson(Map<String, dynamic> json) =>
+      PickOrderDetailFull(
+        pickOrderId: json['pickOrderId'],
+        status: json['status'] ?? 'WAITING',
+        owner: json['owner'] ?? '',
+        customerOrderId: json['customerOrderId'],
+        createdAt:
+            DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
+        pallets: ((json['pallets'] ?? []) as List)
+            .map((e) => PickOrderPalletInfo.fromJson(e))
+            .toList(),
+        parts: ((json['parts'] ?? []) as List)
+            .map((e) => PickOrderPartInfo.fromJson(e))
+            .toList(),
+      );
+}
+
+class PickOrderPalletInfo {
+  final String palletId;
+  final String palletStatus;
+  final String? stationId;
+  final String? stationName;
+  final int partCount;
+  final int totalQty;
+  final List<PickOrderPalletPartInfo> parts;
+
+  PickOrderPalletInfo({
+    required this.palletId,
+    required this.palletStatus,
+    this.stationId,
+    this.stationName,
+    required this.partCount,
+    required this.totalQty,
+    required this.parts,
+  });
+
+  factory PickOrderPalletInfo.fromJson(Map<String, dynamic> json) =>
+      PickOrderPalletInfo(
+        palletId: json['palletId'],
+        palletStatus: json['palletStatus'] ?? 'UNKNOWN',
+        stationId: json['stationId'],
+        stationName: json['stationName'],
+        partCount: json['partCount'] ?? 0,
+        totalQty: json['totalQty'] ?? 0,
+        parts: ((json['parts'] ?? []) as List)
+            .map((e) => PickOrderPalletPartInfo.fromJson(e))
+            .toList(),
+      );
+}
+
+class PickOrderPalletPartInfo {
+  final String partId;
+  final String owner;
+  final String brand;
+  final String itemDesc;
+  final String? imageUrl;
+  final int allocatedQty;
+  final int pickedQty;
+  final String status;        // PENDING | PARTIAL | PICKED
+
+  PickOrderPalletPartInfo({
+    required this.partId,
+    required this.owner,
+    required this.brand,
+    required this.itemDesc,
+    this.imageUrl,
+    required this.allocatedQty,
+    required this.pickedQty,
+    required this.status,
+  });
+
+  factory PickOrderPalletPartInfo.fromJson(Map<String, dynamic> json) =>
+      PickOrderPalletPartInfo(
+        partId: json['partId'],
+        owner: json['owner'] ?? '',
+        brand: json['brand'] ?? '',
+        itemDesc: json['itemDesc'] ?? '',
+        imageUrl: json['imageUrl'],
+        allocatedQty: json['allocatedQty'] ?? 0,
+        pickedQty: json['pickedQty'] ?? 0,
+        status: json['status'] ?? 'PENDING',
+      );
+
+  bool get isPicked => status == 'PICKED';
+}
+
+class PickOrderPartInfo {
+  final String partId;
+  final String owner;
+  final String brand;
+  final String itemDesc;
+  final String? imageUrl;
+  final int requiredQty;
+  final int reservedQty;
+  final int remainingQty;
+  final String status;
+
+  PickOrderPartInfo({
+    required this.partId,
+    required this.owner,
+    required this.brand,
+    required this.itemDesc,
+    this.imageUrl,
+    required this.requiredQty,
+    required this.reservedQty,
+    required this.remainingQty,
+    required this.status,
+  });
+
+  factory PickOrderPartInfo.fromJson(Map<String, dynamic> json) =>
+      PickOrderPartInfo(
+        partId: json['partId'],
+        owner: json['owner'] ?? '',
+        brand: json['brand'] ?? '',
+        itemDesc: json['itemDesc'] ?? '',
+        imageUrl: json['imageUrl'],
+        requiredQty: json['requiredQty'] ?? 0,
+        reservedQty: json['reservedQty'] ?? 0,
+        remainingQty: json['remainingQty'] ?? 0,
+        status: json['status'] ?? 'PENDING',
+      );
+}
+
+// Notify Arrival response
+class NotifyArrivalResponse {
+  final String pickOrderId;
+  final String status;
+  final List<NotifyArrivalAssignment> assignments;
+  final String message;
+
+  NotifyArrivalResponse({
+    required this.pickOrderId,
+    required this.status,
+    required this.assignments,
+    required this.message,
+  });
+
+  factory NotifyArrivalResponse.fromJson(Map<String, dynamic> json) =>
+      NotifyArrivalResponse(
+        pickOrderId: json['pickOrderId'],
+        status: json['status'] ?? 'PICKING',
+        assignments: ((json['assignments'] ?? []) as List)
+            .map((e) => NotifyArrivalAssignment.fromJson(e))
+            .toList(),
+        message: json['message'] ?? '',
+      );
+}
+
+class NotifyArrivalAssignment {
+  final String palletId;
+  final String? stationId;
+  final String outcome;       // ASSIGNED | ALREADY_AT_STATION | NO_FREE_STATION
+
+  NotifyArrivalAssignment({
+    required this.palletId,
+    this.stationId,
+    required this.outcome,
+  });
+
+  factory NotifyArrivalAssignment.fromJson(Map<String, dynamic> json) =>
+      NotifyArrivalAssignment(
+        palletId: json['palletId'],
+        stationId: json['stationId'],
+        outcome: json['outcome'] ?? 'ASSIGNED',
+      );
+}
+
 class PickOrder {
   final String pickOrderId;
   final String status;

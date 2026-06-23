@@ -9,8 +9,10 @@ import '../../../theme/theme.dart';
 import '../../../widgets/common_widgets.dart';
 import '../../../widgets/part_thumbnail.dart';
 import 'widgets/after_pick/picking_after_pick_success_banner.dart';
+import 'widgets/after_pick/picking_remaining_items_card.dart';
 import 'widgets/pick_view/picking_dest_pallet_banner.dart';
 import 'widgets/pick_view/picking_order_info_banner.dart';
+import 'widgets/pick_view/picking_order_needs_card.dart';
 import 'widgets/pick_view/picking_station_banner.dart';
 import 'widgets/return_source/picking_return_source_actions.dart';
 import 'widgets/return_source/picking_return_source_info_card.dart';
@@ -209,9 +211,6 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
   }
 
   void _togglePickedSerials(String partId) {
-    final serials = _pickedSerials[partId] ?? const <String>[];
-    if (serials.isEmpty) return;
-
     setState(() {
       if (_expandedSerialPartIds.contains(partId)) {
         _expandedSerialPartIds.remove(partId);
@@ -672,6 +671,11 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
               children: [
                 PickingStationBanner(assignment: assignment),
                 const SizedBox(height: 12),
+                PickingOrderNeedsCard(
+                  pickOrderId: _pickOrderId,
+                  pickOrderItems: assignment.pickOrderItems,
+                ),
+                const SizedBox(height: 12),
                 _buildPickScannerCard(),
                 const SizedBox(height: 14),
                 _buildPalletListHeader(totalPicked, totalNeeded),
@@ -1068,7 +1072,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                       ),
                       InkWell(
                         borderRadius: BorderRadius.circular(999),
-                        onTap: pickedSerials.isEmpty
+                        onTap: item.availableSerials.isEmpty
                             ? null
                             : () => _togglePickedSerials(item.partId),
                         child: Container(
@@ -1095,7 +1099,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                                       : AppTheme.primary,
                                 ),
                               ),
-                              if (pickedSerials.isNotEmpty) ...[
+                              if (item.availableSerials.isNotEmpty) ...[
                                 const SizedBox(width: 3),
                                 Icon(
                                   showSerials
@@ -1125,9 +1129,10 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                   ),
                   if (showSerials) ...[
                     const SizedBox(height: 8),
-                    _buildPickedSerialTable(
+                    _buildSerialTable(
                       partId: item.partId,
-                      serials: pickedSerials,
+                      availableSerials: item.availableSerials,
+                      pickedSerials: pickedSerials,
                       actionColor: selectedColor,
                     ),
                   ],
@@ -1140,14 +1145,22 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
     );
   }
 
-  Widget _buildPickedSerialTable({
+  /// แสดง S/N pool ทั้งหมดของ part บน pallet + highlight อันที่ scan แล้ว
+  /// - Picked: bg เขียวอ่อน + ✓ icon + text เขียวเข้ม
+  /// - Unpicked: bg ขาว + text grey
+  /// - Tap row ที่ picked = ยกเลิก scan (ลบออก)
+  Widget _buildSerialTable({
     required String partId,
-    required List<String> serials,
+    required List<String> availableSerials,
+    required List<String> pickedSerials,
     required Color actionColor,
   }) {
-    final visibleRows = serials.length > _pickSerialVisibleRowLimit
+    final pickedSet = pickedSerials.toSet();
+    final total = availableSerials.length;
+    final picked = pickedSet.length;
+    final visibleRows = total > _pickSerialVisibleRowLimit
         ? _pickSerialVisibleRowLimit
-        : serials.length;
+        : total;
     final rowCount = visibleRows == 0 ? 1 : visibleRows;
 
     return Container(
@@ -1160,13 +1173,14 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
+          // ── Header ──
           Container(
             height: _pickSerialHeaderHeight,
             color: const Color(0xFFF3F7FC),
             padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: const Row(
+            child: Row(
               children: [
-                SizedBox(
+                const SizedBox(
                   width: 34,
                   child: Text(
                     '#',
@@ -1177,7 +1191,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                     ),
                   ),
                 ),
-                Expanded(
+                const Expanded(
                   child: Text(
                     'S/N',
                     style: TextStyle(
@@ -1187,76 +1201,109 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                     ),
                   ),
                 ),
-                SizedBox(width: 42),
+                Text(
+                  'สแกนแล้ว $picked/$total',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: picked > 0 ? _pickSuccess : _pickTextMuted,
+                  ),
+                ),
+                const SizedBox(width: 6),
               ],
             ),
           ),
-          Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.zero,
-              itemExtent: _pickSerialRowHeight,
-              physics: serials.length > _pickSerialVisibleRowLimit
-                  ? const ClampingScrollPhysics()
-                  : const NeverScrollableScrollPhysics(),
-              itemCount: serials.length,
-              itemBuilder: (context, index) {
-                final serialNo = serials[index];
-                final isLast = index == serials.length - 1;
 
-                return Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border(
-                      bottom: BorderSide(
-                        color: isLast ? Colors.transparent : _pickBorder,
-                      ),
+          // ── Rows ──
+          Expanded(
+            child: total == 0
+                ? const Center(
+                    child: Text(
+                      'ไม่มี S/N pool',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: _pickTextMuted,
+                          fontWeight: FontWeight.w600),
                     ),
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.zero,
+                    itemExtent: _pickSerialRowHeight,
+                    physics: total > _pickSerialVisibleRowLimit
+                        ? const ClampingScrollPhysics()
+                        : const NeverScrollableScrollPhysics(),
+                    itemCount: total,
+                    itemBuilder: (context, index) {
+                      final serialNo = availableSerials[index];
+                      final isPicked = pickedSet.contains(serialNo);
+                      final isLast = index == total - 1;
+
+                      return InkWell(
+                        onTap: isPicked
+                            ? () => _removePickedSerial(partId, serialNo)
+                            : null,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isPicked
+                                ? _pickSuccess.withValues(alpha: 0.10)
+                                : Colors.white,
+                            border: Border(
+                              bottom: BorderSide(
+                                color: isLast
+                                    ? Colors.transparent
+                                    : _pickBorder,
+                              ),
+                            ),
+                          ),
+                          padding: const EdgeInsets.only(left: 10),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 34,
+                                child: Text(
+                                  '${index + 1}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isPicked
+                                        ? _pickSuccess
+                                        : _pickTextMuted,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  serialNo,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isPicked
+                                        ? _pickSuccess
+                                        : _pickTextDark,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              SizedBox(
+                                width: 42,
+                                height: _pickSerialRowHeight,
+                                child: isPicked
+                                    ? Icon(Icons.check_circle,
+                                        size: 18, color: _pickSuccess)
+                                    : Icon(
+                                        Icons.radio_button_unchecked,
+                                        size: 16,
+                                        color: AppTheme.textGrey(context)
+                                            .withValues(alpha: 0.4),
+                                      ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                  padding: const EdgeInsets.only(left: 10),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 34,
-                        child: Text(
-                          '${index + 1}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: _pickTextMuted,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          serialNo,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: _pickTextDark,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 42,
-                        height: _pickSerialRowHeight,
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          tooltip: 'ลบ S/N',
-                          onPressed: () => _removePickedSerial(partId, serialNo),
-                          icon: Icon(
-                            Icons.close,
-                            size: 18,
-                            color: actionColor,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
           ),
         ],
       ),
@@ -1284,6 +1331,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
             controller: _destScanCtrl,
             focusNode: _destScanFocus,
             onConfirm: _scanDestAndConfirm,
+            pickOrderId: _pickOrderId,
           ),
           const SizedBox(height: 12),
           DangerButton(
@@ -1299,6 +1347,9 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
   Widget _buildAfterPick() {
     final result = _lastResult!;
     final isComplete = result.isPickOrderComplete;
+    final remaining = result.remainingItems
+        .where((item) => item.remainingQty > 0)
+        .toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -1309,6 +1360,10 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
             isComplete: isComplete,
             destPalletId: _destPalletId,
           ),
+          if (remaining.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            PickingRemainingItemsCard(remainingItems: remaining),
+          ],
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,

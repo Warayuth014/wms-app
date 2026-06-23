@@ -1,4 +1,8 @@
 // lib/screens/picking/picking_session/picking_session_screen.dart
+//
+// ⚠️ DEPRECATED entry — เปลี่ยน flow เป็น 2-page (Orders List → Detail → Scan)
+// หน้านี้แค่ redirect ไป PickingOrdersListScreen ทันที (เพื่อ backward compat
+// กับ Home → Picking route เดิม)
 
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
@@ -6,6 +10,7 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 import '../../../services/api_service.dart';
 import '../../../theme/theme.dart';
 import '../../../widgets/common_widgets.dart';
+import '../orders_list/picking_orders_list_screen.dart';
 import '../pick_items/pick_items_screen.dart';
 import 'widgets/scan/picking_scan_card.dart';
 
@@ -32,8 +37,18 @@ class _PickingSessionScreenState extends State<PickingSessionScreen> {
   @override
   void initState() {
     super.initState();
+    // Redirect ไป Picking Orders List ทันที (flow ใหม่)
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scanFocus.requestFocus();
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PickingOrdersListScreen(
+            userId: widget.userId,
+            fullName: widget.fullName,
+          ),
+        ),
+      );
     });
   }
 
