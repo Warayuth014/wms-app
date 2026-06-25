@@ -2,7 +2,6 @@ class PalletScanResponse {
   final String palletId;
   final String type;
   final String status;
-  final bool needsLabeling;
   final List<UnloadItem> items;
   final String message;
 
@@ -10,7 +9,6 @@ class PalletScanResponse {
     required this.palletId,
     required this.type,
     required this.status,
-    required this.needsLabeling,
     required this.items,
     required this.message,
   });
@@ -20,7 +18,6 @@ class PalletScanResponse {
         palletId: json['palletId'],
         type: json['type'],
         status: json['status'],
-        needsLabeling: json['needsLabeling'],
         items: (json['items'] as List)
             .map((i) => UnloadItem.fromJson(i))
             .toList(),

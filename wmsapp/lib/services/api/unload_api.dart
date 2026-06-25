@@ -10,19 +10,6 @@ extension UnloadApi on ApiService {
     return ApiResult.success(PalletScanResponse.fromJson(response.data!));
   }
 
-  Future<ApiResult<Map<String, dynamic>>> confirmLabeling({
-    required String palletId,
-    required String operatorId,
-  }) async {
-    final response = await _post('/unload/confirm-labeling', {
-      'palletId': palletId,
-      'operatorId': operatorId,
-    });
-    if (!response.success) return ApiResult.error(response.error);
-
-    return ApiResult.success(response.data!);
-  }
-
   Future<ApiResult<UnloadSession>> openUnloadSession({
     required String palletId,
     required String operatorId,
@@ -60,12 +47,10 @@ extension UnloadApi on ApiService {
   Future<ApiResult<Map<String, dynamic>>> returnPalletToAsis({
     required String palletId,
     int? sessionId,
-    required String operatorId,
   }) async {
     final response = await _post('/unload/return-pallet-to-asis', {
       'palletId': palletId,
       'sessionId': sessionId,
-      'operatorId': operatorId,
     });
     if (!response.success) return ApiResult.error(response.error);
 

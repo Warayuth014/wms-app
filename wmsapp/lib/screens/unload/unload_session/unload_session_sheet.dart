@@ -122,48 +122,6 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
 
     setState(() => _pallet = result.data);
 
-    if (_pallet!.needsLabeling) {
-      await _showLabelingDialog();
-      return;
-    }
-
-    await _openSession();
-  }
-
-  Future<void> _showLabelingDialog() async {
-    final pallet = _pallet;
-    if (pallet == null) return;
-
-    final confirm = await showConfirmDialog(
-      context,
-      title: 'ต้องติดสติกเกอร์',
-      message:
-          'Pallet ${pallet.palletId} เป็นประเภท PW\n'
-          'กรุณาส่งไปจุด Labeling ก่อน\n'
-          'แล้วกดยืนยันเมื่อติดเรียบร้อย',
-      confirmLabel: 'ติดแล้ว ยืนยัน',
-    );
-
-    if (!confirm || !mounted) return;
-
-    setState(() => _loading = true);
-    final result = await ApiService().confirmLabeling(
-      palletId: pallet.palletId,
-      operatorId: widget.userId,
-    );
-
-    if (!mounted) return;
-    setState(() => _loading = false);
-
-    if (!result.success) {
-      showErrorDialog(
-        context,
-        message: result.error ?? 'เกิดข้อผิดพลาด',
-      );
-      return;
-    }
-
-    showSuccessSnackbar(context, 'เปลี่ยนเป็น FG แล้ว');
     await _openSession();
   }
 
@@ -198,7 +156,6 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
         palletId: pallet.palletId,
         type: pallet.type,
         status: pallet.status,
-        needsLabeling: false,
         items: session.items,
         message: pallet.message,
       );
@@ -310,7 +267,6 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
             palletId: pallet.palletId,
             type: pallet.type,
             status: pallet.status,
-            needsLabeling: pallet.needsLabeling,
             items: updatedItems,
             message: pallet.message,
           );
@@ -357,7 +313,6 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
       ApiService().returnPalletToAsis(
         palletId: pallet.palletId,
         sessionId: _sessionId,
-        operatorId: widget.userId,
       ),
       Future.delayed(const Duration(seconds: 5)),
     ]);
