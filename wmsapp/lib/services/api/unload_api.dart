@@ -1,15 +1,6 @@
 part of '../api_service.dart';
 
 extension UnloadApi on ApiService {
-  Future<ApiResult<PalletScanResponse>> scanPalletForUnload(
-    String palletId,
-  ) async {
-    final response = await _get('/unload/scan-pallet/$palletId');
-    if (!response.success) return ApiResult.error(response.error);
-
-    return ApiResult.success(PalletScanResponse.fromJson(response.data!));
-  }
-
   Future<ApiResult<UnloadSession>> openUnloadSession({
     required String palletId,
     required String operatorId,

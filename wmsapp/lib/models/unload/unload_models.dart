@@ -1,30 +1,3 @@
-class PalletScanResponse {
-  final String palletId;
-  final String type;
-  final String status;
-  final List<UnloadItem> items;
-  final String message;
-
-  PalletScanResponse({
-    required this.palletId,
-    required this.type,
-    required this.status,
-    required this.items,
-    required this.message,
-  });
-
-  factory PalletScanResponse.fromJson(Map<String, dynamic> json) =>
-      PalletScanResponse(
-        palletId: json['palletId'],
-        type: json['type'],
-        status: json['status'],
-        items: (json['items'] as List)
-            .map((i) => UnloadItem.fromJson(i))
-            .toList(),
-        message: json['message'],
-      );
-}
-
 class UnloadItem {
   final String partId;
   final String owner;

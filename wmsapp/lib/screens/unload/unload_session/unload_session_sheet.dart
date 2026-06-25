@@ -41,7 +41,7 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
   final _partController = TextEditingController();
   final _partFocus = FocusNode();
 
-  PalletScanResponse? _pallet;
+  UnloadSession? _session;
   int? _sessionId;
   bool _loading = false;
   bool _sessionOpen = false;
@@ -86,9 +86,9 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
 
   void _buildQtyControllers() {
     _disposeQtyControllers();
-    if (_pallet == null) return;
+    if (_session == null) return;
 
-    for (final item in _pallet!.items) {
+    for (final item in _session!.items) {
       _qtyCtrl[item.partId] = TextEditingController(text: '${item.qty}');
     }
   }
@@ -105,7 +105,10 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
     if (palletId.isEmpty) return;
 
     setState(() => _loading = true);
-    final result = await ApiService().scanPalletForUnload(palletId);
+    final result = await ApiService().openUnloadSession(
+      palletId: palletId,
+      operatorId: widget.userId,
+    );
 
     if (!mounted) return;
     setState(() => _loading = false);
@@ -120,45 +123,13 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
       return;
     }
 
-    setState(() => _pallet = result.data);
-
-    await _openSession();
-  }
-
-  Future<void> _openSession() async {
-    final pallet = _pallet;
-    if (pallet == null) return;
-
-    setState(() => _loading = true);
-    final result = await ApiService().openUnloadSession(
-      palletId: pallet.palletId,
-      operatorId: widget.userId,
-    );
-
-    if (!mounted) return;
-    setState(() => _loading = false);
-
-    if (!result.success) {
-      showErrorDialog(
-        context,
-        message: result.error ?? 'เปิด session ไม่ได้',
-      );
-      return;
-    }
-
     final session = result.data!;
     setState(() {
+      _session = session;
       _sessionId = session.sessionId;
       _sessionOpen = true;
       _scannedPartId = null;
       _partStatus.clear();
-      _pallet = PalletScanResponse(
-        palletId: pallet.palletId,
-        type: pallet.type,
-        status: pallet.status,
-        items: session.items,
-        message: pallet.message,
-      );
 
       for (final item in session.items) {
         _partStatus[item.partId] =
@@ -198,10 +169,10 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
   }
 
   Future<void> _confirmScannedPart() async {
-    final pallet = _pallet;
+    final session = _session;
     final sessionId = _sessionId;
     final partId = _scannedPartId;
-    if (pallet == null || sessionId == null || partId == null) return;
+    if (session == null || sessionId == null || partId == null) return;
 
     final qtyText = _qtyCtrl[partId]?.text.trim() ?? '';
     final qty = int.tryParse(qtyText) ?? 0;
@@ -214,7 +185,7 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
       return;
     }
 
-    final item = pallet.items.firstWhere((entry) => entry.partId == partId);
+    final item = session.items.firstWhere((entry) => entry.partId == partId);
     if (qty > item.qty) {
       showErrorDialog(
         context,
@@ -226,7 +197,7 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
     setState(() => _loading = true);
     final result = await ApiService().confirmUnload(
       sessionId: sessionId,
-      palletId: pallet.palletId,
+      palletId: session.palletId,
       partId: partId,
       operatorId: widget.userId,
       qtyUnloaded: qty,
@@ -249,9 +220,9 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
       _scannedPartId = null;
 
       if (remainder > 0) {
-        final index = pallet.items.indexWhere((entry) => entry.partId == partId);
+        final index = session.items.indexWhere((entry) => entry.partId == partId);
         if (index >= 0) {
-          final updatedItems = List<UnloadItem>.from(pallet.items);
+          final updatedItems = List<UnloadItem>.from(session.items);
           updatedItems[index] = UnloadItem(
             partId: item.partId,
             owner: item.owner,
@@ -263,12 +234,12 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
             qty: remainder,
             condition: item.condition,
           );
-          _pallet = PalletScanResponse(
-            palletId: pallet.palletId,
-            type: pallet.type,
-            status: pallet.status,
+          _session = UnloadSession(
+            sessionId: session.sessionId,
+            palletId: session.palletId,
+            status: session.status,
             items: updatedItems,
-            message: pallet.message,
+            confirmedPartIds: session.confirmedPartIds,
           );
           _qtyCtrl[partId]?.text = '$remainder';
         }
@@ -293,14 +264,14 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
   }
 
   Future<void> _returnPallet() async {
-    final pallet = _pallet;
-    if (pallet == null) return;
+    final session = _session;
+    if (session == null) return;
 
     final confirm = await showConfirmDialog(
       context,
       title: 'คืน Pallet',
       message:
-          'คืน Pallet ${pallet.palletId}\n'
+          'คืน Pallet ${session.palletId}\n'
           'ให้โฟล์คลิฟท์อัตโนมัติรับกลับ ASRS?\n\n'
           '(หยิบออกแล้ว $_confirmedCount/$_totalCount รายการ)',
       confirmLabel: 'คืน Pallet',
@@ -311,7 +282,7 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
     setState(() => _returning = true);
     final results = await Future.wait([
       ApiService().returnPalletToAsis(
-        palletId: pallet.palletId,
+        palletId: session.palletId,
         sessionId: _sessionId,
       ),
       Future.delayed(const Duration(seconds: 5)),
@@ -339,7 +310,7 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
   void _resetForNextPallet() {
     _disposeQtyControllers();
     setState(() {
-      _pallet = null;
+      _session = null;
       _sessionId = null;
       _sessionOpen = false;
       _scannedPartId = null;
@@ -463,7 +434,7 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
           const SizedBox(height: 16),
         ],
         if (!_sessionOpen) _buildPalletScanSection(),
-        if (_pallet != null) _buildPalletInfoSection(),
+        if (_session != null) _buildPalletInfoSection(),
         if (_sessionOpen) _buildPartScanSection(),
         if (_partStatus.isNotEmpty) _buildItemsList(),
         if (_scannedPartId != null) ...[
@@ -518,7 +489,8 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
   Widget _buildPalletInfoSection() => Column(
     children: [
       UnloadPalletInfoCard(
-        pallet: _pallet!,
+        palletId: _session!.palletId,
+        itemCount: _session!.items.length,
         sessionId: _sessionId,
         confirmedCount: _confirmedCount,
         totalCount: _totalCount,
@@ -539,7 +511,7 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
   );
 
   Widget _buildItemsList() => UnloadItemsList(
-    items: _pallet!.items,
+    items: _session!.items,
     partStatus: _partStatus,
     qtyControllers: _qtyCtrl,
     scannedPartId: _scannedPartId,

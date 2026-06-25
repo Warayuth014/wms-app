@@ -19,6 +19,7 @@ Dead code/field/param/bug ที่เคยอยู่ในเอกสาร
 | `operatorId` ใน `confirm-labeling` 💀 | หมดไปกับ endpoint |
 | `operatorId` ใน `return-pallet-to-asis` 💀 | ลบจาก DTO + Flutter wrapper + caller |
 | `Condition: "NORMAL"` hardcoded 🐛 | แก้เป็น lookup จาก `ReceiptLines` ตอน open-session resume |
+| `GET /unload/scan-pallet/{id}` ♻️ | ยุบรวมกับ `open-session` — สแกน pallet 1 ครั้งเปิด/ resume session ทันที (ประหยัด 1 round-trip) |
 
 > **Convention สำหรับเอกสารอื่น:** 🧟 = endpoint ตาย, 💀 = field/param ตาย, 🐛 = bug เล็ก (ไม่ตาย แต่ผิดเงียบๆ)
 
@@ -46,16 +47,16 @@ Dead code/field/param/bug ที่เคยอยู่ในเอกสาร
                   ▼                │
         UnloadSessionSheet (popup) │
         ┌──────────────────────┐   │
-        │ 1. สแกน Pallet ID    │── │──▶ GET  /unload/scan-pallet/{id}
-        │                      │   │
-        │ 2. เปิด session       │── │──▶ POST /unload/open-session
+        │ 1. สแกน Pallet ID    │── │──▶ POST /unload/open-session
+        │    (เปิด/resume       │   │      → REPLENISH → สร้าง session ใหม่
+        │     session ใน 1 ยิง) │   │      → UNLOADING → resume session เดิม
         │                      │   │      → Pallet: REPLENISH→UNLOADING
         │                      │   │
-        │ 3. สแกน Part + qty   │── │──▶ POST /unload/confirm-unload
+        │ 2. สแกน Part + qty   │── │──▶ POST /unload/confirm-unload
         │    (ทำซ้ำจนครบ)      │   │      → UnloadLine: PENDING→CONFIRMED
         │                      │   │      → Session: STEP1→STEP2 ถ้าครบ
         │                      │   │
-        │ 4. คืน Pallet         │── │──▶ POST /unload/return-pallet-to-asis
+        │ 3. คืน Pallet         │── │──▶ POST /unload/return-pallet-to-asis
         └──────────────────────┘   │      → Pallet กลับ REPLENISH/AVAILABLE
                                    │      → AGV รับกลับ ASRS
                                    │
@@ -120,46 +121,14 @@ PENDING ──return-pallet──▶ CANCELLED   (ยกเลิกเพรา
 
 # PHASE 1 — UNLOAD
 
-## API 1.1 — สแกน Pallet
-
-| field | value |
-| --- | --- |
-| **Endpoint** | `GET /unload/scan-pallet/{palletId}` |
-| **Screen** | `UnloadSessionSheet._scanPallet()` |
-| **API wrapper** | `ApiService.scanPalletForUnload()` |
-
-**ทำอะไร:** ตรวจว่า pallet พร้อม unload ไหม + คืน item ที่อยู่บน pallet
-
-**Validate:**
-- Pallet ต้องมีอยู่
-- `Status ∈ {REPLENISH, UNLOADING}`
-
 > Pallet ที่ไปถึง REPLENISH มี `Type=FG` เสมอ — Putaway block `Type=PW` ห้ามไป REPLENISH ([PutawayService.cs:124](../../wms-api/WmsApi/WmsApi/Services/Putaway/PutawayService.cs#L124)) และ PW→FG เกิดที่ PW-Station ใน Putaway flow
 
-**Response:**
-```json
-{
-  "palletId": "PLT001",
-  "type": "FG",
-  "status": "REPLENISH",
-  "items": [
-    { "partId": "PART001", "lotNumber": "LOT001",
-      "qty": 10, "condition": "FG", ... }
-  ],
-  "message": "..."
-}
-```
-
-**DB:** อ่านเท่านั้น — `Pallets`, `ReceiptLines (Status=PALLETIZED)`, `Parts`
-
----
-
-## API 1.2 — เปิด Unload Session
+## API 1.1 — สแกน Pallet → เปิด/Resume Session
 
 | field | value |
 | --- | --- |
 | **Endpoint** | `POST /unload/open-session` |
-| **Screen** | `UnloadSessionSheet._openSession()` |
+| **Screen** | `UnloadSessionSheet._scanPallet()` |
 
 **Request:** `{ palletId, operatorId }`
 
@@ -190,7 +159,7 @@ PENDING ──return-pallet──▶ CANCELLED   (ยกเลิกเพรา
 
 ---
 
-## API 1.3 — Confirm Unload Part (ทำซ้ำต่อ Part)
+## API 1.2 — Confirm Unload Part (ทำซ้ำต่อ Part)
 
 | field | value |
 | --- | --- |
@@ -218,7 +187,7 @@ PENDING ──return-pallet──▶ CANCELLED   (ยกเลิกเพรา
 
 ---
 
-## API 1.4 — คืน Pallet กลับ ASRS
+## API 1.3 — คืน Pallet กลับ ASRS
 
 | field | value |
 | --- | --- |
@@ -312,12 +281,11 @@ PENDING ──return-pallet──▶ CANCELLED   (ยกเลิกเพรา
 
 | # | จังหวะ | Screen | API | DB หลัก |
 | - | --- | --- | --- | --- |
-| 1 | สแกน pallet | `UnloadSessionSheet` | `GET /unload/scan-pallet/{id}` | Read: `Pallets`, `ReceiptLines`, `Parts` |
-| 2 | เปิด session | `UnloadSessionSheet` | `POST /unload/open-session` | Write: `UnloadSessions`, `UnloadLines`, `Pallets` |
-| 3 | confirm part+qty | `UnloadSessionSheet` | `POST /unload/confirm-unload` | Write: `UnloadLines`, `ReceiptLines`, `UnloadSessions` |
-| 4 | คืน pallet | `UnloadSessionSheet` | `POST /unload/return-pallet-to-asis` | Write: `UnloadLines`, `UnloadSessions`, `Pallets` |
-| 5 | โหลดรายการที่ unload | `LoadToBasketScreen` | `GET /basket/unloaded-items` | Read only |
-| 6 | load เข้า basket | `LoadToBasketScreen` | `POST /basket/load` | Write: `Baskets`, `BasketLines`, `UnloadLines` |
+| 1 | สแกน pallet → เปิด/resume session | `UnloadSessionSheet` | `POST /unload/open-session` | Write: `UnloadSessions`, `UnloadLines`, `Pallets` |
+| 2 | confirm part+qty | `UnloadSessionSheet` | `POST /unload/confirm-unload` | Write: `UnloadLines`, `ReceiptLines`, `UnloadSessions` |
+| 3 | คืน pallet | `UnloadSessionSheet` | `POST /unload/return-pallet-to-asis` | Write: `UnloadLines`, `UnloadSessions`, `Pallets` |
+| 4 | โหลดรายการที่ unload | `LoadToBasketScreen` | `GET /basket/unloaded-items` | Read only |
+| 5 | load เข้า basket | `LoadToBasketScreen` | `POST /basket/load` | Write: `Baskets`, `BasketLines`, `UnloadLines` |
 
 ---
 
