@@ -63,27 +63,16 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
 
   Future<void> _startReceiving() async {
     final po = _po!;
-    final active = await _api.getActiveReceivingSession(po.poId);
+    final result = await _api.openReceivingSession(
+      poId: po.poId,
+      operatorId: widget.userId,
+    );
     if (!mounted) return;
-
-    ReceivingSession session;
-
-    if (active != null) {
-      session = active;
-    } else {
-      final result = await _api.openReceivingSession(
-        poId: po.poId,
-        operatorId: widget.userId,
-      );
-      if (!mounted) return;
-      if (!result.success) {
-        showErrorDialog(context, message: result.error!);
-        return;
-      }
-      session = result.data!;
+    if (!result.success) {
+      showErrorDialog(context, message: result.error!);
+      return;
     }
-
-    if (!mounted) return;
+    final session = result.data!;
 
     await Navigator.push(
       context,

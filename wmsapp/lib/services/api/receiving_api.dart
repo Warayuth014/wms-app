@@ -21,27 +21,6 @@ extension ReceivingApi on ApiService {
     return ApiResult.success(ReceivingSession.fromJson(response.data!));
   }
 
-  Future<ReceivingSession?> getActiveReceivingSession(String poId) async {
-    try {
-      final base = await ApiService._resolveBase();
-      final response = await http
-          .get(
-            Uri.parse('$base/receiving/active-session/$poId'),
-            headers: _headers,
-          )
-          .timeout(const Duration(seconds: 5));
-
-      if (response.statusCode == 200) {
-        final body = jsonDecode(response.body) as Map<String, dynamic>;
-        return ReceivingSession.fromJson(body);
-      }
-
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
-
   Future<ApiResult<Map<String, dynamic>>> validateReceivingSerial({
     required String partId,
     required String serialNo,

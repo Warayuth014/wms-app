@@ -80,7 +80,6 @@ class ReceivingSession {
   final String poId;
   final String supplierName;
   final String status;
-  final List<POItem> pendingItems;
   final List<ReceiptLineResponse> pendingLines;
 
   ReceivingSession({
@@ -88,7 +87,6 @@ class ReceivingSession {
     required this.poId,
     required this.supplierName,
     required this.status,
-    required this.pendingItems,
     this.pendingLines = const [],
   });
 
@@ -98,9 +96,6 @@ class ReceivingSession {
         poId: json['poId'],
         supplierName: json['supplierName'],
         status: json['status'],
-        pendingItems: (json['pendingItems'] as List)
-            .map((i) => POItem.fromJson(i))
-            .toList(),
         pendingLines: (json['pendingLines'] as List? ?? [])
             .map((l) => ReceiptLineResponse.fromJson(l))
             .toList(),
