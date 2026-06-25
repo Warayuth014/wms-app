@@ -47,38 +47,13 @@ extension PutawayApi on ApiService {
     return ApiResult.success(stations);
   }
 
-  Future<ApiResult<List<Map<String, dynamic>>>> getPreworkPallets() async {
-    final response = await _get('/putaway/prework-pallets');
-    if (!response.success) return ApiResult.error(response.error);
-
-    final items = (response.data!['items'] as List).cast<Map<String, dynamic>>();
-    return ApiResult.success(items);
-  }
-
-  Future<ApiResult<PreworkReceiveResult>> preworkReceive({
-    required String palletId,
-    required String stationId,
-    required String operatorId,
-  }) async {
-    final response = await _post('/putaway/prework-receive', {
-      'palletId': palletId,
-      'stationId': stationId,
-      'operatorId': operatorId,
-    });
-    if (!response.success) return ApiResult.error(response.error);
-
-    return ApiResult.success(PreworkReceiveResult.fromJson(response.data!));
-  }
-
   Future<ApiResult<Map<String, dynamic>>> preworkReturnPallet({
     required String palletId,
     required String stationId,
-    required String operatorId,
   }) async {
     final response = await _post('/putaway/prework-return-pallet', {
       'palletId': palletId,
       'stationId': stationId,
-      'operatorId': operatorId,
     });
     if (!response.success) return ApiResult.error(response.error);
 

@@ -55,7 +55,6 @@ class _PreworkReceiveSheetState extends State<PreworkReceiveSheet> {
     final result = await _api.preworkReturnPallet(
       palletId: widget.palletId!,
       stationId: widget.station.id,
-      operatorId: widget.userId,
     );
 
     if (!mounted) return;

@@ -54,29 +54,3 @@ class PutawayResult {
   );
 }
 
-class PreworkReceiveResult {
-  final bool success;
-  final String palletId;
-  final String stationId;
-  final List<UnloadItem> items;
-  final String message;
-
-  PreworkReceiveResult({
-    required this.success,
-    required this.palletId,
-    required this.stationId,
-    required this.items,
-    required this.message,
-  });
-
-  factory PreworkReceiveResult.fromJson(Map<String, dynamic> json) =>
-      PreworkReceiveResult(
-        success: json['success'] ?? true,
-        palletId: json['palletId'],
-        stationId: json['stationId'],
-        items: (json['items'] as List)
-            .map((i) => UnloadItem.fromJson(i))
-            .toList(),
-        message: json['message'] ?? '',
-      );
-}
