@@ -6,12 +6,10 @@ import '../../../../../theme/theme.dart';
 
 class ReceivingSessionBar extends StatelessWidget {
   final POResponse po;
-  final ReceivingSession session;
 
   const ReceivingSessionBar({
     super.key,
     required this.po,
-    required this.session,
   });
 
   @override
@@ -50,8 +48,12 @@ class ReceivingSessionBar extends StatelessWidget {
             ),
           ),
           Text(
-            'Session #${session.sessionId}',
-            style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
+            po.status,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textGrey(context),
+            ),
           ),
         ],
       ),

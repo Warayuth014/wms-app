@@ -20,14 +20,12 @@ import 'widgets/lists/resumed_pending_list.dart';
 class ScanPartScreen extends StatefulWidget {
   final String userId;
   final String fullName;
-  final ReceivingSession session;
   final POResponse po;
 
   const ScanPartScreen({
     super.key,
     required this.userId,
     required this.fullName,
-    required this.session,
     required this.po,
   });
 
@@ -74,8 +72,8 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
   void initState() {
     super.initState();
     _currentPo = widget.po;
-    if (widget.session.pendingLines.isNotEmpty) {
-      _resumedPendingLines.addAll(widget.session.pendingLines);
+    if (widget.po.pendingLines.isNotEmpty) {
+      _resumedPendingLines.addAll(widget.po.pendingLines);
     }
   }
 
@@ -440,7 +438,6 @@ if (_serialPartId != null &&
     setState(() => _loading = true);
 
     final result = await _api.scanReceiptPart(
-      sessionId: widget.session.sessionId,
       poId: widget.po.poId,
       partId: poItem.partId,
       qtyReceived: qty,
@@ -490,7 +487,6 @@ if (_serialPartId != null &&
     setState(() => _loading = true);
 
     final result = await _api.assignPallet(
-      sessionId: widget.session.sessionId,
       palletId: palletId,
       palletType: line.condition,
       operatorId: widget.userId,
@@ -1046,7 +1042,6 @@ if (_serialPartId != null &&
                       children: [
                         ReceivingSessionBar(
                           po: _currentPo,
-                          session: widget.session,
                         ),
                         const SizedBox(height: 16),
                         if (_lastPalletId != null)

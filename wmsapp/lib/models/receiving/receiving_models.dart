@@ -5,6 +5,7 @@ class POResponse {
   final String status;
   final DateTime createdAt;
   final List<POItem> items;
+  final List<ReceiptLineResponse> pendingLines;
 
   POResponse({
     required this.poId,
@@ -13,6 +14,7 @@ class POResponse {
     required this.status,
     required this.createdAt,
     required this.items,
+    this.pendingLines = const [],
   });
 
   factory POResponse.fromJson(Map<String, dynamic> json) => POResponse(
@@ -24,6 +26,9 @@ class POResponse {
         ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
         : DateTime.now(),
     items: (json['items'] as List).map((i) => POItem.fromJson(i)).toList(),
+    pendingLines: (json['pendingLines'] as List? ?? [])
+        .map((l) => ReceiptLineResponse.fromJson(l))
+        .toList(),
   );
 }
 
@@ -75,33 +80,6 @@ class POItem {
   );
 }
 
-class ReceivingSession {
-  final int sessionId;
-  final String poId;
-  final String supplierName;
-  final String status;
-  final List<ReceiptLineResponse> pendingLines;
-
-  ReceivingSession({
-    required this.sessionId,
-    required this.poId,
-    required this.supplierName,
-    required this.status,
-    this.pendingLines = const [],
-  });
-
-  factory ReceivingSession.fromJson(Map<String, dynamic> json) =>
-      ReceivingSession(
-        sessionId: json['sessionId'],
-        poId: json['poId'],
-        supplierName: json['supplierName'],
-        status: json['status'],
-        pendingLines: (json['pendingLines'] as List? ?? [])
-            .map((l) => ReceiptLineResponse.fromJson(l))
-            .toList(),
-      );
-}
-
 class ReceiptLineResponse {
   final int lineId;
   final String partId;
@@ -150,7 +128,6 @@ class ReceiptLineResponse {
 
 class PendingPalletLine {
   final int lineId;
-  final int sessionId;
   final String poId;
   final String partId;
   final String owner;
@@ -164,7 +141,6 @@ class PendingPalletLine {
 
   PendingPalletLine({
     required this.lineId,
-    required this.sessionId,
     required this.poId,
     required this.partId,
     required this.owner,
@@ -180,7 +156,6 @@ class PendingPalletLine {
   factory PendingPalletLine.fromJson(Map<String, dynamic> json) =>
       PendingPalletLine(
         lineId: json['lineId'],
-        sessionId: json['sessionId'],
         poId: json['poId'],
         partId: json['partId'],
         owner: json['owner'],

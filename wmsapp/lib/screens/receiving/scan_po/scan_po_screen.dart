@@ -63,24 +63,12 @@ class _ScanPoScreenState extends State<ScanPoScreen> {
 
   Future<void> _startReceiving() async {
     final po = _po!;
-    final result = await _api.openReceivingSession(
-      poId: po.poId,
-      operatorId: widget.userId,
-    );
-    if (!mounted) return;
-    if (!result.success) {
-      showErrorDialog(context, message: result.error!);
-      return;
-    }
-    final session = result.data!;
-
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ScanPartScreen(
           userId: widget.userId,
           fullName: widget.fullName,
-          session: session,
           po: po,
         ),
       ),

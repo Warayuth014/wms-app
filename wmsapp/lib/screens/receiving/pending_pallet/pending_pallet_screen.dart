@@ -214,7 +214,6 @@ class _PendingPalletScreenState extends State<PendingPalletScreen> {
     markLoading();
 
     final result = await _api.assignPallet(
-      sessionId: line.sessionId,
       palletId: palletId,
       palletType: line.condition,
       operatorId: widget.userId,
