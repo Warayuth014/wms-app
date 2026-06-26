@@ -722,42 +722,46 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
       (sum, item) => sum + (_pickedSerials[item.partId]?.length ?? 0),
     );
 
+    // filter ตาม select + sort: expanded ขึ้นล่างสุด
+    final visibleItems = assignment.palletItems
+        .where((i) =>
+            _selectedPartIds.isEmpty ||
+            _selectedPartIds.contains(i.partId))
+        .toList()
+      ..sort((a, b) {
+        final ae = _expandedSerialPartIds.contains(a.partId) ? 1 : 0;
+        final be = _expandedSerialPartIds.contains(b.partId) ? 1 : 0;
+        return ae.compareTo(be);
+      });
+
     return Column(
       children: [
+        // ── Sticky top: station + order need + scanner ──
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              PickingStationBanner(assignment: assignment),
+              const SizedBox(height: 12),
+              PickingOrderNeedsCard(
+                pickOrderId: _pickOrderId,
+                pickOrderItems: assignment.pickOrderItems,
+              ),
+              const SizedBox(height: 12),
+              _buildPickScannerCard(),
+              const SizedBox(height: 14),
+              _buildPalletListHeader(totalPicked, totalNeeded),
+              const SizedBox(height: 8),
+              if (_selectedPartIds.isNotEmpty) _buildShowAllBanner(),
+            ],
+          ),
+        ),
+        // ── Scrollable: part list เท่านั้น ──
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                PickingStationBanner(assignment: assignment),
-                const SizedBox(height: 12),
-                PickingOrderNeedsCard(
-                  pickOrderId: _pickOrderId,
-                  pickOrderItems: assignment.pickOrderItems,
-                ),
-                const SizedBox(height: 12),
-                _buildPickScannerCard(),
-                const SizedBox(height: 14),
-                _buildPalletListHeader(totalPicked, totalNeeded),
-                const SizedBox(height: 8),
-                if (_selectedPartIds.isNotEmpty) _buildShowAllBanner(),
-                ...(() {
-                  // filter ตาม select + sort: expanded ขึ้นล่างสุด
-                  final list = assignment.palletItems
-                      .where((i) =>
-                          _selectedPartIds.isEmpty ||
-                          _selectedPartIds.contains(i.partId))
-                      .toList()
-                    ..sort((a, b) {
-                      final ae = _expandedSerialPartIds.contains(a.partId) ? 1 : 0;
-                      final be = _expandedSerialPartIds.contains(b.partId) ? 1 : 0;
-                      return ae.compareTo(be);
-                    });
-                  return list.map(_buildPalletItemCard);
-                })(),
-              ],
-            ),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            children: visibleItems.map(_buildPalletItemCard).toList(),
           ),
         ),
         Container(
@@ -774,10 +778,14 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
               width: double.infinity,
               height: 54,
               child: ElevatedButton.icon(
-                onPressed: _goToScanDestOrConfirm,
+                onPressed: totalPicked > 0 ? _goToScanDestOrConfirm : null,
                 icon: Icon(hasDest ? Icons.check : Icons.arrow_forward_rounded),
                 label: Text(
-                  hasDest ? 'ยืนยันไป $_destPalletId' : 'ยืนยัน Pallet ปลายทาง',
+                  totalPicked == 0
+                      ? 'สแกนสินค้าก่อนยืนยัน'
+                      : hasDest
+                          ? 'ยืนยันไป $_destPalletId'
+                          : 'ยืนยัน Pallet ปลายทาง',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
@@ -788,6 +796,8 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                   foregroundColor: Colors.white,
                   elevation: 2,
                   shadowColor: AppTheme.primary.withValues(alpha: 0.25),
+                  disabledBackgroundColor: const Color(0xFFCBD5E1),
+                  disabledForegroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -1231,7 +1241,12 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
     required Color actionColor,
   }) {
     final pickedSet = pickedSerials.toSet();
-    final total = availableSerials.length;
+    // Sort: unpicked อยู่บน, picked ไปท้าย (เรียงตามลำดับที่สแกน)
+    final sortedSerials = <String>[
+      ...availableSerials.where((s) => !pickedSet.contains(s)),
+      ...pickedSerials.where((s) => availableSerials.contains(s)),
+    ];
+    final total = sortedSerials.length;
     final picked = pickedSet.length;
     final visibleRows = total > _pickSerialVisibleRowLimit
         ? _pickSerialVisibleRowLimit
@@ -1309,7 +1324,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                         : const NeverScrollableScrollPhysics(),
                     itemCount: total,
                     itemBuilder: (context, index) {
-                      final serialNo = availableSerials[index];
+                      final serialNo = sortedSerials[index];
                       final isPicked = pickedSet.contains(serialNo);
                       final isLast = index == total - 1;
 
