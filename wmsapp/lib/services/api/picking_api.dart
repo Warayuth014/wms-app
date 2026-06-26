@@ -92,14 +92,19 @@ extension PickingApi on ApiService {
     return ApiResult.success(ConfirmPickResponse.fromJson(response.data!));
   }
 
+  /// คืน/ส่ง Pallet ต่อ
+  /// - ถ้าระบุ [destination] (ASRS / ZONE_PACK) → ส่งตามนั้น
+  /// - ถ้าไม่ระบุ → backend ตัดสินใจเอง:
+  ///   - PACKED → ZONE_PACK
+  ///   - อื่นๆ (PICKING/AVAILABLE) → ASRS
   Future<ApiResult<void>> returnPallet({
     required String palletId,
-    required String destination,
+    String? destination,
   }) async {
-    final response = await _post('/picking/return-pallet', {
-      'palletId': palletId,
-      'destination': destination,
-    });
+    final body = <String, dynamic>{'palletId': palletId};
+    if (destination != null) body['destination'] = destination;
+
+    final response = await _post('/picking/return-pallet', body);
     if (!response.success) return ApiResult.error(response.error);
 
     return ApiResult.success(null);

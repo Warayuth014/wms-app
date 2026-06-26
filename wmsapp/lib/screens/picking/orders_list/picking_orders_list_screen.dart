@@ -34,10 +34,9 @@ class _PickingOrdersListScreenState extends State<PickingOrdersListScreen> {
   bool _loading = false;
   List<PickOrderListItem> _orders = [];
 
-  // ── Send Pallet panel ──
+  // ── Scan Pallet panel — auto-route ──
   final _sendPalletCtrl = TextEditingController();
   final _sendPalletFocus = FocusNode();
-  String _sendDest = 'ASRS'; // ASRS | ZONE_PACK
 
   @override
   void initState() {
@@ -74,22 +73,22 @@ class _PickingOrdersListScreenState extends State<PickingOrdersListScreen> {
     }
 
     setState(() => _loading = true);
-    final ok = await _api.returnPallet(
-      palletId: palletId,
-      destination: _sendDest,
-    );
+    // Backend auto-decide destination:
+    // - PACKED → ZONE_PACK
+    // - PICKING/AVAILABLE → ASRS
+    final ok = await _api.returnPallet(palletId: palletId);
 
     if (!mounted) return;
     setState(() => _loading = false);
 
     if (!ok.success) {
       showErrorDialog(context,
-          message: ok.error ?? 'ส่ง $palletId → $_sendDest ไม่สำเร็จ');
+          message: ok.error ?? 'สแกน $palletId ไม่สำเร็จ');
       _sendPalletFocus.requestFocus();
       return;
     }
 
-    showSuccessSnackbar(context, '📦 ส่ง $palletId → $_sendDest แล้ว');
+    showSuccessSnackbar(context, '📦 ส่ง Pallet $palletId แล้ว');
     _sendPalletCtrl.clear();
     _sendPalletFocus.requestFocus();
   }
@@ -195,15 +194,13 @@ class _PickingOrdersListScreenState extends State<PickingOrdersListScreen> {
     );
   }
 
-  // ── Send Pallet sticky panel ──────────────────────
+  // ── Scan Pallet sticky panel — backend auto-decides destination ──
   Widget _buildSendPalletPanel() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-      decoration: const BoxDecoration(
-        color: Color(0xFFFFF8EE),
-        border: Border(
-          top: BorderSide(color: Color(0xFFFAD7A0)),
-        ),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        border: const Border(top: BorderSide(color: Color(0xFFE4EAF2))),
       ),
       child: SafeArea(
         top: false,
@@ -213,127 +210,56 @@ class _PickingOrdersListScreenState extends State<PickingOrdersListScreen> {
           children: [
             Row(
               children: [
-                Icon(MdiIcons.packageVariantClosed,
-                    size: 16, color: AppTheme.warning),
+                Icon(Icons.qr_code_scanner,
+                    size: 18, color: AppTheme.primary),
                 const SizedBox(width: 6),
                 const Text(
-                  'ส่ง Pallet ไปปลายทาง',
+                  'Scan Pallet',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 16,
                     fontWeight: FontWeight.w900,
-                    color: AppTheme.warning,
+                    color: AppTheme.primary,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: _destChip(
-                    label: 'ASRS',
-                    icon: Icons.warehouse_outlined,
-                    selected: _sendDest == 'ASRS',
-                    onTap: () => setState(() => _sendDest = 'ASRS'),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: _destChip(
-                    label: 'ZONE_PACK',
-                    icon: Icons.inventory_2_outlined,
-                    selected: _sendDest == 'ZONE_PACK',
-                    onTap: () => setState(() => _sendDest = 'ZONE_PACK'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _sendPalletCtrl,
-                    focusNode: _sendPalletFocus,
-                    textCapitalization: TextCapitalization.characters,
-                    decoration: const InputDecoration(
-                      labelText: 'Pallet ID',
-                      hintText: 'scan / type',
-                      prefixIcon:
-                          Icon(Icons.qr_code_scanner, size: 18),
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    onSubmitted: (_) => _sendPallet(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
+            const SizedBox(height: 8),
+            TextField(
+              controller: _sendPalletCtrl,
+              focusNode: _sendPalletFocus,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                labelText: 'Pallet ID',
+                hintText: 'Scan Pallet ID',
+                prefixIcon:
+                    const Icon(Icons.qr_code_scanner, size: 18),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.send, size: 18),
+                  color: AppTheme.primary,
                   onPressed: _sendPallet,
-                  icon: const Icon(Icons.send, size: 16),
-                  label: const Text(
-                    'ส่ง',
-                    style: TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w800),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.warning,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(72, 44),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
                 ),
-              ],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                isDense: true,
+              ),
+              onSubmitted: (_) => _sendPallet(),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _destChip({
-    required String label,
-    required IconData icon,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppTheme.warning.withValues(alpha: 0.18)
-              : Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: selected
-                ? AppTheme.warning
-                : AppTheme.warning.withValues(alpha: 0.25),
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon,
-                size: 14,
-                color: selected
-                    ? AppTheme.warning
-                    : AppTheme.warning.withValues(alpha: 0.5)),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-                color: selected
-                    ? AppTheme.warning
-                    : AppTheme.warning.withValues(alpha: 0.6),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: _sendPallet,
+              icon: const Icon(Icons.search, size: 18),
+              label: const Text(
+                'Scan',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(44),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
           ],
