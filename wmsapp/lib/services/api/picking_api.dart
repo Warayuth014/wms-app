@@ -58,12 +58,10 @@ extension PickingApi on ApiService {
   // ── Existing endpoints ──────────────────────────────
   Future<ApiResult<AssignPickStationResponse>> assignPickStation({
     required String palletId,
-    required String operatorId,
     String? pickOrderId,
   }) async {
     final body = <String, dynamic>{
       'palletId': palletId,
-      'operatorId': operatorId,
     };
     if (pickOrderId != null) body['pickOrderId'] = pickOrderId;
 

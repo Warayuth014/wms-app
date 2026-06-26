@@ -255,15 +255,73 @@ class _PackingScreenState extends State<PackingScreen> {
     _serialScanFocus.requestFocus();
   }
 
+  /// แบนเนอร์ "ดูทั้งหมด" ที่ขึ้นเมื่อ filter อยู่ — แตะเพื่อเคลียร์ selection
+  Widget _buildPackShowAllBanner() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: () => setState(() {
+          _selectedPartId = null;
+          _partScanCtrl.clear();
+        }),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
+            border:
+                Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.filter_alt_outlined,
+                  size: 14, color: AppTheme.primary),
+              const SizedBox(width: 6),
+              const Expanded(
+                child: Text(
+                  'แสดงเฉพาะ part ที่เลือก',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.primary,
+                  ),
+                ),
+              ),
+              Text(
+                'ดูทั้งหมด',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.primary,
+                ),
+              ),
+              const SizedBox(width: 2),
+              Icon(Icons.close, size: 14, color: AppTheme.primary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _selectPartForPackScan(String partId) {
     final part = _orderResp?.parts.where((p) => p.partId == partId).firstOrNull;
     if (part == null || part.isDone) return;
 
     setState(() {
-      _selectedPartId = partId;
-      _partScanCtrl.text = partId;
+      if (_selectedPartId == partId) {
+        // tap ตัวที่ select อยู่ → deselect (กลับไปดูทั้งหมด)
+        _selectedPartId = null;
+        _partScanCtrl.clear();
+      } else {
+        _selectedPartId = partId;
+        _partScanCtrl.text = partId;
+      }
     });
-    _serialScanFocus.requestFocus();
+    if (_selectedPartId != null) {
+      _serialScanFocus.requestFocus();
+    }
   }
 
   void _removeCollectedSerial(String partId, String serialNo) {
@@ -977,7 +1035,21 @@ class _PackingScreenState extends State<PackingScreen> {
                 const SizedBox(height: 14),
                 _buildPackListHeader(totalPacked, totalNeeded),
                 const SizedBox(height: 8),
-                ...order.parts.map(_buildPackItemCard),
+                if (_selectedPartId != null) _buildPackShowAllBanner(),
+                ...(() {
+                  // filter ตาม select + sort: expanded ขึ้นล่างสุด
+                  final list = order.parts
+                      .where((p) =>
+                          _selectedPartId == null ||
+                          p.partId == _selectedPartId)
+                      .toList()
+                    ..sort((a, b) {
+                      final ae = _expandedSerialPartIds.contains(a.partId) ? 1 : 0;
+                      final be = _expandedSerialPartIds.contains(b.partId) ? 1 : 0;
+                      return ae.compareTo(be);
+                    });
+                  return list.map(_buildPackItemCard);
+                })(),
               ],
             ),
           ),

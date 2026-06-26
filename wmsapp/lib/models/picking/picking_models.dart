@@ -225,32 +225,6 @@ class NotifyArrivalAssignment {
       );
 }
 
-class PickOrder {
-  final String pickOrderId;
-  final String status;
-  final DateTime createdAt;
-  final List<PickOrderDetail> details;
-
-  PickOrder({
-    required this.pickOrderId,
-    required this.status,
-    required this.createdAt,
-    required this.details,
-  });
-
-  int get totalRequired => details.fold(0, (sum, detail) => sum + detail.requiredQty);
-  int get totalPicked => details.fold(0, (sum, detail) => sum + detail.reservedQty);
-
-  factory PickOrder.fromJson(Map<String, dynamic> json) => PickOrder(
-    pickOrderId: json['pickOrderId'],
-    status: json['status'],
-    createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
-    details: (json['details'] as List)
-        .map((detail) => PickOrderDetail.fromJson(detail))
-        .toList(),
-  );
-}
-
 class PickOrderDetail {
   final int id;
   final String partId;
@@ -262,7 +236,6 @@ class PickOrderDetail {
   final int reservedQty;
   final int remainingQty;
   final String status;
-  final List<PickOrderSub> subs;
 
   PickOrderDetail({
     required this.id,
@@ -275,7 +248,6 @@ class PickOrderDetail {
     required this.reservedQty,
     required this.remainingQty,
     required this.status,
-    this.subs = const [],
   });
 
   factory PickOrderDetail.fromJson(Map<String, dynamic> json) => PickOrderDetail(
@@ -288,39 +260,6 @@ class PickOrderDetail {
     requiredQty: json['requiredQty'],
     reservedQty: json['reservedQty'],
     remainingQty: json['remainingQty'],
-    status: json['status'],
-    subs: (json['subs'] as List? ?? [])
-        .map((sub) => PickOrderSub.fromJson(sub))
-        .toList(),
-  );
-}
-
-class PickOrderSub {
-  final int id;
-  final int pickOrderDetailId;
-  final int receiptLineId;
-  final String? palletId;
-  final int allocatedQty;
-  final int pickedQty;
-  final String status;
-
-  PickOrderSub({
-    required this.id,
-    required this.pickOrderDetailId,
-    required this.receiptLineId,
-    this.palletId,
-    required this.allocatedQty,
-    required this.pickedQty,
-    required this.status,
-  });
-
-  factory PickOrderSub.fromJson(Map<String, dynamic> json) => PickOrderSub(
-    id: json['id'],
-    pickOrderDetailId: json['pickOrderDetailId'],
-    receiptLineId: json['receiptLineId'],
-    palletId: json['palletId'],
-    allocatedQty: json['allocatedQty'],
-    pickedQty: json['pickedQty'],
     status: json['status'],
   );
 }

@@ -103,7 +103,6 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
     setState(() => _loading = true);
     final result = await _api.assignPickStation(
       palletId: palletId,
-      operatorId: widget.userId,
       pickOrderId: _pickOrderId,
     );
     if (!mounted) return;
@@ -186,6 +185,56 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
     _serialScanFocus.requestFocus();
   }
 
+  /// แบนเนอร์ "ดูทั้งหมด" ที่ขึ้นเมื่อ filter อยู่ — แตะเพื่อเคลียร์ selection
+  Widget _buildShowAllBanner() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: () => setState(() {
+          _selectedPartIds.clear();
+          _partScanCtrl.clear();
+        }),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
+            border:
+                Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.filter_alt_outlined,
+                  size: 14, color: AppTheme.primary),
+              const SizedBox(width: 6),
+              const Expanded(
+                child: Text(
+                  'แสดงเฉพาะ part ที่เลือก',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.primary,
+                  ),
+                ),
+              ),
+              Text(
+                'ดูทั้งหมด',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.primary,
+                ),
+              ),
+              const SizedBox(width: 2),
+              Icon(Icons.close, size: 14, color: AppTheme.primary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _selectPartForScan(String partId) {
     final item = _assignment.palletItems
         .where((i) => i.partId == partId)
@@ -193,9 +242,21 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
     if (item == null) return;
 
     setState(() {
-      _partScanCtrl.text = partId;
+      if (_selectedPartIds.contains(partId)) {
+        // tap ตัวที่ select อยู่ → deselect (กลับไปดูทั้งหมด)
+        _selectedPartIds.remove(partId);
+        if (_partScanCtrl.text == partId) _partScanCtrl.clear();
+      } else {
+        // single-select: clear ตัวอื่น + add ตัวนี้
+        _selectedPartIds
+          ..clear()
+          ..add(partId);
+        _partScanCtrl.text = partId;
+      }
     });
-    _serialScanFocus.requestFocus();
+    if (_selectedPartIds.isNotEmpty) {
+      _serialScanFocus.requestFocus();
+    }
   }
 
   void _removePickedSerial(String partId, String serialNo) {
@@ -680,7 +741,21 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
                 const SizedBox(height: 14),
                 _buildPalletListHeader(totalPicked, totalNeeded),
                 const SizedBox(height: 8),
-                ...assignment.palletItems.map(_buildPalletItemCard),
+                if (_selectedPartIds.isNotEmpty) _buildShowAllBanner(),
+                ...(() {
+                  // filter ตาม select + sort: expanded ขึ้นล่างสุด
+                  final list = assignment.palletItems
+                      .where((i) =>
+                          _selectedPartIds.isEmpty ||
+                          _selectedPartIds.contains(i.partId))
+                      .toList()
+                    ..sort((a, b) {
+                      final ae = _expandedSerialPartIds.contains(a.partId) ? 1 : 0;
+                      final be = _expandedSerialPartIds.contains(b.partId) ? 1 : 0;
+                      return ae.compareTo(be);
+                    });
+                  return list.map(_buildPalletItemCard);
+                })(),
               ],
             ),
           ),
@@ -903,7 +978,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
     final needed = orderItem == null ? 0 : item.qtyToPickSuggested;
     final pickedSerials = _pickedSerials[item.partId] ?? const <String>[];
     final pickedQty = pickedSerials.length;
-    final isSelected = pickedQty > 0;
+    final isSelected = pickedQty > 0 || _selectedPartIds.contains(item.partId);
     final isComplete = pickedQty >= needed && needed > 0;
     final progress = needed > 0 ? (pickedQty / needed).clamp(0.0, 1.0) : 0.0;
     final showSerials = _expandedSerialPartIds.contains(item.partId);

@@ -87,7 +87,6 @@ class _PickingOrderDetailScreenState extends State<PickingOrderDetailScreen> {
     setState(() => _loading = true);
     final res = await _api.assignPickStation(
       palletId: palletId,
-      operatorId: widget.userId,
       pickOrderId: widget.pickOrderId,
     );
     if (!mounted) return;
