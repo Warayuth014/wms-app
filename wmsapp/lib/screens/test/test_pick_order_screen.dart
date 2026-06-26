@@ -113,16 +113,18 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
     }
 
     setState(() => _loading = true);
-    final res = await _api.returnPallet(
-      palletId: palletId,
-      destination: _returnDest,
-    );
+    // PICK → simulation endpoint (ส่ง pallet เปล่าไปรอ pick zone)
+    // ASRS/ZONE_PACK → standard return-pallet endpoint
+    final ok = _returnDest == 'PICK'
+        ? (await _api.simulateSendPalletToPick(palletId: palletId))
+        : (await _api.returnPallet(palletId: palletId, destination: _returnDest));
+
     if (!mounted) return;
     setState(() => _loading = false);
 
-    if (!res.success) {
+    if (!ok.success) {
       showErrorDialog(context,
-          message: res.error ?? 'ส่ง $palletId → $_returnDest ไม่สำเร็จ');
+          message: ok.error ?? 'ส่ง $palletId → $_returnDest ไม่สำเร็จ');
       _returnPalletFocus.requestFocus();
       return;
     }
@@ -471,6 +473,16 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
                                   selected: _returnDest == 'ZONE_PACK',
                                   onTap: () => setState(
                                       () => _returnDest = 'ZONE_PACK'),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: _destChip(
+                                  label: 'PICK',
+                                  icon: MdiIcons.handBackRight,
+                                  selected: _returnDest == 'PICK',
+                                  onTap: () => setState(
+                                      () => _returnDest = 'PICK'),
                                 ),
                               ),
                             ],
