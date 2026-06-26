@@ -72,23 +72,115 @@ class _PickingOrdersListScreenState extends State<PickingOrdersListScreen> {
       return;
     }
 
+    // ── 1) Preview ──
     setState(() => _loading = true);
-    // Backend auto-decide destination:
-    // - PACKED → ZONE_PACK
-    // - PICKING/AVAILABLE → ASRS
-    final ok = await _api.returnPallet(palletId: palletId);
+    final preview = await _api.previewReturnPallet(palletId);
+    if (!mounted) return;
+    setState(() => _loading = false);
 
+    if (!preview.success) {
+      showErrorDialog(context,
+          message: preview.error ?? 'ไม่พบ Pallet "$palletId"');
+      _sendPalletFocus.requestFocus();
+      return;
+    }
+
+    final info = preview.data!;
+    if (!info.canReturn) {
+      showErrorDialog(context, message: info.reason);
+      _sendPalletFocus.requestFocus();
+      return;
+    }
+
+    // ── 2) Show popup confirm ──
+    final dest = info.destination!;
+    final destLabel = dest == 'ZONE_PACK' ? 'ZONE PACK' : dest;
+    final destIcon =
+        dest == 'ZONE_PACK' ? MdiIcons.truckDeliveryOutline : MdiIcons.warehouse;
+    final btnText =
+        dest == 'ZONE_PACK' ? 'ส่งไป ZONE PACK' : 'ส่งกลับ ASRS';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.info_outline, color: AppTheme.primary, size: 22),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(palletId,
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w900)),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(info.reason,
+                style: TextStyle(
+                    fontSize: 13, color: AppTheme.textGrey(context))),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.pop(ctx, true),
+                icon: Icon(destIcon, size: 18),
+                label: Text(btnText,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w900)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.textGrey(context),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('ปิด'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) {
+      _sendPalletFocus.requestFocus();
+      return;
+    }
+
+    // ── 3) Execute ──
+    setState(() => _loading = true);
+    final ok = await _api.returnPallet(
+      palletId: palletId,
+      destination: dest,
+    );
     if (!mounted) return;
     setState(() => _loading = false);
 
     if (!ok.success) {
       showErrorDialog(context,
-          message: ok.error ?? 'สแกน $palletId ไม่สำเร็จ');
+          message: ok.error ?? 'ส่ง $palletId → $destLabel ไม่สำเร็จ');
       _sendPalletFocus.requestFocus();
       return;
     }
 
-    showSuccessSnackbar(context, '📦 ส่ง Pallet $palletId แล้ว');
+    showSuccessSnackbar(context, '📦 ส่ง $palletId → $destLabel แล้ว');
     _sendPalletCtrl.clear();
     _sendPalletFocus.requestFocus();
   }

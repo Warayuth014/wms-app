@@ -1,3 +1,32 @@
+// ── Return Pallet preview (popup ก่อน confirm) ──────
+class ReturnPalletPreview {
+  final String palletId;
+  final String currentStatus;
+  final String? currentLocation;
+  final bool canReturn;
+  final String? destination; // ASRS | ZONE_PACK | null
+  final String reason;
+
+  ReturnPalletPreview({
+    required this.palletId,
+    required this.currentStatus,
+    this.currentLocation,
+    required this.canReturn,
+    this.destination,
+    required this.reason,
+  });
+
+  factory ReturnPalletPreview.fromJson(Map<String, dynamic> json) =>
+      ReturnPalletPreview(
+        palletId: json['palletId'],
+        currentStatus: json['currentStatus'] ?? '',
+        currentLocation: json['currentLocation'],
+        canReturn: json['canReturn'] ?? false,
+        destination: json['destination'],
+        reason: json['reason'] ?? '',
+      );
+}
+
 // ── New flow: 2-page picking entry ─────────────────
 // หน้า 1: list orders summary
 class PickOrderListItem {

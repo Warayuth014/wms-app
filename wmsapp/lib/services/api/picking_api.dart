@@ -110,6 +110,16 @@ extension PickingApi on ApiService {
     return ApiResult.success(null);
   }
 
+  /// Preview ก่อนคืน pallet — เช็คว่าสแกนได้ไหม + จะส่งไปไหน (ไม่มี side effect)
+  Future<ApiResult<ReturnPalletPreview>> previewReturnPallet(
+      String palletId) async {
+    final response = await _get('/picking/return-pallet-preview/$palletId');
+    if (!response.success) {
+      return ApiResult.error(response.error, statusCode: response.statusCode);
+    }
+    return ApiResult.success(ReturnPalletPreview.fromJson(response.data!));
+  }
+
   Future<ApiResult<List<Map<String, dynamic>>>> getAvailableLines() async {
     final response = await _get('/picking/available-lines');
     if (!response.success) return ApiResult.error(response.error);
