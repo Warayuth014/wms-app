@@ -37,7 +37,7 @@ class _PickingOrdersListScreenState extends State<PickingOrdersListScreen> {
   // ── Send Pallet panel ──
   final _sendPalletCtrl = TextEditingController();
   final _sendPalletFocus = FocusNode();
-  String _sendDest = 'PICK'; // ASRS | ZONE_PACK | PICK
+  String _sendDest = 'ASRS'; // ASRS | ZONE_PACK
 
   @override
   void initState() {
@@ -74,9 +74,10 @@ class _PickingOrdersListScreenState extends State<PickingOrdersListScreen> {
     }
 
     setState(() => _loading = true);
-    final ok = _sendDest == 'PICK'
-        ? (await _api.simulateSendPalletToPick(palletId: palletId))
-        : (await _api.returnPallet(palletId: palletId, destination: _sendDest));
+    final ok = await _api.returnPallet(
+      palletId: palletId,
+      destination: _sendDest,
+    );
 
     if (!mounted) return;
     setState(() => _loading = false);
@@ -245,15 +246,6 @@ class _PickingOrdersListScreenState extends State<PickingOrdersListScreen> {
                     onTap: () => setState(() => _sendDest = 'ZONE_PACK'),
                   ),
                 ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: _destChip(
-                    label: 'PICK',
-                    icon: MdiIcons.handBackRight,
-                    selected: _sendDest == 'PICK',
-                    onTap: () => setState(() => _sendDest = 'PICK'),
-                  ),
-                ),
               ],
             ),
             const SizedBox(height: 6),
@@ -276,23 +268,21 @@ class _PickingOrdersListScreenState extends State<PickingOrdersListScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                SizedBox(
-                  height: 44,
-                  child: ElevatedButton.icon(
-                    onPressed: _sendPallet,
-                    icon: const Icon(Icons.send, size: 16),
-                    label: Text(
-                      'ส่ง',
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w800),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.warning,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                ElevatedButton.icon(
+                  onPressed: _sendPallet,
+                  icon: const Icon(Icons.send, size: 16),
+                  label: const Text(
+                    'ส่ง',
+                    style: TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w800),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.warning,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(72, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                 ),

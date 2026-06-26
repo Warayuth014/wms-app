@@ -121,18 +121,6 @@ extension PickingApi on ApiService {
     return ApiResult.success(response.data!);
   }
 
-  /// Dev/Test: ส่ง pallet เปล่าไปรอที่ Pick Zone (Location=PICK)
-  /// จะถูกแนะนำใน suggest-dest-pallets
-  Future<ApiResult<Map<String, dynamic>>> simulateSendPalletToPick({
-    required String palletId,
-  }) async {
-    final response = await _post('/simulate/pallet/send-to-pick/$palletId', {});
-    if (!response.success) {
-      return ApiResult.error(response.error, statusCode: response.statusCode);
-    }
-    return ApiResult.success(response.data!);
-  }
-
   Future<ApiResult<Map<String, dynamic>>> createTestOrder({
     required String operatorId,
     required List<Map<String, dynamic>> items,
