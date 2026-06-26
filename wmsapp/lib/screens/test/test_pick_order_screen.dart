@@ -34,12 +34,6 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
   // Hidden dev shortcut — long-press title to reveal Quick Create
   bool _showQuickCreate = false;
 
-  // Hidden return-pallet panel — long-press box icon to reveal
-  bool _showReturnPallet = false;
-  final _returnPalletCtrl = TextEditingController();
-  final _returnPalletFocus = FocusNode();
-  String _returnDest = 'ASRS';   // ASRS | ZONE_PACK
-
   @override
   void initState() {
     super.initState();
@@ -51,87 +45,7 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
     for (final c in _qtyCtrl.values) {
       c.dispose();
     }
-    _returnPalletCtrl.dispose();
-    _returnPalletFocus.dispose();
     super.dispose();
-  }
-
-  Widget _destChip({
-    required String label,
-    required IconData icon,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppTheme.warning.withValues(alpha: 0.18)
-              : Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: selected
-                ? AppTheme.warning
-                : AppTheme.warning.withValues(alpha: 0.25),
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon,
-                size: 16,
-                color: selected
-                    ? AppTheme.warning
-                    : AppTheme.warning.withValues(alpha: 0.5)),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-                color: selected
-                    ? AppTheme.warning
-                    : AppTheme.warning.withValues(alpha: 0.6),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _sendPallet() async {
-    final palletId = _returnPalletCtrl.text.trim().toUpperCase();
-    if (palletId.isEmpty) {
-      showErrorDialog(context, message: 'กรุณาใส่ Pallet ID');
-      _returnPalletFocus.requestFocus();
-      return;
-    }
-
-    setState(() => _loading = true);
-    // PICK → simulation endpoint (ส่ง pallet เปล่าไปรอ pick zone)
-    // ASRS/ZONE_PACK → standard return-pallet endpoint
-    final ok = _returnDest == 'PICK'
-        ? (await _api.simulateSendPalletToPick(palletId: palletId))
-        : (await _api.returnPallet(palletId: palletId, destination: _returnDest));
-
-    if (!mounted) return;
-    setState(() => _loading = false);
-
-    if (!ok.success) {
-      showErrorDialog(context,
-          message: ok.error ?? 'ส่ง $palletId → $_returnDest ไม่สำเร็จ');
-      _returnPalletFocus.requestFocus();
-      return;
-    }
-
-    showSuccessSnackbar(context, '📦 ส่ง $palletId → $_returnDest แล้ว');
-    _returnPalletCtrl.clear();
-    _returnPalletFocus.requestFocus();
   }
 
   Future<void> _loadLines() async {
@@ -324,26 +238,6 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
                         size: 20,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    GestureDetector(
-                      onLongPress: () {
-                        setState(() =>
-                            _showReturnPallet = !_showReturnPallet);
-                        showSuccessSnackbar(
-                          context,
-                          _showReturnPallet
-                              ? 'Return Pallet: ON'
-                              : 'Return Pallet: OFF',
-                        );
-                      },
-                      child: Icon(
-                        MdiIcons.packageVariantClosed,
-                        color: _showReturnPallet
-                            ? AppTheme.warning
-                            : AppTheme.primary,
-                        size: 20,
-                      ),
-                    ),
                     const SizedBox(width: 8),
                     Text(
                       'เลือกสินค้าที่ต้องการ Pick (${_selected.length}/${_lines.length})',
@@ -420,114 +314,6 @@ class _TestPickOrderScreenState extends State<TestPickOrderScreen> {
                   ),
                 ),
 
-              // ── Return Pallet (hidden) — long-press box icon to toggle ──
-              if (_showReturnPallet)
-                SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppTheme.warning.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: AppTheme.warning.withValues(alpha: 0.35)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(MdiIcons.packageVariantClosed,
-                                  size: 18, color: AppTheme.warning),
-                              const SizedBox(width: 6),
-                              const Text(
-                                'ส่ง Pallet ไปปลายทาง',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppTheme.warning,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          // ── Destination picker ──
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _destChip(
-                                  label: 'ASRS',
-                                  icon: Icons.warehouse_outlined,
-                                  selected: _returnDest == 'ASRS',
-                                  onTap: () => setState(
-                                      () => _returnDest = 'ASRS'),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: _destChip(
-                                  label: 'ZONE_PACK',
-                                  icon: Icons.inventory_2_outlined,
-                                  selected: _returnDest == 'ZONE_PACK',
-                                  onTap: () => setState(
-                                      () => _returnDest = 'ZONE_PACK'),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: _destChip(
-                                  label: 'PICK',
-                                  icon: MdiIcons.handBackRight,
-                                  selected: _returnDest == 'PICK',
-                                  onTap: () => setState(
-                                      () => _returnDest = 'PICK'),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: _returnPalletCtrl,
-                            focusNode: _returnPalletFocus,
-                            textCapitalization:
-                                TextCapitalization.characters,
-                            decoration: InputDecoration(
-                              labelText: 'Pallet ID',
-                              hintText: 'scan / type → กดปุ่ม',
-                              prefixIcon: const Icon(Icons.qr_code_scanner,
-                                  size: 18),
-                              border: const OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                            onSubmitted: (_) => _sendPallet(),
-                          ),
-                          const SizedBox(height: 8),
-                          ElevatedButton.icon(
-                            onPressed: _sendPallet,
-                            icon: Icon(MdiIcons.packageVariantClosedCheck,
-                                size: 18),
-                            label: Text(
-                              'ส่งไป $_returnDest',
-                              style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.warning,
-                              foregroundColor: Colors.white,
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
             ],
           ),
         ),

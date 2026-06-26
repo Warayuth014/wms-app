@@ -1,11 +1,9 @@
 // lib/screens/picking/orders_list/picking_orders_list_screen.dart
 //
-// หน้า 1 ของ Picking flow ใหม่:
-//   - List ทุก Pick Order ที่ WAITING + PICKING
-//   - Tag status ขวา
-//   - Pull-to-refresh
-//   - Tap order ที่ PICKING → ไปหน้า detail
-//   - Tap WAITING → แจ้งให้รอ robot
+// หน้า 1 ของ Picking flow:
+//   - Sticky top: summary (Waiting/Picking/รวม)
+//   - Scrollable middle: รายการ Pick Orders (WAITING + PICKING)
+//   - Sticky bottom: ส่ง Pallet → ASRS / ZONE_PACK / PICK
 
 import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
@@ -36,10 +34,22 @@ class _PickingOrdersListScreenState extends State<PickingOrdersListScreen> {
   bool _loading = false;
   List<PickOrderListItem> _orders = [];
 
+  // ── Send Pallet panel ──
+  final _sendPalletCtrl = TextEditingController();
+  final _sendPalletFocus = FocusNode();
+  String _sendDest = 'PICK'; // ASRS | ZONE_PACK | PICK
+
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _sendPalletCtrl.dispose();
+    _sendPalletFocus.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -53,6 +63,34 @@ class _PickingOrdersListScreenState extends State<PickingOrdersListScreen> {
       return;
     }
     setState(() => _orders = res.data!);
+  }
+
+  Future<void> _sendPallet() async {
+    final palletId = _sendPalletCtrl.text.trim().toUpperCase();
+    if (palletId.isEmpty) {
+      showErrorDialog(context, message: 'กรุณาใส่ Pallet ID');
+      _sendPalletFocus.requestFocus();
+      return;
+    }
+
+    setState(() => _loading = true);
+    final ok = _sendDest == 'PICK'
+        ? (await _api.simulateSendPalletToPick(palletId: palletId))
+        : (await _api.returnPallet(palletId: palletId, destination: _sendDest));
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (!ok.success) {
+      showErrorDialog(context,
+          message: ok.error ?? 'ส่ง $palletId → $_sendDest ไม่สำเร็จ');
+      _sendPalletFocus.requestFocus();
+      return;
+    }
+
+    showSuccessSnackbar(context, '📦 ส่ง $palletId → $_sendDest แล้ว');
+    _sendPalletCtrl.clear();
+    _sendPalletFocus.requestFocus();
   }
 
   Future<void> _openOrder(PickOrderListItem o) async {
@@ -126,20 +164,189 @@ class _PickingOrdersListScreenState extends State<PickingOrdersListScreen> {
         child: LoadingOverlay(
           loading: _loading,
           message: 'กำลังโหลด...',
-          child: RefreshIndicator(
-            onRefresh: _load,
-            child: _orders.isEmpty && !_loading
-                ? _buildEmpty()
-                : ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-                    children: [
-                      _buildSummary(waitingCount, pickingCount),
-                      const SizedBox(height: 12),
-                      ..._orders.map(_buildOrderCard),
-                    ],
-                  ),
+          child: Column(
+            children: [
+              // ── Sticky top: Summary ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                child: _buildSummary(waitingCount, pickingCount),
+              ),
+              // ── Scrollable middle: Pick Orders list ──
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: _load,
+                  child: _orders.isEmpty && !_loading
+                      ? _buildEmpty()
+                      : ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding:
+                              const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                          children: _orders.map(_buildOrderCard).toList(),
+                        ),
+                ),
+              ),
+              // ── Sticky bottom: Send Pallet panel ──
+              _buildSendPalletPanel(),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // ── Send Pallet sticky panel ──────────────────────
+  Widget _buildSendPalletPanel() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      decoration: const BoxDecoration(
+        color: Color(0xFFFFF8EE),
+        border: Border(
+          top: BorderSide(color: Color(0xFFFAD7A0)),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(MdiIcons.packageVariantClosed,
+                    size: 16, color: AppTheme.warning),
+                const SizedBox(width: 6),
+                const Text(
+                  'ส่ง Pallet ไปปลายทาง',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.warning,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: _destChip(
+                    label: 'ASRS',
+                    icon: Icons.warehouse_outlined,
+                    selected: _sendDest == 'ASRS',
+                    onTap: () => setState(() => _sendDest = 'ASRS'),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _destChip(
+                    label: 'ZONE_PACK',
+                    icon: Icons.inventory_2_outlined,
+                    selected: _sendDest == 'ZONE_PACK',
+                    onTap: () => setState(() => _sendDest = 'ZONE_PACK'),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _destChip(
+                    label: 'PICK',
+                    icon: MdiIcons.handBackRight,
+                    selected: _sendDest == 'PICK',
+                    onTap: () => setState(() => _sendDest = 'PICK'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _sendPalletCtrl,
+                    focusNode: _sendPalletFocus,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: const InputDecoration(
+                      labelText: 'Pallet ID',
+                      hintText: 'scan / type',
+                      prefixIcon:
+                          Icon(Icons.qr_code_scanner, size: 18),
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    onSubmitted: (_) => _sendPallet(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  height: 44,
+                  child: ElevatedButton.icon(
+                    onPressed: _sendPallet,
+                    icon: const Icon(Icons.send, size: 16),
+                    label: Text(
+                      'ส่ง',
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w800),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.warning,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _destChip({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppTheme.warning.withValues(alpha: 0.18)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected
+                ? AppTheme.warning
+                : AppTheme.warning.withValues(alpha: 0.25),
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon,
+                size: 14,
+                color: selected
+                    ? AppTheme.warning
+                    : AppTheme.warning.withValues(alpha: 0.5)),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                color: selected
+                    ? AppTheme.warning
+                    : AppTheme.warning.withValues(alpha: 0.6),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -147,6 +354,7 @@ class _PickingOrdersListScreenState extends State<PickingOrdersListScreen> {
 
   Widget _buildSummary(int waiting, int picking) {
     return Card(
+      margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
