@@ -34,6 +34,8 @@ extension PackingApi on ApiService {
   }
 
   /// สแกน Part (เพิ่ม scanned qty) — ส่ง serialNumbers ได้ (optional)
+  /// Auto-finalize เมื่อทุก Detail ใน Pack เป็น DONE — response จะมี
+  /// packFinalized=true + trackingId + palletReleased
   Future<ApiResult<PackingOrderResponse>> scanPackPart({
     required String packingId,
     required String pickOrderId,
@@ -55,20 +57,5 @@ extension PackingApi on ApiService {
       return ApiResult.error(response.error, statusCode: response.statusCode);
     }
     return ApiResult.success(PackingOrderResponse.fromJson(response.data!));
-  }
-
-  /// ยืนยัน Pack → DONE
-  Future<ApiResult<ConfirmPackResponse>> confirmPack({
-    required String packingId,
-    required String operatorId,
-  }) async {
-    final response = await _post('/packing/confirm-pack', {
-      'packingId': packingId,
-      'operatorId': operatorId,
-    });
-    if (!response.success) {
-      return ApiResult.error(response.error, statusCode: response.statusCode);
-    }
-    return ApiResult.success(ConfirmPackResponse.fromJson(response.data!));
   }
 }

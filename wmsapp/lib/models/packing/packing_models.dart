@@ -4,14 +4,12 @@ class PackingPalletResponse {
   final String status;
   final String? location;
   final List<PackingSummary> packs;
-  final String message;
 
   PackingPalletResponse({
     required this.palletId,
     required this.status,
     this.location,
     required this.packs,
-    required this.message,
   });
 
   factory PackingPalletResponse.fromJson(Map<String, dynamic> json) =>
@@ -22,7 +20,6 @@ class PackingPalletResponse {
         packs: (json['packs'] as List)
             .map((p) => PackingSummary.fromJson(p))
             .toList(),
-        message: json['message'] ?? '',
       );
 }
 
