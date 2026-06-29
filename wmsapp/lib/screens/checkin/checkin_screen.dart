@@ -96,13 +96,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
 
   CheckInSlotDetail _syntheticSlotFromPreview(PreviewCheckInResponse p) {
     return CheckInSlotDetail(
-      slotId: p.slotId,
-      owner: p.owner,
       status: 'OPEN',
-      createdAt: DateTime.now(),
-      cartonsInSlot: 0,
-      expectedCartons: 0,
-      isReadyToComplete: false,
       cartons: const [],
       customerOrderId: p.customerOrderId,
       pipelineTotal: p.pipelineTotal,

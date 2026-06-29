@@ -37,20 +37,8 @@ extension CheckInApi on ApiService {
     return ApiResult.success(CheckInSlotDetail.fromJson(response.data!));
   }
 
-  /// รายการ Slot ที่ active (OPEN/READY)
-  Future<ApiResult<List<CheckInSlotSummary>>> getActiveCheckInSlots() async {
-    final response = await _get('/checkin/slots');
-    if (!response.success) {
-      return ApiResult.error(response.error, statusCode: response.statusCode);
-    }
-    final items = (response.data!['items'] as List? ?? [])
-        .map((e) => CheckInSlotSummary.fromJson(e as Map<String, dynamic>))
-        .toList();
-    return ApiResult.success(items);
-  }
-
-  /// Complete Slot → generate Tracking ID
-  Future<ApiResult<CompleteCheckInResponse>> completeCheckIn({
+  /// Complete Slot → status=READY
+  Future<ApiResult<void>> completeCheckIn({
     required String slotId,
     required String operatorId,
   }) async {
@@ -61,11 +49,11 @@ extension CheckInApi on ApiService {
     if (!response.success) {
       return ApiResult.error(response.error, statusCode: response.statusCode);
     }
-    return ApiResult.success(CompleteCheckInResponse.fromJson(response.data!));
+    return ApiResult.success(null);
   }
 
   /// Dispatch Slot → ย้ายขึ้นรถ SHIPPED
-  Future<ApiResult<DispatchCheckInResponse>> dispatchCheckIn({
+  Future<ApiResult<void>> dispatchCheckIn({
     required String slotId,
     required String operatorId,
   }) async {
@@ -76,6 +64,6 @@ extension CheckInApi on ApiService {
     if (!response.success) {
       return ApiResult.error(response.error, statusCode: response.statusCode);
     }
-    return ApiResult.success(DispatchCheckInResponse.fromJson(response.data!));
+    return ApiResult.success(null);
   }
 }
