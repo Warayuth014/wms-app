@@ -29,9 +29,6 @@ class SortingStationView {
   final int? cartonsCount;
   final int? maxCapacity;
   final bool? isFull;
-  final DateTime? startedAt;
-  final String? disabledBy;
-  final DateTime? disabledAt;
   final String? disableReason;
 
   SortingStationView({
@@ -42,9 +39,6 @@ class SortingStationView {
     this.cartonsCount,
     this.maxCapacity,
     this.isFull,
-    this.startedAt,
-    this.disabledBy,
-    this.disabledAt,
     this.disableReason,
   });
 
@@ -57,9 +51,6 @@ class SortingStationView {
         cartonsCount: json['cartonsCount'],
         maxCapacity: json['maxCapacity'],
         isFull: json['isFull'],
-        startedAt: _parseDate(json['startedAt']),
-        disabledBy: json['disabledBy'],
-        disabledAt: _parseDate(json['disabledAt']),
         disableReason: json['disableReason'],
       );
 
@@ -79,9 +70,6 @@ class SortingStationView {
         cartonsCount: cartonsCount ?? this.cartonsCount,
         maxCapacity: maxCapacity ?? this.maxCapacity,
         isFull: isFull ?? this.isFull,
-        startedAt: startedAt,
-        disabledBy: disabledBy,
-        disabledAt: disabledAt,
         disableReason: disableReason,
       );
 }
@@ -95,8 +83,6 @@ class SortingStationDetail {
   final int cartonsCount;
   final int maxCapacity;
   final bool isFull;
-  final DateTime? startedAt;
-  final DateTime? fullAt;
   final List<SortingStationCarton> cartons;
   final int pendingCount;
 
@@ -108,8 +94,6 @@ class SortingStationDetail {
     required this.cartonsCount,
     required this.maxCapacity,
     required this.isFull,
-    this.startedAt,
-    this.fullAt,
     required this.cartons,
     required this.pendingCount,
   });
@@ -123,8 +107,6 @@ class SortingStationDetail {
         cartonsCount: json['cartonsCount'] ?? 0,
         maxCapacity: json['maxCapacity'] ?? 0,
         isFull: json['isFull'] ?? false,
-        startedAt: _parseDate(json['startedAt']),
-        fullAt: _parseDate(json['fullAt']),
         cartons: ((json['cartons'] ?? []) as List)
             .map((c) => SortingStationCarton.fromJson(c))
             .toList(),
@@ -193,28 +175,19 @@ class AvailablePackForSorting {
 class CreateSortingBatchResponse {
   final String outcome;       // ASSIGNED | QUEUED
   final int? stationId;
-  final String? palletId;
   final int batchSize;
-  final int? queueId;
-  final String message;
 
   CreateSortingBatchResponse({
     required this.outcome,
     this.stationId,
-    this.palletId,
     required this.batchSize,
-    this.queueId,
-    required this.message,
   });
 
   factory CreateSortingBatchResponse.fromJson(Map<String, dynamic> json) =>
       CreateSortingBatchResponse(
         outcome: json['outcome'] ?? 'ASSIGNED',
         stationId: json['stationId'],
-        palletId: json['palletId'],
         batchSize: json['batchSize'] ?? 0,
-        queueId: json['queueId'],
-        message: json['message'] ?? '',
       );
 
   bool get isQueued => outcome == 'QUEUED';
