@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
 import '../models/wms_models.dart';
+import 'api_config_service.dart';
 
 part 'api/upload_api.dart';
 part 'api/receiving_api.dart';
@@ -36,19 +38,27 @@ class ApiService {
 
   ApiService._internal();
 
-  static const _physicalIp = '192.168.1.124';
-  static const _port = 5000;
+  static const _defaultPort = ApiConfigService.defaultPort;
+  static const _configService = ApiConfigService();
   static String? _cachedBase;
 
   final _headers = {'Content-Type': 'application/json'};
 
+  /// หา base URL ที่ใช้ได้:
+  /// 1. IP/Port ที่ผู้ใช้ตั้งเองใน Settings (ถ้ามี) — ลองก่อนเสมอ
+  /// 2. Android emulator (10.0.2.2) / localhost — สำหรับรันบนเครื่อง dev
+  /// ไม่มี IP hardcode อีกต่อไป — เครื่องจริง/ย้าย network ต้องตั้งค่าใน Settings
   static Future<String> _resolveBase() async {
     if (_cachedBase != null) return _cachedBase!;
 
+    final custom = await _configService.getCustomBase();
+    // kIsWeb ต้องเช็คก่อนเสมอ — Platform.* throw บน web (dart:io ไม่รองรับ)
+    final isAndroid = !kIsWeb && Platform.isAndroid;
+
     final candidates = <String>[
-      if (Platform.isAndroid) 'http://10.0.2.2:$_port',
-      if (!Platform.isAndroid) 'http://localhost:$_port',
-      'http://$_physicalIp:$_port',
+      if (custom != null) custom,
+      if (isAndroid) 'http://10.0.2.2:$_defaultPort',
+      if (!isAndroid) 'http://localhost:$_defaultPort',
     ];
 
     for (final base in candidates) {
@@ -65,7 +75,9 @@ class ApiService {
       } catch (_) {}
     }
 
-    _cachedBase = 'http://$_physicalIp:$_port/api';
+    // ไม่มี candidate ไหน connect ได้ตอนนี้ — ใช้ตัวแรก (custom ถ้ามี) เป็น fallback
+    // request จริงจะ throw SocketException ให้เห็น error ชัดเจนแทน
+    _cachedBase = '${candidates.first}/api';
     return _cachedBase!;
   }
 

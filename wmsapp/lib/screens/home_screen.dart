@@ -17,6 +17,7 @@ import 'package:wmsapp/screens/sorting/sorting_screen.dart';
 import 'home/widgets/cards/home_flow_card.dart';
 import 'package:wmsapp/screens/test/test_pick_order_screen.dart';
 import 'package:wmsapp/screens/test/test_sorting_screen.dart';
+import 'package:wmsapp/screens/settings/settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -169,6 +170,18 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
+          // ── Server settings (IP/Port) ──
+          IconButton(
+            icon: Icon(
+              Icons.settings_ethernet_rounded,
+              color: Colors.white.withValues(alpha: 0.8),
+            ),
+            tooltip: 'ตั้งค่าการเชื่อมต่อ',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
+          ),
           // ── Dark mode toggle ──
           IconButton(
             icon: Icon(
