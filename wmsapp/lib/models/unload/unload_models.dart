@@ -1,4 +1,6 @@
+// LineId = UnloadLine.LineId — ระบุ Part+Lot ที่แน่นอน (1 Part อาจมีหลาย Lot บน pallet เดียวกัน)
 class UnloadItem {
+  final int lineId;
   final String partId;
   final String owner;
   final String brand;
@@ -8,8 +10,10 @@ class UnloadItem {
   final String? expiredDate;
   final int qty;
   final String condition;
+  final List<String> serialNumbers;
 
   UnloadItem({
+    required this.lineId,
     required this.partId,
     required this.owner,
     required this.brand,
@@ -19,9 +23,11 @@ class UnloadItem {
     this.expiredDate,
     required this.qty,
     required this.condition,
+    this.serialNumbers = const [],
   });
 
   factory UnloadItem.fromJson(Map<String, dynamic> json) => UnloadItem(
+    lineId: json['lineId'],
     partId: json['partId'],
     owner: json['owner'],
     brand: json['brand'],
@@ -31,7 +37,13 @@ class UnloadItem {
     expiredDate: json['expiredDate'],
     qty: json['qty'],
     condition: json['condition'],
+    serialNumbers: (json['serialNumbers'] as List?)
+            ?.map((e) => e as String)
+            .toList() ??
+        [],
   );
+
+  bool get serialRequire => serialNumbers.isNotEmpty;
 }
 
 class UnloadSession {
@@ -39,14 +51,14 @@ class UnloadSession {
   final String palletId;
   final String status;
   final List<UnloadItem> items;
-  final List<String> confirmedPartIds;
+  final List<int> confirmedLineIds;
 
   UnloadSession({
     required this.sessionId,
     required this.palletId,
     required this.status,
     required this.items,
-    this.confirmedPartIds = const [],
+    this.confirmedLineIds = const [],
   });
 
   factory UnloadSession.fromJson(Map<String, dynamic> json) => UnloadSession(
@@ -54,8 +66,8 @@ class UnloadSession {
     palletId: json['palletId'],
     status: json['status'],
     items: (json['items'] as List).map((i) => UnloadItem.fromJson(i)).toList(),
-    confirmedPartIds: (json['confirmedPartIds'] as List? ?? [])
-        .map((e) => e.toString())
+    confirmedLineIds: (json['confirmedLineIds'] as List? ?? [])
+        .map((e) => e as int)
         .toList(),
   );
 }

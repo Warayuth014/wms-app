@@ -18,14 +18,19 @@ extension UnloadApi on ApiService {
     required int sessionId,
     required String palletId,
     required String partId,
+    required int lineId,
     required String operatorId,
     int? qtyUnloaded,
+    List<String>? serialNumbers,
   }) async {
     final body = <String, dynamic>{
       'sessionId': sessionId,
       'palletId': palletId,
       'partId': partId,
+      'lineId': lineId,
       'operatorId': operatorId,
+      // Part ไม่ require serial ต้องส่ง null/[] เสมอ (ฝั่ง backend รองรับทั้งคู่)
+      'serialNumbers': serialNumbers ?? [],
     };
     if (qtyUnloaded != null) body['qtyUnloaded'] = qtyUnloaded;
 

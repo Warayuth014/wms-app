@@ -40,16 +40,20 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
   final _palletFocus = FocusNode();
   final _partController = TextEditingController();
   final _partFocus = FocusNode();
+  final _serialController = TextEditingController();
+  final _serialFocus = FocusNode();
 
   UnloadSession? _session;
   int? _sessionId;
   bool _loading = false;
   bool _sessionOpen = false;
   bool _returning = false;
-  String? _scannedPartId;
+  int? _scannedLineId;
+  final List<String> _scannedSerials = [];
 
-  final Map<String, String> _partStatus = {};
-  final Map<String, TextEditingController> _qtyCtrl = {};
+  // key = UnloadItem.lineId (ไม่ใช่ partId — 1 Part อาจมีหลาย Lot บน pallet เดียวกัน)
+  final Map<int, String> _partStatus = {};
+  final Map<int, TextEditingController> _qtyCtrl = {};
 
   @override
   void initState() {
@@ -58,10 +62,7 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
       vsync: this,
       duration: const Duration(milliseconds: 800),
     )..repeat(reverse: true);
-    _arrowAnimation = Tween<double>(
-      begin: 0,
-      end: -20,
-    ).animate(
+    _arrowAnimation = Tween<double>(begin: 0, end: -20).animate(
       CurvedAnimation(parent: _arrowController, curve: Curves.easeInOut),
     );
   }
@@ -73,6 +74,8 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
     _palletFocus.dispose();
     _partController.dispose();
     _partFocus.dispose();
+    _serialController.dispose();
+    _serialFocus.dispose();
     _disposeQtyControllers();
     super.dispose();
   }
@@ -89,7 +92,7 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
     if (_session == null) return;
 
     for (final item in _session!.items) {
-      _qtyCtrl[item.partId] = TextEditingController(text: '${item.qty}');
+      _qtyCtrl[item.lineId] = TextEditingController(text: '${item.qty}');
     }
   }
 
@@ -114,10 +117,7 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
     setState(() => _loading = false);
 
     if (!result.success) {
-      showErrorDialog(
-        context,
-        message: result.error ?? 'ไม่พบ Pallet นี้',
-      );
+      showErrorDialog(context, message: result.error ?? 'ไม่พบ Pallet นี้');
       _palletController.clear();
       _palletFocus.requestFocus();
       return;
@@ -128,12 +128,12 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
       _session = session;
       _sessionId = session.sessionId;
       _sessionOpen = true;
-      _scannedPartId = null;
+      _scannedLineId = null;
       _partStatus.clear();
 
       for (final item in session.items) {
-        _partStatus[item.partId] =
-            session.confirmedPartIds.contains(item.partId)
+        _partStatus[item.lineId] =
+            session.confirmedLineIds.contains(item.lineId)
             ? 'CONFIRMED'
             : 'PENDING';
       }
@@ -143,117 +143,192 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
     _partFocus.requestFocus();
   }
 
+  // โหลด session ปัจจุบันซ้ำจาก server — ใช้หลัง confirm สำเร็จ เพื่อให้ LineId/qty ตรงกับจริงเสมอ
+  // (ถ้ามีเศษเหลือ backend จะสร้าง UnloadLine ใหม่ที่มี LineId ต่างจากเดิม แก้ปัญหาโดยโหลดใหม่แทนการ patch เอง)
+  Future<void> _reloadSession() async {
+    final session = _session;
+    if (session == null) return;
+
+    final result = await ApiService().openUnloadSession(
+      palletId: session.palletId,
+      operatorId: widget.userId,
+    );
+    if (!mounted || !result.success) return;
+
+    final fresh = result.data!;
+    setState(() {
+      _session = fresh;
+      _sessionId = fresh.sessionId;
+      _partStatus.clear();
+      for (final item in fresh.items) {
+        _partStatus[item.lineId] = fresh.confirmedLineIds.contains(item.lineId)
+            ? 'CONFIRMED'
+            : 'PENDING';
+      }
+    });
+    _buildQtyControllers();
+  }
+
+  // สแกน Part ID — แสดงทุก Lot ของ Part นั้นในลิสต์เสมออยู่แล้ว (ไม่ popup เลือก lot)
+  // ถ้ามีหลาย Lot ที่ยัง PENDING เลือก lot แรกที่เจอไปก่อน ผู้ใช้แตะการ์ด lot อื่นในลิสต์เพื่อสลับได้เอง
   void _scanPart() {
     final partId = _partController.text.trim().toUpperCase();
     if (partId.isEmpty) return;
 
-    if (!_partStatus.containsKey(partId)) {
-      showErrorDialog(
-        context,
-        message: 'Part $partId ไม่อยู่ใน Pallet นี้',
-      );
+    final matches =
+        _session?.items.where((i) => i.partId == partId).toList() ?? [];
+
+    if (matches.isEmpty) {
+      showErrorDialog(context, message: 'Part $partId ไม่อยู่ใน Pallet นี้');
       _partController.clear();
       return;
     }
 
-    if (_partStatus[partId] == 'CONFIRMED') {
-      showWarningSnackbar(context, 'Part $partId ยืนยันไปแล้ว');
+    final pending = matches
+        .where((i) => _partStatus[i.lineId] != 'CONFIRMED')
+        .toList();
+
+    if (pending.isEmpty) {
+      showWarningSnackbar(context, 'Part $partId ยืนยันไปแล้วทุก Lot');
       _partController.clear();
       return;
     }
 
     setState(() {
-      _scannedPartId = partId;
+      _scannedLineId = pending.first.lineId;
+      _scannedSerials.clear();
       _partController.clear();
     });
+  }
+
+  void _selectLine(int lineId) {
+    if (_partStatus[lineId] == 'CONFIRMED') return;
+    if (_scannedLineId == lineId) return;
+    setState(() {
+      _scannedLineId = lineId;
+      _scannedSerials.clear();
+    });
+  }
+
+  // สแกน S/N ทีละตัว inline ในการ์ด (ไม่ใช้ popup) — เฉพาะ Part ที่มี S/N เท่านั้น
+  void _addSerial() {
+    final item = _currentScannedItem();
+    if (item == null) return;
+
+    final sn = _serialController.text.trim().toUpperCase();
+    _serialController.clear();
+    if (sn.isEmpty) return;
+
+    if (!item.serialNumbers.contains(sn)) {
+      showErrorDialog(
+        context,
+        message: 'S/N "$sn" ไม่ใช่ของรายการนี้ หรือถูกใช้ไปแล้ว',
+      );
+      _serialFocus.requestFocus();
+      return;
+    }
+    if (_scannedSerials.contains(sn)) {
+      showErrorDialog(context, message: 'สแกน S/N "$sn" ซ้ำ');
+      _serialFocus.requestFocus();
+      return;
+    }
+    if (_scannedSerials.length >= item.qty) {
+      showErrorDialog(context, message: 'สแกนครบจำนวนแล้ว (${item.qty})');
+      return;
+    }
+
+    setState(() => _scannedSerials.add(sn));
+    _serialFocus.requestFocus();
+  }
+
+  void _removeSerial(String sn) {
+    setState(() => _scannedSerials.remove(sn));
+  }
+
+  UnloadItem? _currentScannedItem() {
+    final lineId = _scannedLineId;
+    if (lineId == null || _session == null) return null;
+    return _session!.items.firstWhere((i) => i.lineId == lineId);
+  }
+
+  bool _canConfirmScanned() {
+    final item = _currentScannedItem();
+    if (item == null) return false;
+    if (item.serialRequire) return _scannedSerials.length == item.qty;
+    return true;
   }
 
   Future<void> _confirmScannedPart() async {
     final session = _session;
     final sessionId = _sessionId;
-    final partId = _scannedPartId;
-    if (session == null || sessionId == null || partId == null) return;
+    final item = _currentScannedItem();
+    if (session == null || sessionId == null || item == null) return;
 
-    final qtyText = _qtyCtrl[partId]?.text.trim() ?? '';
-    final qty = int.tryParse(qtyText) ?? 0;
+    int qty;
+    List<String>? serialNumbers;
 
-    if (qty <= 0) {
-      showErrorDialog(
-        context,
-        message: 'กรุณาระบุจำนวนที่ต้องการ Unload',
-      );
-      return;
-    }
+    if (item.serialRequire) {
+      if (_scannedSerials.length != item.qty) {
+        showErrorDialog(
+          context,
+          message:
+              'กรุณาสแกน S/N ให้ครบ (${_scannedSerials.length}/${item.qty})',
+        );
+        return;
+      }
+      qty = _scannedSerials.length;
+      serialNumbers = List<String>.of(_scannedSerials);
+    } else {
+      final qtyText = _qtyCtrl[item.lineId]?.text.trim() ?? '';
+      qty = int.tryParse(qtyText) ?? 0;
 
-    final item = session.items.firstWhere((entry) => entry.partId == partId);
-    if (qty > item.qty) {
-      showErrorDialog(
-        context,
-        message: 'จำนวนเกินที่มีบน Pallet (${item.qty})',
-      );
-      return;
+      if (qty <= 0) {
+        showErrorDialog(context, message: 'กรุณาระบุจำนวนที่ต้องการ Unload');
+        return;
+      }
+      if (qty > item.qty) {
+        showErrorDialog(
+          context,
+          message: 'จำนวนเกินที่มีบน Pallet (${item.qty})',
+        );
+        return;
+      }
     }
 
     setState(() => _loading = true);
     final result = await ApiService().confirmUnload(
       sessionId: sessionId,
       palletId: session.palletId,
-      partId: partId,
+      partId: item.partId,
+      lineId: item.lineId,
       operatorId: widget.userId,
       qtyUnloaded: qty,
+      serialNumbers: serialNumbers,
     );
 
     if (!mounted) return;
-    setState(() => _loading = false);
 
     if (!result.success) {
-      showErrorDialog(
-        context,
-        message: result.error ?? 'เกิดข้อผิดพลาด',
-      );
+      setState(() => _loading = false);
+      showErrorDialog(context, message: result.error ?? 'เกิดข้อผิดพลาด');
       return;
     }
 
     final remainder = item.qty - qty;
-
     setState(() {
-      _scannedPartId = null;
-
-      if (remainder > 0) {
-        final index = session.items.indexWhere((entry) => entry.partId == partId);
-        if (index >= 0) {
-          final updatedItems = List<UnloadItem>.from(session.items);
-          updatedItems[index] = UnloadItem(
-            partId: item.partId,
-            owner: item.owner,
-            brand: item.brand,
-            itemDesc: item.itemDesc,
-            imageUrl: item.imageUrl,
-            lotNumber: item.lotNumber,
-            expiredDate: item.expiredDate,
-            qty: remainder,
-            condition: item.condition,
-          );
-          _session = UnloadSession(
-            sessionId: session.sessionId,
-            palletId: session.palletId,
-            status: session.status,
-            items: updatedItems,
-            confirmedPartIds: session.confirmedPartIds,
-          );
-          _qtyCtrl[partId]?.text = '$remainder';
-        }
-        _partStatus[partId] = 'PENDING';
-      } else {
-        _partStatus[partId] = 'CONFIRMED';
-      }
+      _scannedLineId = null;
+      _scannedSerials.clear();
     });
+    await _reloadSession();
+
+    if (!mounted) return;
+    setState(() => _loading = false);
 
     showSuccessSnackbar(
       context,
       remainder > 0
-          ? '$partId หยิบ $qty ชิ้น (เหลือ $remainder)'
-          : '$partId ครบ $qty ชิ้น ($_confirmedCount/$_totalCount)',
+          ? '${item.partId} หยิบ $qty ชิ้น (เหลือ $remainder)'
+          : '${item.partId} ครบ $qty ชิ้น ($_confirmedCount/$_totalCount)',
     );
 
     _partFocus.requestFocus();
@@ -293,10 +368,7 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
 
     final result = results.first as ApiResult<Map<String, dynamic>>;
     if (!result.success) {
-      showErrorDialog(
-        context,
-        message: result.error ?? 'เกิดข้อผิดพลาด',
-      );
+      showErrorDialog(context, message: result.error ?? 'เกิดข้อผิดพลาด');
       return;
     }
 
@@ -313,7 +385,7 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
       _session = null;
       _sessionId = null;
       _sessionOpen = false;
-      _scannedPartId = null;
+      _scannedLineId = null;
       _partStatus.clear();
       _palletController.clear();
       _partController.clear();
@@ -400,10 +472,7 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
                 ),
                 Text(
                   widget.station.label,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                  ),
+                  style: const TextStyle(color: Colors.white70, fontSize: 13),
                 ),
               ],
             ),
@@ -429,27 +498,27 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (_sessionOpen) ...[
-          _buildProgressBar(),
-          const SizedBox(height: 16),
-        ],
+        if (_sessionOpen) ...[_buildProgressBar(), const SizedBox(height: 16)],
         if (!_sessionOpen) _buildPalletScanSection(),
         if (_session != null) _buildPalletInfoSection(),
         if (_sessionOpen) _buildPartScanSection(),
         if (_partStatus.isNotEmpty) _buildItemsList(),
-        if (_scannedPartId != null) ...[
+        if (_scannedLineId != null) ...[
           const SizedBox(height: 12),
           PrimaryButton(
-            label: 'ยืนยัน Unload: $_scannedPartId',
+            label: 'ยืนยัน Unload: ${_scannedItemLabel()}',
             icon: Icons.check,
-            onPressed: _confirmScannedPart,
+            onPressed: _canConfirmScanned() ? _confirmScannedPart : null,
           ),
           const SizedBox(height: 8),
           DangerButton(
             label: 'ยกเลิก',
             icon: Icons.close,
             onPressed: () {
-              setState(() => _scannedPartId = null);
+              setState(() {
+                _scannedLineId = null;
+                _scannedSerials.clear();
+              });
               _partFocus.requestFocus();
             },
           ),
@@ -499,10 +568,8 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
     ],
   );
 
-  Widget _buildPartScanSection() => UnloadPartScanSection(
-    controller: _partController,
-    onSubmit: _scanPart,
-  );
+  Widget _buildPartScanSection() =>
+      UnloadPartScanSection(controller: _partController, onSubmit: _scanPart);
 
   Widget _buildProgressBar() => UnloadProgressBar(
     confirmedCount: _confirmedCount,
@@ -514,6 +581,21 @@ class _UnloadSessionSheetState extends State<UnloadSessionSheet>
     items: _session!.items,
     partStatus: _partStatus,
     qtyControllers: _qtyCtrl,
-    scannedPartId: _scannedPartId,
+    scannedLineId: _scannedLineId,
+    onSelectLine: _selectLine,
+    scannedSerials: _scannedSerials,
+    serialController: _serialController,
+    serialFocus: _serialFocus,
+    onAddSerial: _addSerial,
+    onRemoveSerial: _removeSerial,
   );
+
+  String _scannedItemLabel() {
+    final lineId = _scannedLineId;
+    if (lineId == null || _session == null) return '';
+    final item = _session!.items.firstWhere((i) => i.lineId == lineId);
+    return item.lotNumber != null && item.lotNumber!.isNotEmpty
+        ? '${item.partId} (${item.lotNumber})'
+        : item.partId;
+  }
 }
