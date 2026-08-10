@@ -37,6 +37,7 @@ class UnloadedItem {
   final int qtyRemaining;
   final String? basketId;
   final List<int> unloadLineIds;
+  final List<String> serialNumbers;
 
   UnloadedItem({
     required this.partId,
@@ -51,6 +52,7 @@ class UnloadedItem {
     required this.qtyRemaining,
     this.basketId,
     required this.unloadLineIds,
+    this.serialNumbers = const [],
   });
 
   factory UnloadedItem.fromJson(Map<String, dynamic> json) => UnloadedItem(
@@ -69,9 +71,14 @@ class UnloadedItem {
                 ?.map((e) => e as int)
                 .toList() ??
             [],
+        serialNumbers: (json['serialNumbers'] as List?)
+                ?.map((e) => e as String)
+                .toList() ??
+            [],
       );
 
   bool get isDone => qtyRemaining <= 0;
+  bool get serialRequire => serialNumbers.isNotEmpty;
 }
 
 // ── Load to Basket response ──────────

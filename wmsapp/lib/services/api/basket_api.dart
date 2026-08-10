@@ -17,6 +17,7 @@ extension BasketApi on ApiService {
     required String basketId,
     required int qty,
     required String operatorId,
+    List<String>? serialNumbers,
   }) async {
     final response = await _post('/basket/load', {
       'partId': partId,
@@ -24,6 +25,8 @@ extension BasketApi on ApiService {
       'basketId': basketId,
       'qty': qty,
       'operatorId': operatorId,
+      // Part ไม่ require serial ต้องส่ง null/[] เสมอ (ฝั่ง backend รองรับทั้งคู่)
+      'serialNumbers': serialNumbers ?? [],
     });
     if (!response.success) {
       return ApiResult.error(response.error, statusCode: response.statusCode);

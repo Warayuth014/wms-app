@@ -75,79 +75,177 @@ class _LoadToBasketScreenState extends State<LoadToBasketScreen> {
   Future<void> _showBasketDialog(UnloadedItem item) async {
     final basketCtrl = TextEditingController();
     final qtyCtrl = TextEditingController(text: item.qtyRemaining.toString());
+    final serialCtrl = TextEditingController();
+    final serialFocus = FocusNode();
+    final requiresSerial = item.serialRequire;
+    final scannedSerials = <String>[];
+    // มี serial ต้องสแกน S/N ให้ครบก่อน ถึงจะไปสแกน/กรอก Basket ID ได้
+    var showBasketStep = !requiresSerial;
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(MdiIcons.basketOutline, color: AppTheme.teal, size: 22),
-            const SizedBox(width: 8),
-            const Expanded(child: Text('Load เข้า Basket', style: TextStyle(fontSize: 16))),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Part info
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(8),
-              ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          void addSerial() {
+            final sn = serialCtrl.text.trim().toUpperCase();
+            serialCtrl.clear();
+            if (sn.isEmpty) return;
+            if (!item.serialNumbers.contains(sn)) {
+              showErrorDialog(context,
+                  message: 'S/N "$sn" ไม่ใช่ของรายการนี้ หรือถูก Load ไปแล้ว');
+              serialFocus.requestFocus();
+              return;
+            }
+            if (scannedSerials.contains(sn)) {
+              showErrorDialog(context, message: 'สแกน S/N "$sn" ซ้ำ');
+              serialFocus.requestFocus();
+              return;
+            }
+            if (scannedSerials.length >= item.qtyRemaining) {
+              showErrorDialog(context,
+                  message: 'สแกนครบจำนวนที่เหลือแล้ว (${item.qtyRemaining})');
+              return;
+            }
+            setDialogState(() => scannedSerials.add(sn));
+            serialFocus.requestFocus();
+          }
+
+          return AlertDialog(
+            title: Row(
+              children: [
+                Icon(MdiIcons.basketOutline, color: AppTheme.teal, size: 22),
+                const SizedBox(width: 8),
+                const Expanded(child: Text('Load เข้า Basket', style: TextStyle(fontSize: 16))),
+              ],
+            ),
+            content: SingleChildScrollView(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item.partId,
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                  Text(item.itemDesc,
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-                  const SizedBox(height: 4),
-                  Text('Lot: ${item.lotNumber ?? "-"}  |  เหลือ: ${item.qtyRemaining}',
-                      style: const TextStyle(fontSize: 12)),
+                  // Part info
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.partId,
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                        Text(item.itemDesc,
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                        const SizedBox(height: 4),
+                        Text('Lot: ${item.lotNumber ?? "-"}  |  เหลือ: ${item.qtyRemaining}',
+                            style: const TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (!showBasketStep) ...[
+                    Text('สแกน S/N (${scannedSerials.length}/${item.qtyRemaining})',
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: serialCtrl,
+                      focusNode: serialFocus,
+                      autofocus: true,
+                      textCapitalization: TextCapitalization.characters,
+                      onSubmitted: (_) => addSerial(),
+                      decoration: InputDecoration(
+                        labelText: 'Serial Number',
+                        prefixIcon: Icon(MdiIcons.barcodeScan),
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.add),
+                          onPressed: addSerial,
+                        ),
+                      ),
+                    ),
+                    if (scannedSerials.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 140),
+                        child: SingleChildScrollView(
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: scannedSerials
+                                .map((sn) => Chip(
+                                      label: Text(sn, style: const TextStyle(fontSize: 11)),
+                                      onDeleted: () =>
+                                          setDialogState(() => scannedSerials.remove(sn)),
+                                    ))
+                                .toList(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ] else ...[
+                    // Basket ID
+                    TextField(
+                      controller: basketCtrl,
+                      textCapitalization: TextCapitalization.characters,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        labelText: 'Basket ID',
+                        prefixIcon: Icon(MdiIcons.basketOutline),
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (requiresSerial)
+                      Text('สแกน S/N แล้ว ${scannedSerials.length} ชิ้น',
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600]))
+                    else
+                      TextField(
+                        controller: qtyCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'จำนวน',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                  ],
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            // Basket ID
-            TextField(
-              controller: basketCtrl,
-              textCapitalization: TextCapitalization.characters,
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: 'Basket ID',
-                prefixIcon: Icon(MdiIcons.basketOutline),
-                border: const OutlineInputBorder(),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('ยกเลิก'),
               ),
-            ),
-            const SizedBox(height: 12),
-            // Qty
-            TextField(
-              controller: qtyCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'จำนวน',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('ยกเลิก'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.teal,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('ยืนยัน'),
-          ),
-        ],
+              if (!showBasketStep)
+                ElevatedButton(
+                  onPressed: scannedSerials.isEmpty
+                      ? null
+                      : () => setDialogState(() => showBasketStep = true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.teal,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('ถัดไป'),
+                )
+              else ...[
+                if (requiresSerial)
+                  TextButton(
+                    onPressed: () => setDialogState(() => showBasketStep = false),
+                    child: const Text('ย้อนกลับ'),
+                  ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.teal,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('ยืนยัน'),
+                ),
+              ],
+            ],
+          );
+        },
       ),
     );
 
@@ -157,7 +255,7 @@ class _LoadToBasketScreenState extends State<LoadToBasketScreen> {
     }
 
     final basketId = basketCtrl.text.trim().toUpperCase();
-    final qty = int.tryParse(qtyCtrl.text) ?? 0;
+    final qty = requiresSerial ? scannedSerials.length : (int.tryParse(qtyCtrl.text) ?? 0);
 
     if (basketId.isEmpty) {
       showErrorDialog(context, message: 'กรุณาระบุ Basket ID');
@@ -170,10 +268,15 @@ class _LoadToBasketScreenState extends State<LoadToBasketScreen> {
       return;
     }
 
-    await _doLoad(item, basketId, qty);
+    await _doLoad(item, basketId, qty, requiresSerial ? scannedSerials : null);
   }
 
-  Future<void> _doLoad(UnloadedItem item, String basketId, int qty) async {
+  Future<void> _doLoad(
+    UnloadedItem item,
+    String basketId,
+    int qty,
+    List<String>? serialNumbers,
+  ) async {
     setState(() => _loading = true);
     final result = await _api.loadToBasket(
       partId: item.partId,
@@ -181,6 +284,7 @@ class _LoadToBasketScreenState extends State<LoadToBasketScreen> {
       basketId: basketId,
       qty: qty,
       operatorId: widget.userId,
+      serialNumbers: serialNumbers,
     );
     if (!mounted) return;
     setState(() => _loading = false);
