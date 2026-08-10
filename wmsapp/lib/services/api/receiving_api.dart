@@ -8,7 +8,7 @@ extension ReceivingApi on ApiService {
     return ApiResult.success(POResponse.fromJson(response.data!));
   }
 
-  Future<ApiResult<Map<String, dynamic>>> validateReceivingSerial({
+  Future<ApiResult<ValidateSerialResponse>> validateReceivingSerial({
     required String partId,
     required String serialNo,
   }) async {
@@ -20,23 +20,43 @@ extension ReceivingApi on ApiService {
       },
     ).toString();
 
-    return _get(path);
+    final response = await _get(path);
+    if (!response.success) return ApiResult.error(response.error);
+
+    return ApiResult.success(ValidateSerialResponse.fromJson(response.data!));
+  }
+
+  // สแกน Part ID อย่างเดียว (ยังไม่มี S/N) — เช็คว่า part นี้มีกี่ condition/lot ให้เลือก
+  Future<ApiResult<PartLinesResponse>> getPartLines(String partId) async {
+    final path = Uri(
+      path: '/receiving/validate-serial',
+      queryParameters: {'partId': partId},
+    ).toString();
+
+    final response = await _get(path);
+    if (!response.success) return ApiResult.error(response.error);
+
+    return ApiResult.success(PartLinesResponse.fromJson(response.data!));
   }
 
   Future<ApiResult<ReceiptLineResponse>> scanReceiptPart({
     required String poId,
     required String partId,
+    required int lineId,
     required int qtyReceived,
     required String operatorId,
     List<String>? serialNumbers,
+    String? palletId,
   }) async {
     final response = await _post('/receiving/scan-part', {
       'poId': poId,
       'partId': partId,
+      'lineId': lineId,
       'qtyReceived': qtyReceived,
       'operatorId': operatorId,
-      if (serialNumbers != null && serialNumbers.isNotEmpty)
-        'serialNumbers': serialNumbers,
+      // serialRequire=false ต้องส่ง null/[] ไม่ require เสมอ (ฝั่ง backend รองรับทั้งคู่)
+      'serialNumbers': serialNumbers ?? [],
+      if (palletId != null) 'palletId': palletId,
     });
     if (!response.success) return ApiResult.error(response.error);
 

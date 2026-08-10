@@ -43,6 +43,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
   final _partController = TextEditingController();
   final _partFocus = FocusNode();
   final _qtyController = TextEditingController();
+  final _manualQtyController = TextEditingController(text: '0');
   final _serialController = TextEditingController();
   final _serialFocus = FocusNode();
   final _palletController = TextEditingController();
@@ -62,6 +63,7 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
   final List<String> _serialNumbers = [];
   String? _serialPartId;
   POItem? _scanningItem;
+  int _manualQty = 0;
   String? _highlightedSerial;
   bool _highlightedSerialDuplicate = false;
   Timer? _scanStatusTimer;
@@ -120,6 +122,8 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
   void _clearSerialScan() {
     _serialPartId = null;
     _scanningItem = null;
+    _manualQty = 0;
+    _manualQtyController.text = '0';
     _highlightedSerial = null;
     _highlightedSerialDuplicate = false;
     _serialController.clear();
@@ -139,10 +143,9 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       final index = _serialNumbers.indexOf(serialNo);
       if (index < 0 || !_serialListController.hasClients) return;
 
-      final target = (index * _serialRowHeight).clamp(
-        0.0,
-        _serialListController.position.maxScrollExtent,
-      ).toDouble();
+      final target = (index * _serialRowHeight)
+          .clamp(0.0, _serialListController.position.maxScrollExtent)
+          .toDouble();
       _serialListController.animateTo(
         target,
         duration: const Duration(milliseconds: 220),
@@ -175,7 +178,10 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
     setState(() => _scanStatusMessage = null);
   }
 
-  Future<void> _scanPart() async {
+  // สแกน Part ID ก่อนเสมอ — เช็คว่ามีกี่ condition/lot แล้ว popup ให้เลือกถ้าจำเป็น
+  Future<void> _scanPartId() async {
+    if (_scanningItem != null) return;
+
     final partId = _partController.text.trim().toUpperCase();
     if (partId.isEmpty) {
       showErrorDialog(context, message: 'กรุณาใส่ Part ID');
@@ -183,15 +189,24 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       return;
     }
 
-    final serialNo = _serialController.text.trim().toUpperCase();
-    if (serialNo.isEmpty) {
-      showErrorDialog(context, message: 'กรุณาใส่ S/N');
-      _serialFocus.requestFocus();
+    setState(() => _loading = true);
+    final result = await _api.getPartLines(partId);
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (!result.success) {
+      showErrorDialog(
+        context,
+        message: result.error ?? 'Part $partId ไม่อยู่ใน PO ${_currentPo.poId}',
+      );
+      _partFocus.requestFocus();
       return;
     }
 
-    final inPo = _currentPo.items.any((item) => item.partId == partId);
-    if (!inPo) {
+    final relevantLines = result.data!.lines
+        .where((l) => l.poId == _currentPo.poId)
+        .toList();
+    if (relevantLines.isEmpty) {
       showErrorDialog(
         context,
         message: 'Part $partId ไม่อยู่ใน PO ${_currentPo.poId}',
@@ -199,14 +214,422 @@ class _ScanPartScreenState extends State<ScanPartScreen> {
       _partFocus.requestFocus();
       return;
     }
-if (_serialPartId != null &&
-        _serialPartId != partId &&
-        _serialNumbers.isNotEmpty) {
+
+    PartLine line;
+    if (relevantLines.length == 1) {
+      line = relevantLines.first;
+    } else {
+      final chosen = await _pickCondition(relevantLines);
+      if (!mounted || chosen == null) return;
+      line = chosen;
+    }
+
+    if (line.lots.isEmpty) {
       showErrorDialog(
         context,
-        message: 'กำลังสแกน Part $_serialPartId อยู่ กรุณาบันทึกหรือล้างก่อน',
+        message: 'Part $partId ไม่มี Lot ให้รับใน PO นี้',
       );
-      _partController.text = _serialPartId!;
+      return;
+    }
+
+    PartLot lot;
+    if (line.lots.length == 1) {
+      lot = line.lots.first;
+    } else {
+      final chosen = await _pickLot(line.lots);
+      if (!mounted || chosen == null) return;
+      lot = chosen;
+    }
+
+    final resolvedItem = _currentPo.items.firstWhere(
+      (i) => i.id == lot.id,
+      orElse: () => POItem(
+        id: lot.id,
+        partId: partId,
+        owner: '',
+        brand: '',
+        itemDesc: '',
+        serialRequire: result.data!.serialRequire,
+        qtyOrdered: lot.qtyOrdered,
+        qtyReceived: lot.qtyReceived,
+        qtyRemaining: lot.qtyOrdered - lot.qtyReceived,
+        status: 'PENDING',
+        condition: line.condition,
+        lotNumber: lot.lotNumber,
+      ),
+    );
+
+    setState(() {
+      _scanningItem = resolvedItem;
+      _serialPartId = partId;
+      _manualQty = 0;
+      _manualQtyController.text = '0';
+    });
+
+    if (resolvedItem.serialRequire) {
+      _serialFocus.requestFocus();
+    }
+  }
+
+  Color _conditionColor(String condition) =>
+      condition == 'FG' ? AppTheme.success : AppTheme.warning;
+
+  Widget _buildConditionCard({
+    required BuildContext ctx,
+    required String condition,
+    required int lotCount,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final color = _conditionColor(condition);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: selected ? 0.16 : 0.06),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color, width: selected ? 2.5 : 1.2),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                condition,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              condition,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 4),
+            // Text(
+            //   '$lotCount lot',
+            //   style: TextStyle(fontSize: 13, color: AppTheme.textGrey(ctx)),
+            // ),
+            const SizedBox(height: 10),
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.chevron_right, color: color, size: 18),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<PartLine?> _pickCondition(List<PartLine> lines) {
+    PartLine? selected;
+
+    return showModalBottomSheet<PartLine>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Container(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            8,
+            16,
+            MediaQuery.of(ctx).padding.bottom + 16,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'เลือกประเภทสินค้าที่จะรับ',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'กรุณาเลือกประเภทสินค้าเพื่อดูจำนวน Lot ที่จะรับ',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: AppTheme.textGrey(ctx)),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: lines
+                    .map(
+                      (line) => Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: _buildConditionCard(
+                            ctx: ctx,
+                            condition: line.condition,
+                            lotCount: line.lots.length,
+                            selected: selected == line,
+                            onTap: () => setModalState(() => selected = line),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: PrimaryButton(
+                  label: 'ยืนยันการเลือก',
+                  onPressed: selected != null
+                      ? () => Navigator.pop(ctx, selected)
+                      : null,
+                ),
+              ),
+              const SizedBox(height: 4),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('ยกเลิก'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLotRow({
+    required BuildContext ctx,
+    required PartLot lot,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final available = lot.qtyOrdered - lot.qtyReceived;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppTheme.primary.withValues(alpha: 0.08)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected
+                ? AppTheme.primary
+                : Colors.grey.withValues(alpha: 0.25),
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            // Container(
+            //   width: 40,
+            //   height: 40,
+            //   decoration: BoxDecoration(
+            //     color: AppTheme.primary.withValues(alpha: 0.08),
+            //     shape: BoxShape.circle,
+            //   ),
+            //   child: Icon(
+            //     MdiIcons.tagOutline,
+            //     color: AppTheme.primary,
+            //     size: 20,
+            //   ),
+            // ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    lot.lotNumber,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Batch No. ${lot.lotNumber}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textGrey(ctx),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  'รับได้ $available ชิ้น',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: selected ? AppTheme.primary : AppTheme.textGrey(ctx),
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Icon(
+                  selected ? Icons.check_circle : Icons.circle_outlined,
+                  color: selected ? AppTheme.primary : Colors.grey.shade400,
+                  size: 22,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<PartLot?> _pickLot(List<PartLot> lots) {
+    PartLot? selected;
+
+    return showModalBottomSheet<PartLot>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+          ),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            MediaQuery.of(ctx).padding.bottom + 16,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      MdiIcons.tagOutline,
+                      color: AppTheme.primary,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'เลือก Lot ที่จะรับ',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          'เลือกรายการ Lot เพื่อดำเนินการรับสินค้า',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textGrey(ctx),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    icon: const Icon(Icons.close),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.grey.withValues(alpha: 0.1),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: lots
+                        .map(
+                          (lot) => _buildLotRow(
+                            ctx: ctx,
+                            lot: lot,
+                            selected: selected == lot,
+                            onTap: () => setModalState(() => selected = lot),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: PrimaryButton(
+                  label: 'ยืนยันการเลือก',
+                  icon: Icons.check_circle,
+                  onPressed: selected != null
+                      ? () => Navigator.pop(ctx, selected)
+                      : null,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // เพิ่ม S/N ให้ item ที่ resolve ไว้แล้วจาก _scanPartId
+  Future<void> _addSerial() async {
+    final item = _scanningItem;
+    if (item == null) {
+      showErrorDialog(context, message: 'กรุณาสแกน Part ID ก่อน');
+      _partFocus.requestFocus();
+      return;
+    }
+
+    final serialNo = _serialController.text.trim().toUpperCase();
+    if (serialNo.isEmpty) {
+      showErrorDialog(context, message: 'กรุณาใส่ S/N');
       _serialFocus.requestFocus();
       return;
     }
@@ -223,9 +646,7 @@ if (_serialPartId != null &&
       return;
     }
 
-    final poItem = _currentPo.items.firstWhere((item) => item.partId == partId);
-    final maxQty =
-        poItem.qtyRemaining > 0 ? poItem.qtyRemaining : poItem.qtyOrdered;
+    final maxQty = item.qtyRemaining > 0 ? item.qtyRemaining : item.qtyOrdered;
     if (_serialNumbers.length >= maxQty) {
       showErrorDialog(context, message: 'สแกนครบ $maxQty ชิ้นแล้ว');
       _serialController.clear();
@@ -235,24 +656,32 @@ if (_serialPartId != null &&
 
     setState(() => _loading = true);
     final serialResult = await _api.validateReceivingSerial(
-      partId: partId,
+      partId: item.partId,
       serialNo: serialNo,
     );
     if (!mounted) return;
     setState(() => _loading = false);
 
     if (!serialResult.success) {
+      showErrorDialog(context, message: serialResult.error ?? 'S/N ไม่ถูกต้อง');
+      _serialFocus.requestFocus();
+      return;
+    }
+
+    // S/N ต้องเป็นของ lot/line ที่กำลังรับอยู่เท่านั้น (กันสแกน S/N lot อื่นหลุดเข้ามาผิด lot)
+    if (serialResult.data!.lineId != item.id) {
       showErrorDialog(
         context,
-        message: serialResult.error ?? 'S/N ไม่ถูกต้อง',
+        message:
+            'S/N "$serialNo" ไม่ตรงกับ Lot "${item.lotNumber}" ที่กำลังรับ '
+            '(จริงๆ อยู่ Lot "${serialResult.data!.lotNumber ?? "ไม่ทราบ"}")',
       );
+      _serialController.clear();
       _serialFocus.requestFocus();
       return;
     }
 
     setState(() {
-      _scanningItem = poItem;
-      _serialPartId = partId;
       _serialNumbers.add(serialNo);
       _qtyController.text = _serialNumbers.length.toString();
       _serialController.clear();
@@ -265,8 +694,9 @@ if (_serialPartId != null &&
   }
 
   void showPartForm(POItem poItem) {
-    final condColor =
-        poItem.condition == 'FG' ? AppTheme.success : AppTheme.warning;
+    final condColor = poItem.condition == 'FG'
+        ? AppTheme.success
+        : AppTheme.warning;
 
     showModalBottomSheet(
       context: context,
@@ -287,162 +717,175 @@ if (_serialPartId != null &&
         ),
         child: SingleChildScrollView(
           child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      poItem.partId,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.primary,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              Text(
-                poItem.itemDesc,
-                style: TextStyle(color: AppTheme.textGrey(ctx), fontSize: 13),
-              ),
-              const Divider(height: 20),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  color: condColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: condColor, width: 2),
-                ),
-                child: Column(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(
-                      poItem.condition == 'FG'
-                          ? Icons.check_circle
-                          : MdiIcons.cogOutline,
-                      color: condColor,
-                      size: 36,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      poItem.condition,
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: condColor,
+                    Expanded(
+                      child: Text(
+                        poItem.partId,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.primary,
+                        ),
                       ),
                     ),
-                    Text(
-                      poItem.condition == 'FG'
-                          ? 'สินค้าปกติ'
-                          : 'ต้องติดสติ๊กเกอร์',
-                      style: TextStyle(fontSize: 13, color: condColor),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 12),
-              InfoRow(
-                label: 'Owner',
-                value: '${poItem.owner} (${poItem.brand})',
-              ),
-              InfoRow(label: 'สั่งซื้อ', value: '${poItem.qtyOrdered} ชิ้น'),
-              if (poItem.qtyRemaining > 0 &&
-                  poItem.qtyRemaining < poItem.qtyOrdered)
+                Text(
+                  poItem.itemDesc,
+                  style: TextStyle(color: AppTheme.textGrey(ctx), fontSize: 13),
+                ),
+                const Divider(height: 20),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  decoration: BoxDecoration(
+                    color: condColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: condColor, width: 2),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        poItem.condition == 'FG'
+                            ? Icons.check_circle
+                            : MdiIcons.cogOutline,
+                        color: condColor,
+                        size: 36,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        poItem.condition,
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: condColor,
+                        ),
+                      ),
+                      Text(
+                        poItem.condition == 'FG'
+                            ? 'สินค้าปกติ'
+                            : 'ต้องติดสติ๊กเกอร์',
+                        style: TextStyle(fontSize: 13, color: condColor),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
                 InfoRow(
-                  label: 'รับได้อีก',
-                  value: '${poItem.qtyRemaining} ชิ้น',
-                  valueColor: AppTheme.warning,
+                  label: 'Owner',
+                  value: '${poItem.owner} (${poItem.brand})',
                 ),
-              if (poItem.lotNumber != null && poItem.lotNumber!.isNotEmpty)
-                InfoRow(label: 'Batch No.', value: poItem.lotNumber!),
-              if (poItem.expiredDate != null && poItem.expiredDate!.isNotEmpty)
-                InfoRow(label: 'Exp', value: poItem.expiredDate!),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _qtyController,
-                keyboardType: TextInputType.number,
-                readOnly: true,
-                decoration: InputDecoration(
-                  labelText: 'จำนวนที่รับจริง',
-                  prefixIcon: Icon(MdiIcons.numeric),
+                InfoRow(label: 'สั่งซื้อ', value: '${poItem.qtyOrdered} ชิ้น'),
+                if (poItem.qtyRemaining > 0 &&
+                    poItem.qtyRemaining < poItem.qtyOrdered)
+                  InfoRow(
+                    label: 'รับได้อีก',
+                    value: '${poItem.qtyRemaining} ชิ้น',
+                    valueColor: AppTheme.warning,
+                  ),
+                if (poItem.lotNumber != null && poItem.lotNumber!.isNotEmpty)
+                  InfoRow(label: 'Batch No.', value: poItem.lotNumber!),
+                if (poItem.expiredDate != null &&
+                    poItem.expiredDate!.isNotEmpty)
+                  InfoRow(label: 'Exp', value: poItem.expiredDate!),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _qtyController,
+                  keyboardType: TextInputType.number,
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    labelText: 'จำนวนที่รับจริง',
+                    prefixIcon: Icon(MdiIcons.numeric),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              InfoRow(
-                label: 'S/N',
-                value: _serialNumbers.isNotEmpty ? _serialNumbers.first : '-',
-                valueColor: AppTheme.primary,
-                bold: true,
-              ),
-              const SizedBox(height: 16),
-              PrimaryButton(
-                label: 'บันทึก',
-                icon: Icons.save,
-                loading: _loading,
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  await _confirmPart(poItem);
-                },
-              ),
-            ],
-          ),
+                const SizedBox(height: 8),
+                InfoRow(
+                  label: 'S/N',
+                  value: _serialNumbers.isNotEmpty ? _serialNumbers.first : '-',
+                  valueColor: AppTheme.primary,
+                  bold: true,
+                ),
+                const SizedBox(height: 16),
+                PrimaryButton(
+                  label: 'บันทึก',
+                  icon: Icons.save,
+                  loading: _loading,
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    await _confirmPart(poItem);
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Future<void> _confirmPart(POItem poItem) async {
-    final qty = int.tryParse(_qtyController.text.trim());
+  Future<void> _confirmPart(POItem poItem, {int? qtyOverride}) async {
+    final qty = qtyOverride ?? int.tryParse(_qtyController.text.trim());
     if (qty == null || qty <= 0) {
       showErrorDialog(context, message: 'จำนวนไม่ถูกต้อง');
       return;
     }
 
-    final maxQty =
-        poItem.qtyRemaining > 0 ? poItem.qtyRemaining : poItem.qtyOrdered;
+    final maxQty = poItem.qtyRemaining > 0
+        ? poItem.qtyRemaining
+        : poItem.qtyOrdered;
     if (qty > maxQty) {
       showErrorDialog(
         context,
-        message: 'รับได้สูงสุด $maxQty ชิ้น (รับไปแล้ว ${poItem.qtyReceived} ชิ้น)',
+        message:
+            'รับได้สูงสุด $maxQty ชิ้น (รับไปแล้ว ${poItem.qtyReceived} ชิ้น)',
       );
       return;
     }
 
-    final serialNumbers =
-        _serialPartId == poItem.partId && _serialNumbers.length == qty
-            ? List<String>.of(_serialNumbers)
-            : null;
-    if (serialNumbers == null) {
-      showErrorDialog(
-        context,
-        message: _serialNumbers.isEmpty
-            ? 'กรุณาสแกน S/N'
-            : 'จำนวน S/N (${_serialNumbers.length}) ไม่ตรงกับจำนวนรับ ($qty)',
-      );
-      return;
+    // สินค้ามี serial ต้องมี S/N ครบตามจำนวน — ไม่มี serial ก็รับจำนวนตรงๆ ได้เลย
+    List<String>? serialNumbers;
+    if (poItem.serialRequire) {
+      serialNumbers =
+          _serialPartId == poItem.partId && _serialNumbers.length == qty
+          ? List<String>.of(_serialNumbers)
+          : null;
+      if (serialNumbers == null) {
+        showErrorDialog(
+          context,
+          message: _serialNumbers.isEmpty
+              ? 'กรุณาสแกน S/N'
+              : 'จำนวน S/N (${_serialNumbers.length}) ไม่ตรงกับจำนวนรับ ($qty)',
+        );
+        return;
+      }
     }
+
+    // เด้ง popup สแกน pallet ก่อนบันทึกจริงเสมอ (ไม่ต้องไปหน้าอื่น/section อื่น)
+    final palletId = await _pickPallet(defaultPalletId: _lastPalletId);
+    if (!mounted || palletId == null || palletId.isEmpty) return;
 
     setState(() => _loading = true);
 
     final result = await _api.scanReceiptPart(
       poId: widget.po.poId,
       partId: poItem.partId,
+      lineId: poItem.id,
       qtyReceived: qty,
       operatorId: widget.userId,
       serialNumbers: serialNumbers,
+      palletId: palletId,
     );
 
     if (!mounted) return;
@@ -457,33 +900,179 @@ if (_serialPartId != null &&
 
     if (line.poItemStatus == 'OVER') {
       showWarningSnackbar(context, 'Over receiving: ${line.message}');
+    }
+
+    if (line.palletError != null) {
+      // scan สำเร็จแล้ว แค่ผูก pallet ไม่สำเร็จ — เอาไปไว้ในลิสต์รอผูกใหม่
+      showWarningSnackbar(
+        context,
+        '${line.partId} บันทึกแล้ว แต่ผูก Pallet ไม่สำเร็จ: ${line.palletError}',
+      );
+      setState(() => _resumedPendingLines.insert(0, line));
     } else {
-      showSuccessSnackbar(context, '${line.partId} บันทึกแล้ว');
+      showSuccessSnackbar(context, '${line.partId} -> Pallet ${line.palletId} สำเร็จ');
+      setState(() {
+        _lastPalletId = line.palletId;
+        _lastPalletType = line.condition;
+        _storeAssignedLine(line, line.palletId!);
+      });
     }
 
     _clearFormFields();
     _clearSerialScan();
 
-    setState(() {
-      _pendingLine = line;
-      if (_lastPalletId != null && _lastPalletType == line.condition) {
-        _palletController.text = _lastPalletId!;
-      } else {
-        _palletController.clear();
-      }
-    });
-
-    if (_lastPalletId != null && _lastPalletType != line.condition) {
-      showWarningSnackbar(
-        context,
-        'Pallet $_lastPalletId เป็น $_lastPalletType ไม่ตรงกับสินค้า ${line.condition} - กรุณาสแกน Pallet ใหม่',
+    if (line.autoClosed) {
+      await _showAutoClosedDialog(
+        line.poStatus ?? 'RECEIVED',
+        line.closeMessage ?? 'ปิด Session อัตโนมัติ',
       );
+      return;
     }
 
-    _palletFocus.requestFocus();
+    await _reloadPo();
+    _partFocus.requestFocus();
   }
 
-  Future<void> _assignToPallet(ReceiptLineResponse line, String palletId) async {
+  // สแกน/กรอก Pallet ID ก่อน submit จริง — popup ลอย ไม่สลับ section/หน้า
+  Future<String?> _pickPallet({String? defaultPalletId}) {
+    final controller = TextEditingController(text: defaultPalletId ?? '');
+    final focusNode = FocusNode();
+
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Container(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            MediaQuery.of(ctx).padding.bottom + 16,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'สแกน Pallet',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'สแกนหรือกรอก Pallet ID เพื่อใส่สินค้าที่รับเข้า',
+                style: TextStyle(fontSize: 13, color: AppTheme.textGrey(ctx)),
+              ),
+              const SizedBox(height: 16),
+              ScanTextField(
+                label: 'Pallet ID',
+                hint: 'เช่น PLT-001',
+                controller: controller,
+                focusNode: focusNode,
+                onSubmit: () {
+                  final id = controller.text.trim().toUpperCase();
+                  if (id.isNotEmpty) Navigator.pop(ctx, id);
+                },
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: PrimaryButton(
+                  label: 'ยืนยัน',
+                  icon: Icons.save,
+                  onPressed: () {
+                    final id = controller.text.trim().toUpperCase();
+                    if (id.isEmpty) return;
+                    Navigator.pop(ctx, id);
+                  },
+                ),
+              ),
+              const SizedBox(height: 4),
+              Center(
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('ยกเลิก'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAutoClosedDialog(String poStatus, String closeMessage) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Row(
+          children: [
+            Icon(
+              poStatus == 'RECEIVED' ? Icons.check_circle : Icons.warning_amber,
+              color: poStatus == 'RECEIVED' ? AppTheme.success : AppTheme.warning,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                poStatus == 'RECEIVED' ? 'รับสินค้าครบแล้ว' : 'รับสินค้าบางส่วน',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(closeMessage),
+            const SizedBox(height: 8),
+            Text(
+              'Session ถูกปิดอัตโนมัติ',
+              style: TextStyle(color: AppTheme.textGrey(context), fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            InfoRow(label: 'PO', value: widget.po.poId),
+            InfoRow(label: 'Status', value: poStatus),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.popUntil(
+                context,
+                (route) => route.isFirst || route.settings.name == '/',
+              );
+            },
+            child: const Text('เสร็จสิ้น'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _assignToPallet(
+    ReceiptLineResponse line,
+    String palletId,
+  ) async {
     setState(() => _loading = true);
 
     final result = await _api.assignPallet(
@@ -521,66 +1110,7 @@ if (_serialPartId != null &&
           data['closeMessage'] as String? ?? 'ปิด Session อัตโนมัติ';
 
       if (!mounted) return;
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          title: Row(
-            children: [
-              Icon(
-                poStatus == 'RECEIVED'
-                    ? Icons.check_circle
-                    : Icons.warning_amber,
-                color: poStatus == 'RECEIVED'
-                    ? AppTheme.success
-                    : AppTheme.warning,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  poStatus == 'RECEIVED'
-                      ? 'รับสินค้าครบแล้ว'
-                      : 'รับสินค้าบางส่วน',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(closeMessage),
-              const SizedBox(height: 8),
-              Text(
-                'Session ถูกปิดอัตโนมัติ',
-                style: TextStyle(
-                  color: AppTheme.textGrey(context),
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 12),
-              InfoRow(label: 'PO', value: widget.po.poId),
-              InfoRow(label: 'Status', value: poStatus),
-            ],
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                Navigator.popUntil(
-                  context,
-                  (route) => route.isFirst || route.settings.name == '/',
-                );
-              },
-              child: const Text('เสร็จสิ้น'),
-            ),
-          ],
-        ),
-      );
+      await _showAutoClosedDialog(poStatus, closeMessage);
       return;
     }
 
@@ -647,7 +1177,8 @@ if (_serialPartId != null &&
     final confirmed = await showConfirmDialog(
       context,
       title: 'ลบ S/N?',
-      message: 'ต้องการลบ S/N "$serialNo" ($positionText) ออกจากรายการสแกนหรือไม่',
+      message:
+          'ต้องการลบ S/N "$serialNo" ($positionText) ออกจากรายการสแกนหรือไม่',
       confirmLabel: 'ลบ',
       cancelLabel: 'ยกเลิก',
       isDanger: true,
@@ -680,9 +1211,7 @@ if (_serialPartId != null &&
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: AppTheme.primary.withValues(alpha: 0.14),
-        ),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.14)),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -755,12 +1284,15 @@ if (_serialPartId != null &&
                           : Colors.white,
                       border: Border(
                         left: BorderSide(
-                          color: highlighted ? highlightColor : Colors.transparent,
+                          color: highlighted
+                              ? highlightColor
+                              : Colors.transparent,
                           width: 3,
                         ),
                         bottom: BorderSide(
-                          color: AppTheme.textGrey(context)
-                              .withValues(alpha: 0.08),
+                          color: AppTheme.textGrey(
+                            context,
+                          ).withValues(alpha: 0.08),
                         ),
                       ),
                     ),
@@ -828,8 +1360,7 @@ if (_serialPartId != null &&
   }
 
   Widget _buildScannedSerialSummary(POItem item) {
-    final maxQty =
-        item.qtyRemaining > 0 ? item.qtyRemaining : item.qtyOrdered;
+    final maxQty = item.qtyRemaining > 0 ? item.qtyRemaining : item.qtyOrdered;
 
     return Container(
       width: double.infinity,
@@ -859,10 +1390,7 @@ if (_serialPartId != null &&
           const SizedBox(height: 4),
           Text(
             item.itemDesc,
-            style: TextStyle(
-              color: AppTheme.textGrey(context),
-              fontSize: 13,
-            ),
+            style: TextStyle(color: AppTheme.textGrey(context), fontSize: 13),
           ),
           const SizedBox(height: 10),
           InfoRow(
@@ -900,13 +1428,143 @@ if (_serialPartId != null &&
     );
   }
 
+  // สินค้าไม่มี serial — แก้จำนวนรับด้วยปุ่ม +/- แทนการสแกน S/N ทีละชิ้น
+  void _setManualQty(int value, int maxQty) {
+    final clamped = value.clamp(0, maxQty);
+    final text = '$clamped';
+    setState(() {
+      _manualQty = clamped;
+      if (_manualQtyController.text != text) {
+        _manualQtyController.text = text;
+        _manualQtyController.selection = TextSelection.collapsed(
+          offset: text.length,
+        );
+      }
+    });
+  }
+
+  Widget _buildManualQtyEditor(POItem item) {
+    final maxQty = item.qtyRemaining > 0 ? item.qtyRemaining : item.qtyOrdered;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  item.partId,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.primary,
+                  ),
+                ),
+              ),
+              StatusBadge(item.condition),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            item.itemDesc,
+            style: TextStyle(color: AppTheme.textGrey(context), fontSize: 13),
+          ),
+          if (item.lotNumber != null && item.lotNumber!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            InfoRow(label: 'Batch No.', value: item.lotNumber!),
+          ],
+          const SizedBox(height: 12),
+          Text(
+            'จำนวนที่รับ',
+            style: TextStyle(fontSize: 13, color: AppTheme.textGrey(context)),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton.filled(
+                onPressed: _manualQty > 0
+                    ? () => _setManualQty(_manualQty - 1, maxQty)
+                    : null,
+                icon: const Icon(Icons.remove),
+              ),
+              SizedBox(
+                width: 90,
+                child: TextField(
+                  controller: _manualQtyController,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  onChanged: (value) =>
+                      _setManualQty(int.tryParse(value) ?? 0, maxQty),
+                ),
+              ),
+              IconButton.filled(
+                onPressed: _manualQty < maxQty
+                    ? () => _setManualQty(_manualQty + 1, maxQty)
+                    : null,
+                icon: const Icon(Icons.add),
+              ),
+            ],
+          ),
+          Center(
+            child: Text(
+              'สูงสุด $maxQty ชิ้น',
+              style: TextStyle(fontSize: 12, color: AppTheme.textGrey(context)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => setState(() {
+                    _clearSerialScan();
+                    _clearFormFields();
+                  }),
+                  icon: const Icon(Icons.clear, size: 18),
+                  label: const Text('ยกเลิก'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _manualQty > 0
+                      ? () => _confirmPart(item, qtyOverride: _manualQty)
+                      : null,
+                  icon: const Icon(Icons.save, size: 18),
+                  label: Text('บันทึก ($_manualQty)'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFloatingScanStatus() {
     final message = _scanStatusMessage;
     if (message == null) return const SizedBox.shrink();
     final isDuplicate = _scanStatusTone == _ScanStatusTone.duplicate;
     final statusColor = isDuplicate ? AppTheme.warning : AppTheme.success;
-    final statusIcon =
-        isDuplicate ? Icons.error_outline_rounded : Icons.check_rounded;
+    final statusIcon = isDuplicate
+        ? Icons.error_outline_rounded
+        : Icons.check_rounded;
     final statusTitle = isDuplicate ? 'สแกนซ้ำ' : 'สถานะสแกน';
 
     return Positioned(
@@ -947,11 +1605,7 @@ if (_serialPartId != null &&
                           color: Colors.white.withValues(alpha: 0.18),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
-                          statusIcon,
-                          color: Colors.white,
-                          size: 22,
-                        ),
+                        child: Icon(statusIcon, color: Colors.white, size: 22),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -1030,122 +1684,128 @@ if (_serialPartId != null &&
             SafeArea(
               top: false,
               child: Column(
-            children: [
-              Expanded(
-                child: LoadingOverlay(
-                  loading: _loading,
-                  message: 'กำลังดำเนินการ...',
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ReceivingSessionBar(
-                          po: _currentPo,
+                children: [
+                  Expanded(
+                    child: LoadingOverlay(
+                      loading: _loading,
+                      message: 'กำลังดำเนินการ...',
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ReceivingSessionBar(po: _currentPo),
+                            const SizedBox(height: 16),
+                            if (_lastPalletId != null)
+                              CurrentPalletBar(
+                                palletId: _lastPalletId!,
+                                palletType: _lastPalletType!,
+                                onClear: () {
+                                  setState(() {
+                                    _lastPalletId = null;
+                                    _lastPalletType = null;
+                                  });
+                                },
+                              ),
+                            if (_lastPalletId != null)
+                              const SizedBox(height: 12),
+                            if (showPalletSection) ...[
+                              PalletScanSection(
+                                pendingLine: _pendingLine!,
+                                palletController: _palletController,
+                                palletFocus: _palletFocus,
+                                onScanPallet: _scanPallet,
+                                title: 'สแกน Pallet',
+                                fieldLabel: 'Pallet ID',
+                                fieldHint: 'เช่น PAL-001',
+                                buttonLabel: 'ผูก Pallet',
+                                conditionMessage:
+                                    'สินค้าเป็น ${_pendingLine!.condition} - สแกน Pallet ประเภท ${_pendingLine!.condition}',
+                                quantitySuffix: 'ชิ้น',
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            if (!showPalletSection) ...[
+                              WmsCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'สแกน Part',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    ScanTextField(
+                                      label: 'Part ID',
+                                      hint: 'เช่น PT-9821',
+                                      controller: _partController,
+                                      focusNode: _partFocus,
+                                      enabled: _scanningItem == null,
+                                      onSubmit: _scanPartId,
+                                    ),
+                                    if (_scanningItem != null &&
+                                        _scanningItem!.serialRequire) ...[
+                                      const SizedBox(height: 12),
+                                      ScanTextField(
+                                        label: 'S/N',
+                                        hint: 'สแกน Serial Number',
+                                        controller: _serialController,
+                                        focusNode: _serialFocus,
+                                        onSubmit: _addSerial,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      PrimaryButton(
+                                        label: 'เพิ่ม S/N',
+                                        icon: MdiIcons.barcodeScan,
+                                        onPressed: _addSerial,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      _buildScannedSerialSummary(
+                                        _scanningItem!,
+                                      ),
+                                    ] else if (_scanningItem != null) ...[
+                                      const SizedBox(height: 16),
+                                      _buildManualQtyEditor(_scanningItem!),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            if (_resumedPendingLines.isNotEmpty) ...[
+                              ResumedPendingList(
+                                lines: _resumedPendingLines,
+                                canAssign: _pendingLine == null,
+                                title: 'รอผูก Pallet (จาก session เดิม)',
+                                buttonLabel: 'ผูก',
+                                quantitySuffix: 'ชิ้น',
+                                onAssign: _assignResumedLine,
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            if (_assignedLines.isNotEmpty) ...[
+                              AssignedList(
+                                lines: _assignedLines,
+                                titlePrefix: 'ผูก Pallet แล้ว',
+                                quantitySuffix: 'ชิ้น',
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            if (pendingItems.isNotEmpty && !showPalletSection)
+                              PendingItemsList(
+                                items: pendingItems,
+                                title: 'ยังไม่ได้สแกน',
+                                quantitySuffix: 'ชิ้น',
+                              ),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        if (_lastPalletId != null)
-                          CurrentPalletBar(
-                            palletId: _lastPalletId!,
-                            palletType: _lastPalletType!,
-                            onClear: () {
-                              setState(() {
-                                _lastPalletId = null;
-                                _lastPalletType = null;
-                              });
-                            },
-                          ),
-                        if (_lastPalletId != null) const SizedBox(height: 12),
-                        if (showPalletSection) ...[
-                          PalletScanSection(
-                            pendingLine: _pendingLine!,
-                            palletController: _palletController,
-                            palletFocus: _palletFocus,
-                            onScanPallet: _scanPallet,
-                            title: 'สแกน Pallet',
-                            fieldLabel: 'Pallet ID',
-                            fieldHint: 'เช่น PAL-001',
-                            buttonLabel: 'ผูก Pallet',
-                            conditionMessage:
-                                'สินค้าเป็น ${_pendingLine!.condition} - สแกน Pallet ประเภท ${_pendingLine!.condition}',
-                            quantitySuffix: 'ชิ้น',
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-                        if (!showPalletSection) ...[
-                          WmsCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'สแกน Part',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                ScanTextField(
-                                  label: 'Part ID',
-                                  hint: 'เช่น PT-9821',
-                                  controller: _partController,
-                                  focusNode: _partFocus,
-                                  onSubmit: () => _serialFocus.requestFocus(),
-                                ),
-                                const SizedBox(height: 12),
-                                ScanTextField(
-                                  label: 'S/N',
-                                  hint: 'สแกน Serial Number',
-                                  controller: _serialController,
-                                  focusNode: _serialFocus,
-                                  onSubmit: _scanPart,
-                                ),
-                                const SizedBox(height: 12),
-                                PrimaryButton(
-                                  label: 'เพิ่ม S/N',
-                                  icon: MdiIcons.barcodeScan,
-                                  onPressed: _scanPart,
-                                ),
-                                if (_scanningItem != null) ...[
-                                  const SizedBox(height: 16),
-                                  _buildScannedSerialSummary(_scanningItem!),
-                                ],
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-                        if (_resumedPendingLines.isNotEmpty) ...[
-                          ResumedPendingList(
-                            lines: _resumedPendingLines,
-                            canAssign: _pendingLine == null,
-                            title: 'รอผูก Pallet (จาก session เดิม)',
-                            buttonLabel: 'ผูก',
-                            quantitySuffix: 'ชิ้น',
-                            onAssign: _assignResumedLine,
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-                        if (_assignedLines.isNotEmpty) ...[
-                          AssignedList(
-                            lines: _assignedLines,
-                            titlePrefix: 'ผูก Pallet แล้ว',
-                            quantitySuffix: 'ชิ้น',
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-                        if (pendingItems.isNotEmpty && !showPalletSection)
-                          PendingItemsList(
-                            items: pendingItems,
-                            title: 'ยังไม่ได้สแกน',
-                            quantitySuffix: 'ชิ้น',
-                          ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ],
+                ],
               ),
             ),
             _buildFloatingScanStatus(),
@@ -1161,6 +1821,7 @@ if (_serialPartId != null &&
     _partController.dispose();
     _partFocus.dispose();
     _qtyController.dispose();
+    _manualQtyController.dispose();
     _serialController.dispose();
     _serialFocus.dispose();
     _serialListController.dispose();

@@ -39,6 +39,7 @@ class POItem {
   final String brand;
   final String itemDesc;
   final String? imageUrl;
+  final bool serialRequire;
   final int qtyOrdered;
   final int qtyReceived;
   final int qtyRemaining;
@@ -54,6 +55,7 @@ class POItem {
     required this.brand,
     required this.itemDesc,
     this.imageUrl,
+    this.serialRequire = false,
     required this.qtyOrdered,
     required this.qtyReceived,
     required this.qtyRemaining,
@@ -70,6 +72,7 @@ class POItem {
     brand: json['brand'],
     itemDesc: json['itemDesc'],
     imageUrl: json['imageUrl'],
+    serialRequire: json['serialRequire'] ?? false,
     qtyOrdered: json['qtyOrdered'],
     qtyReceived: json['qtyReceived'],
     qtyRemaining: json['qtyRemaining'] ?? 0,
@@ -78,6 +81,104 @@ class POItem {
     lotNumber: json['lotNumber'],
     expiredDate: json['expiredDate'],
   );
+}
+
+// ── สแกน Part ID ครั้งแรก (ยังไม่มี S/N) — เอาไว้เช็คว่ามีกี่ condition/lot ให้เลือก ──
+class PartLinesResponse {
+  final String partId;
+  final bool serialRequire;
+  final List<PartLine> lines;
+
+  PartLinesResponse({
+    required this.partId,
+    required this.serialRequire,
+    required this.lines,
+  });
+
+  factory PartLinesResponse.fromJson(Map<String, dynamic> json) =>
+      PartLinesResponse(
+        partId: json['partId'],
+        serialRequire: json['serialRequire'] ?? false,
+        lines: (json['lines'] as List? ?? [])
+            .map((l) => PartLine.fromJson(l))
+            .toList(),
+      );
+}
+
+class PartLine {
+  final int lineId;
+  final String poId;
+  final String condition;
+  final List<PartLot> lots;
+
+  PartLine({
+    required this.lineId,
+    required this.poId,
+    required this.condition,
+    required this.lots,
+  });
+
+  factory PartLine.fromJson(Map<String, dynamic> json) => PartLine(
+    lineId: json['lineId'],
+    poId: json['poId'],
+    condition: json['condition'] ?? 'FG',
+    lots: (json['lots'] as List? ?? [])
+        .map((l) => PartLot.fromJson(l))
+        .toList(),
+  );
+}
+
+class PartLot {
+  final int id;
+  final String lotNumber;
+  final int qtyOrdered;
+  final int qtyReceived;
+
+  PartLot({
+    required this.id,
+    required this.lotNumber,
+    required this.qtyOrdered,
+    required this.qtyReceived,
+  });
+
+  factory PartLot.fromJson(Map<String, dynamic> json) => PartLot(
+    id: json['id'],
+    lotNumber: json['lotNumber'],
+    qtyOrdered: json['qtyOrdered'],
+    qtyReceived: json['qtyReceived'] ?? 0,
+  );
+}
+
+// ผล validate ตอนสแกน S/N — ใช้เช็คว่า S/N นี้เป็นของ lineId/lot ที่กำลังรับอยู่จริงไหม
+class ValidateSerialResponse {
+  final String partId;
+  final String serialNo;
+  final String status;
+  final int? lineId;
+  final String? poId;
+  final String? condition;
+  final String? lotNumber;
+
+  ValidateSerialResponse({
+    required this.partId,
+    required this.serialNo,
+    required this.status,
+    this.lineId,
+    this.poId,
+    this.condition,
+    this.lotNumber,
+  });
+
+  factory ValidateSerialResponse.fromJson(Map<String, dynamic> json) =>
+      ValidateSerialResponse(
+        partId: json['partId'],
+        serialNo: json['serialNo'],
+        status: json['status'],
+        lineId: json['lineId'],
+        poId: json['poId'],
+        condition: json['condition'],
+        lotNumber: json['lotNumber'],
+      );
 }
 
 class ReceiptLineResponse {
@@ -93,6 +194,12 @@ class ReceiptLineResponse {
   final String? lotNumber;
   final String poItemStatus;
   final String message;
+  // ── ผลของการผูก Pallet (ถ้า scan-part ส่ง palletId มาด้วย) ──
+  final String? palletId;
+  final bool autoClosed;
+  final String? poStatus;
+  final String? closeMessage;
+  final String? palletError;
 
   ReceiptLineResponse({
     required this.lineId,
@@ -107,6 +214,11 @@ class ReceiptLineResponse {
     this.lotNumber,
     required this.poItemStatus,
     required this.message,
+    this.palletId,
+    this.autoClosed = false,
+    this.poStatus,
+    this.closeMessage,
+    this.palletError,
   });
 
   factory ReceiptLineResponse.fromJson(Map<String, dynamic> json) =>
@@ -123,6 +235,11 @@ class ReceiptLineResponse {
         lotNumber: json['lotNumber'],
         poItemStatus: json['poItemStatus'],
         message: json['message'],
+        palletId: json['palletId'],
+        autoClosed: json['autoClosed'] ?? false,
+        poStatus: json['poStatus'],
+        closeMessage: json['closeMessage'],
+        palletError: json['palletError'],
       );
 }
 
