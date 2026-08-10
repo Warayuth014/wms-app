@@ -58,7 +58,3 @@ lib/
 ├── widgets/     → shared UI components
 └── theme/       → app-wide styling
 ```
-
-## License
-
-MIT — see [LICENSE](LICENSE).
