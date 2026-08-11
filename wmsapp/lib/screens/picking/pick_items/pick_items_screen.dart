@@ -64,6 +64,8 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
   final _partScanFocus = FocusNode();
   final _serialScanCtrl = TextEditingController();
   final _serialScanFocus = FocusNode();
+  final _qtyEntryCtrl = TextEditingController();
+  final _qtyEntryFocus = FocusNode();
   final _api = ApiService();
 
   _PickState _state = _PickState.pickView;
@@ -77,6 +79,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
   String? _returnPalletId;
   final Set<String> _selectedPartIds = {};
   final Map<String, List<String>> _pickedSerials = {};
+  final Map<String, int> _pickedQty = {};
   final Set<String> _expandedSerialPartIds = {};
 
   @override
@@ -90,10 +93,84 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
   void _resetPickedSerials() {
     _selectedPartIds.clear();
     _pickedSerials.clear();
+    _pickedQty.clear();
     _expandedSerialPartIds.clear();
+    _qtyEntryCtrl.clear();
     for (final item in _assignment.palletItems) {
       _pickedSerials[item.partId] = <String>[];
     }
+  }
+
+  /// จำนวนที่หยิบแล้วของ part นี้ — จาก S/N ที่สแกน (ถ้า require) หรือจำนวนที่กรอกตรง (ถ้าไม่ require)
+  int _pickedCountFor(PickItemOnPallet item) => item.serialRequire
+      ? (_pickedSerials[item.partId]?.length ?? 0)
+      : (_pickedQty[item.partId] ?? 0);
+
+  PickItemOnPallet? get _currentItem {
+    if (_selectedPartIds.length != 1) return null;
+    final partId = _selectedPartIds.first;
+    return _assignment.palletItems.where((i) => i.partId == partId).firstOrNull;
+  }
+
+  /// เลือก part นี้ให้ active (single-select) — ถ้ามี S/N ต้อง scan, ถ้าไม่มีให้กรอกจำนวนตรงๆ
+  void _activatePart(String partId) {
+    final item = _assignment.palletItems.where((i) => i.partId == partId).firstOrNull;
+    if (item == null) return;
+
+    setState(() {
+      _selectedPartIds
+        ..clear()
+        ..add(partId);
+      _partScanCtrl.text = partId;
+      if (!item.serialRequire) {
+        final remaining = item.qtyToPickSuggested - (_pickedQty[partId] ?? 0);
+        _qtyEntryCtrl.text = remaining > 0 ? '$remaining' : '0';
+      }
+    });
+
+    if (item.serialRequire) {
+      _serialScanFocus.requestFocus();
+    } else {
+      _qtyEntryFocus.requestFocus();
+    }
+  }
+
+  void _scanPartField() {
+    final partId = _partScanCtrl.text.trim().toUpperCase();
+    if (partId.isEmpty) return;
+
+    final item = _assignment.palletItems.where((i) => i.partId == partId).firstOrNull;
+    if (item == null) {
+      showErrorDialog(context, message: 'ไม่พบ Part "$partId" บน Pallet นี้');
+      return;
+    }
+    _activatePart(partId);
+  }
+
+  void _addQty() {
+    final item = _currentItem;
+    if (item == null) {
+      showWarningSnackbar(context, 'กรุณาสแกน Part ก่อน');
+      _partScanFocus.requestFocus();
+      return;
+    }
+
+    final qty = int.tryParse(_qtyEntryCtrl.text.trim());
+    if (qty == null || qty <= 0) {
+      showWarningSnackbar(context, 'กรุณาระบุจำนวน');
+      _qtyEntryFocus.requestFocus();
+      return;
+    }
+    if (qty > item.qtyToPickSuggested) {
+      showErrorDialog(
+        context,
+        message: 'จำนวนเกินที่ต้องการ Pick (สูงสุด ${item.qtyToPickSuggested})',
+      );
+      return;
+    }
+
+    setState(() => _pickedQty[item.partId] = qty);
+    showSuccessSnackbar(context, 'Part ${item.partId} ระบุจำนวน $qty ชิ้น');
   }
 
   Future<void> _scanSourcePallet() async {
@@ -241,22 +318,15 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
         .firstOrNull;
     if (item == null) return;
 
-    setState(() {
-      if (_selectedPartIds.contains(partId)) {
-        // tap ตัวที่ select อยู่ → deselect (กลับไปดูทั้งหมด)
+    if (_selectedPartIds.contains(partId)) {
+      // tap ตัวที่ select อยู่ → deselect (กลับไปดูทั้งหมด)
+      setState(() {
         _selectedPartIds.remove(partId);
         if (_partScanCtrl.text == partId) _partScanCtrl.clear();
-      } else {
-        // single-select: clear ตัวอื่น + add ตัวนี้
-        _selectedPartIds
-          ..clear()
-          ..add(partId);
-        _partScanCtrl.text = partId;
-      }
-    });
-    if (_selectedPartIds.isNotEmpty) {
-      _serialScanFocus.requestFocus();
+      });
+      return;
     }
+    _activatePart(partId);
   }
 
   void _removePickedSerial(String partId, String serialNo) {
@@ -536,20 +606,23 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
   Future<void> _confirmPick(String destId) async {
     final items = <Map<String, dynamic>>[];
     for (final item in _assignment.palletItems) {
-      final serials = _pickedSerials[item.partId] ?? const <String>[];
-      if (serials.isNotEmpty) {
-        items.add({
-          'partId': item.partId,
-          'qty': serials.length,
-          'serialNumbers': serials,
-        });
-      }
+      final qty = _pickedCountFor(item);
+      if (qty <= 0) continue;
+
+      items.add({
+        'partId': item.partId,
+        'qty': qty,
+        // สินค้าไม่มี S/N ส่ง [] ไป backend จะเช็คด้วย Part.SerialRequire เอง
+        'serialNumbers': item.serialRequire
+            ? (_pickedSerials[item.partId] ?? const <String>[])
+            : const <String>[],
+      });
     }
 
     if (items.isEmpty) {
       showWarningSnackbar(
         context,
-        'กรุณาสแกน S/N ที่จะ Pick อย่างน้อย 1 รายการ',
+        'กรุณาสแกน S/N หรือระบุจำนวนที่จะ Pick อย่างน้อย 1 รายการ',
       );
       return;
     }
@@ -719,7 +792,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
     );
     final totalPicked = assignment.palletItems.fold<int>(
       0,
-      (sum, item) => sum + (_pickedSerials[item.partId]?.length ?? 0),
+      (sum, item) => sum + _pickedCountFor(item),
     );
 
     // filter ตาม select + sort: expanded ขึ้นล่างสุด
@@ -811,6 +884,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
   }
 
   Widget _buildPickScannerCard() {
+    final activeItem = _currentItem;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: _pickCardDecoration(),
@@ -852,67 +926,129 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             ),
-            onSubmitted: (_) => _serialScanFocus.requestFocus(),
+            onSubmitted: (_) => _scanPartField(),
           ),
           const SizedBox(height: 12),
-          const Text(
-            'สแกน S/N',
-            style: TextStyle(
-              fontSize: 12,
-              color: _pickTextMuted,
-              fontWeight: FontWeight.w700,
+          // สินค้าไม่มี S/N → กรอกจำนวนตรงๆ แทนการสแกน S/N
+          if (activeItem != null && !activeItem.serialRequire) ...[
+            const Text(
+              'ระบุจำนวนที่หยิบ',
+              style: TextStyle(
+                fontSize: 12,
+                color: _pickTextMuted,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _serialScanCtrl,
-            focusNode: _serialScanFocus,
-            textCapitalization: TextCapitalization.characters,
-            decoration: InputDecoration(
-              labelText: 'Serial Number',
-              hintText: 'กรอกหรือสแกน S/N สินค้า',
-              prefixIcon: const Icon(Icons.confirmation_number, size: 20),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: _pickBorder),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(
-                  color: AppTheme.primary,
-                  width: 1.5,
-                ),
-              ),
-              isDense: true,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            ),
-            onSubmitted: (_) => _scanSerial(),
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: _scanSerial,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text(
-                'เพิ่ม S/N',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
+            const SizedBox(height: 6),
+            TextField(
+              controller: _qtyEntryCtrl,
+              focusNode: _qtyEntryFocus,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'จำนวน',
+                hintText: 'สูงสุด ${activeItem.qtyToPickSuggested}',
+                prefixIcon: const Icon(Icons.numbers_rounded, size: 20),
+                border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: _pickBorder),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                    color: AppTheme.primary,
+                    width: 1.5,
+                  ),
+                ),
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              onSubmitted: (_) => _addQty(),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _addQty,
+                icon: const Icon(Icons.check_rounded),
+                label: const Text(
+                  'ยืนยันจำนวน',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
               ),
             ),
-          ),
+          ] else ...[
+            const Text(
+              'สแกน S/N',
+              style: TextStyle(
+                fontSize: 12,
+                color: _pickTextMuted,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _serialScanCtrl,
+              focusNode: _serialScanFocus,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                labelText: 'Serial Number',
+                hintText: 'กรอกหรือสแกน S/N สินค้า',
+                prefixIcon: const Icon(Icons.confirmation_number, size: 20),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: _pickBorder),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                    color: AppTheme.primary,
+                    width: 1.5,
+                  ),
+                ),
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              onSubmitted: (_) => _scanSerial(),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _scanSerial,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text(
+                  'เพิ่ม S/N',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -987,7 +1123,7 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
         .firstOrNull;
     final needed = orderItem == null ? 0 : item.qtyToPickSuggested;
     final pickedSerials = _pickedSerials[item.partId] ?? const <String>[];
-    final pickedQty = pickedSerials.length;
+    final pickedQty = _pickedCountFor(item);
     final isSelected = pickedQty > 0 || _selectedPartIds.contains(item.partId);
     final isComplete = pickedQty >= needed && needed > 0;
     final progress = needed > 0 ? (pickedQty / needed).clamp(0.0, 1.0) : 0.0;
@@ -1543,6 +1679,8 @@ class _PickItemsScreenState extends State<PickItemsScreen> {
     _partScanFocus.dispose();
     _serialScanCtrl.dispose();
     _serialScanFocus.dispose();
+    _qtyEntryCtrl.dispose();
+    _qtyEntryFocus.dispose();
     super.dispose();
   }
 }

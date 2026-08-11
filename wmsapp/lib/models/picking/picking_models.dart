@@ -338,6 +338,7 @@ class PickItemOnPallet {
   final int qtyOnPallet;
   final int qtyToPickSuggested;
   final String condition;
+  final bool serialRequire;
   final List<String> availableSerials;
 
   PickItemOnPallet({
@@ -350,6 +351,7 @@ class PickItemOnPallet {
     required this.qtyOnPallet,
     required this.qtyToPickSuggested,
     required this.condition,
+    this.serialRequire = false,
     this.availableSerials = const [],
   });
 
@@ -363,6 +365,7 @@ class PickItemOnPallet {
     qtyOnPallet: json['qtyOnPallet'],
     qtyToPickSuggested: json['qtyToPickSuggested'],
     condition: json['condition'],
+    serialRequire: json['serialRequire'] ?? false,
     availableSerials: (json['availableSerials'] as List? ?? [])
         .map((serial) => serial.toString())
         .toList(),
