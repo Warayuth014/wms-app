@@ -43,6 +43,8 @@ class _PackingScreenState extends State<PackingScreen> {
   final _partScanFocus = FocusNode();
   final _serialScanCtrl = TextEditingController();
   final _serialScanFocus = FocusNode();
+  final _qtyEntryCtrl = TextEditingController();
+  final _qtyEntryFocus = FocusNode();
 
   _PackState _state = _PackState.scanPallet;
   bool _loading = false;
@@ -59,6 +61,8 @@ class _PackingScreenState extends State<PackingScreen> {
   String? _selectedPartId;
   // Serial numbers collected for each part (keyed by partId)
   final Map<String, List<String>> _collectedSerials = {};
+  // จำนวนที่กรอกเอง สำหรับ part ที่ไม่มี S/N (keyed by partId)
+  final Map<String, int> _collectedQty = {};
   final Set<String> _expandedSerialPartIds = {};
 
   @override
@@ -83,6 +87,8 @@ class _PackingScreenState extends State<PackingScreen> {
     _partScanFocus.dispose();
     _serialScanCtrl.dispose();
     _serialScanFocus.dispose();
+    _qtyEntryCtrl.dispose();
+    _qtyEntryFocus.dispose();
     super.dispose();
   }
 
@@ -153,6 +159,7 @@ class _PackingScreenState extends State<PackingScreen> {
       _currentPickOrderId = pickOrderId;
       _selectedPartId = null;
       _collectedSerials.clear();
+      _collectedQty.clear();
       _expandedSerialPartIds.clear();
       _partScanCtrl.clear();
       _serialScanCtrl.clear();
@@ -161,6 +168,36 @@ class _PackingScreenState extends State<PackingScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _partScanFocus.requestFocus();
     });
+  }
+
+  /// จำนวนที่เก็บไว้รอ pack ของ part นี้ — จาก S/N ที่สแกน (ถ้า require) หรือจำนวนที่กรอกตรง
+  int _collectedCountFor(PackingPartItem part) => part.serialRequire
+      ? (_collectedSerials[part.partId]?.length ?? 0)
+      : (_collectedQty[part.partId] ?? 0);
+
+  PackingPartItem? get _currentPart {
+    final partId = _selectedPartId;
+    if (partId == null) return null;
+    return _orderResp?.parts.where((p) => p.partId == partId).firstOrNull;
+  }
+
+  /// เลือก part ให้ active — ถ้ามี S/N โฟกัสช่องสแกน S/N, ถ้าไม่มีให้กรอกจำนวนตรงๆ
+  void _activatePart(PackingPartItem part) {
+    setState(() {
+      _selectedPartId = part.partId;
+      _partScanCtrl.text = part.partId;
+      if (!part.serialRequire) {
+        final already = _collectedQty[part.partId] ?? 0;
+        final remaining = part.remaining - already;
+        _qtyEntryCtrl.text = remaining > 0 ? '$remaining' : '0';
+      }
+    });
+
+    if (part.serialRequire) {
+      _serialScanFocus.requestFocus();
+    } else {
+      _qtyEntryFocus.requestFocus();
+    }
   }
 
   Future<void> _scanPart() async {
@@ -182,11 +219,33 @@ class _PackingScreenState extends State<PackingScreen> {
       return;
     }
 
-    setState(() {
-      _selectedPartId = partId;
-      _partScanCtrl.text = partId;
-    });
-    _serialScanFocus.requestFocus();
+    _activatePart(part);
+  }
+
+  void _addQty() {
+    final part = _currentPart;
+    if (part == null) {
+      showWarningSnackbar(context, 'กรุณาสแกน Part ก่อน');
+      _partScanFocus.requestFocus();
+      return;
+    }
+
+    final qty = int.tryParse(_qtyEntryCtrl.text.trim());
+    if (qty == null || qty <= 0) {
+      showWarningSnackbar(context, 'กรุณาระบุจำนวน');
+      _qtyEntryFocus.requestFocus();
+      return;
+    }
+    if (qty > part.remaining) {
+      showErrorDialog(
+        context,
+        message: 'จำนวนเกินที่ต้อง Pack (สูงสุด ${part.remaining})',
+      );
+      return;
+    }
+
+    setState(() => _collectedQty[part.partId] = qty);
+    showSuccessSnackbar(context, 'Part ${part.partId} ระบุจำนวน $qty ชิ้น');
   }
 
   void _scanSerial() {
@@ -309,19 +368,15 @@ class _PackingScreenState extends State<PackingScreen> {
     final part = _orderResp?.parts.where((p) => p.partId == partId).firstOrNull;
     if (part == null || part.isDone) return;
 
-    setState(() {
-      if (_selectedPartId == partId) {
-        // tap ตัวที่ select อยู่ → deselect (กลับไปดูทั้งหมด)
+    if (_selectedPartId == partId) {
+      // tap ตัวที่ select อยู่ → deselect (กลับไปดูทั้งหมด)
+      setState(() {
         _selectedPartId = null;
         _partScanCtrl.clear();
-      } else {
-        _selectedPartId = partId;
-        _partScanCtrl.text = partId;
-      }
-    });
-    if (_selectedPartId != null) {
-      _serialScanFocus.requestFocus();
+      });
+      return;
     }
+    _activatePart(part);
   }
 
   void _removeCollectedSerial(String partId, String serialNo) {
@@ -330,6 +385,7 @@ class _PackingScreenState extends State<PackingScreen> {
       serials?.remove(serialNo);
       if (serials == null || serials.isEmpty) {
         _collectedSerials.remove(partId);
+        _collectedQty.remove(partId);
         _expandedSerialPartIds.remove(partId);
         if (_selectedPartId == partId) {
           _selectedPartId = null;
@@ -544,9 +600,11 @@ class _PackingScreenState extends State<PackingScreen> {
     );
   }
 
-  Future<void> _confirmPart(String partId, int qty) async {
+  Future<void> _confirmPart(PackingPartItem part, int qty) async {
+    final partId = part.partId;
     final serials = _collectedSerials[partId] ?? const <String>[];
-    if (serials.length != qty) {
+
+    if (part.serialRequire && serials.length != qty) {
       showErrorDialog(context,
           message:
               'จำนวน S/N (${serials.length}) ไม่ตรงกับจำนวนที่ต้อง Pack ($qty)');
@@ -560,7 +618,8 @@ class _PackingScreenState extends State<PackingScreen> {
       partId: partId,
       qty: qty,
       operatorId: widget.userId,
-      serialNumbers: List<String>.of(serials),
+      // สินค้าไม่มี S/N ส่ง [] — backend เช็คด้วย Part.SerialRequire เอง
+      serialNumbers: part.serialRequire ? List<String>.of(serials) : const [],
     );
     if (!mounted) return;
     setState(() => _loading = false);
@@ -587,6 +646,7 @@ class _PackingScreenState extends State<PackingScreen> {
         );
         _selectedPartId = null;
         _collectedSerials.remove(partId);
+        _collectedQty.remove(partId);
         _expandedSerialPartIds.remove(partId);
         _partScanCtrl.clear();
         _serialScanCtrl.clear();
@@ -599,6 +659,7 @@ class _PackingScreenState extends State<PackingScreen> {
       _orderResp = resp;
       _selectedPartId = null;
       _collectedSerials.remove(partId);
+      _collectedQty.remove(partId);
       _expandedSerialPartIds.remove(partId);
       _partScanCtrl.clear();
       _serialScanCtrl.clear();
@@ -610,24 +671,28 @@ class _PackingScreenState extends State<PackingScreen> {
     final order = _orderResp;
     if (order == null) return;
 
+    // Part มี S/N → ต้องสแกนครบ remaining ถึงจะ pack ได้
+    // Part ไม่มี S/N → กรอกจำนวนเท่าไหร่ก็ pack เท่านั้น (pack บางส่วนได้)
     final readyParts = order.parts
         .where((part) =>
             !part.isDone &&
             part.remaining > 0 &&
-            (_collectedSerials[part.partId]?.length ?? 0) == part.remaining)
+            (part.serialRequire
+                ? _collectedCountFor(part) == part.remaining
+                : _collectedCountFor(part) > 0))
         .toList();
 
     if (readyParts.isEmpty) {
       showWarningSnackbar(
         context,
-        'กรุณาสแกน S/N ให้ครบอย่างน้อย 1 รายการก่อนยืนยัน',
+        'กรุณาสแกน S/N หรือระบุจำนวนอย่างน้อย 1 รายการก่อนยืนยัน',
       );
       _serialScanFocus.requestFocus();
       return;
     }
 
     for (final part in readyParts) {
-      await _confirmPart(part.partId, part.remaining);
+      await _confirmPart(part, _collectedCountFor(part));
       if (!mounted || _state != _PackState.orderParts) return;
     }
   }
@@ -655,6 +720,7 @@ class _PackingScreenState extends State<PackingScreen> {
       _orderResp = null;
       _selectedPartId = null;
       _collectedSerials.clear();
+      _collectedQty.clear();
       _expandedSerialPartIds.clear();
       _state = _PackState.packList;
     });
@@ -670,6 +736,7 @@ class _PackingScreenState extends State<PackingScreen> {
       _currentPickOrderId = '';
       _selectedPartId = null;
       _collectedSerials.clear();
+      _collectedQty.clear();
       _expandedSerialPartIds.clear();
       _scanCtrl.clear();
       _partScanCtrl.clear();
@@ -744,6 +811,7 @@ class _PackingScreenState extends State<PackingScreen> {
           _currentPickOrderId = '';
           _selectedPartId = null;
           _collectedSerials.clear();
+          _collectedQty.clear();
           _expandedSerialPartIds.clear();
           _partScanCtrl.clear();
           _serialScanCtrl.clear();
@@ -1014,9 +1082,9 @@ class _PackingScreenState extends State<PackingScreen> {
     final totalPacked = order.parts.fold<int>(
       0,
       (sum, part) {
-        final collected = _collectedSerials[part.partId]?.length ?? 0;
-        final packedForPart =
-            (part.scannedQty + collected).clamp(0, part.requiredQty).toInt();
+        final packedForPart = (part.scannedQty + _collectedCountFor(part))
+            .clamp(0, part.requiredQty)
+            .toInt();
         return sum + packedForPart;
       },
     );
@@ -1140,6 +1208,7 @@ class _PackingScreenState extends State<PackingScreen> {
   }
 
   Widget _buildPackScannerCard() {
+    final activePart = _currentPart;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: _packCardDecoration(),
@@ -1167,47 +1236,92 @@ class _PackingScreenState extends State<PackingScreen> {
             onSubmitted: (_) => _scanPart(),
           ),
           const SizedBox(height: 12),
-          const Text(
-            'สแกน S/N',
-            style: TextStyle(
-              fontSize: 12,
-              color: _packTextMuted,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _serialScanCtrl,
-            focusNode: _serialScanFocus,
-            textCapitalization: TextCapitalization.characters,
-            decoration: _packScanInputDecoration(
-              label: 'Serial Number',
-              hint: 'กรอกหรือสแกน S/N สินค้า',
-              icon: Icons.confirmation_number,
-            ),
-            onSubmitted: (_) => _scanSerial(),
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: _scanSerial,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text(
-                'เพิ่ม S/N',
-                style: TextStyle(fontWeight: FontWeight.w800),
+          // สินค้าไม่มี S/N → กรอกจำนวนตรงๆ แทนการสแกน S/N
+          if (activePart != null && !activePart.serialRequire) ...[
+            const Text(
+              'ระบุจำนวนที่แพ็ค',
+              style: TextStyle(
+                fontSize: 12,
+                color: _packTextMuted,
+                fontWeight: FontWeight.w700,
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _qtyEntryCtrl,
+              focusNode: _qtyEntryFocus,
+              keyboardType: TextInputType.number,
+              decoration: _packScanInputDecoration(
+                label: 'จำนวน',
+                hint: 'สูงสุด ${activePart.remaining}',
+                icon: Icons.numbers_rounded,
+              ),
+              onSubmitted: (_) => _addQty(),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _addQty,
+                icon: const Icon(Icons.check_rounded),
+                label: const Text(
+                  'ยืนยันจำนวน',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
               ),
             ),
-          ),
+          ] else ...[
+            const Text(
+              'สแกน S/N',
+              style: TextStyle(
+                fontSize: 12,
+                color: _packTextMuted,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _serialScanCtrl,
+              focusNode: _serialScanFocus,
+              textCapitalization: TextCapitalization.characters,
+              decoration: _packScanInputDecoration(
+                label: 'Serial Number',
+                hint: 'กรอกหรือสแกน S/N สินค้า',
+                icon: Icons.confirmation_number,
+              ),
+              onSubmitted: (_) => _scanSerial(),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _scanSerial,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text(
+                  'เพิ่ม S/N',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1291,9 +1405,10 @@ class _PackingScreenState extends State<PackingScreen> {
 
   Widget _buildPackItemCard(PackingPartItem part) {
     final collected = _collectedSerials[part.partId] ?? const <String>[];
+    final collectedCount = _collectedCountFor(part);
     final currentPacked =
-        (part.scannedQty + collected.length).clamp(0, part.requiredQty).toInt();
-    final isSelected = _selectedPartId == part.partId || collected.isNotEmpty;
+        (part.scannedQty + collectedCount).clamp(0, part.requiredQty).toInt();
+    final isSelected = _selectedPartId == part.partId || collectedCount > 0;
     final isComplete = part.isDone || currentPacked >= part.requiredQty;
     final progress = part.requiredQty > 0
         ? (currentPacked / part.requiredQty).clamp(0.0, 1.0)

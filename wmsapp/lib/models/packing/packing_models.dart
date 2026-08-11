@@ -162,6 +162,7 @@ class PackingPartItem {
   final String? imageUrl;
   final int requiredQty; // qty บน Pallet นี้ (จาก ReceiptLines)
   final int scannedQty;
+  final bool serialRequire;
   final List<String> availableSerials;
 
   PackingPartItem({
@@ -172,6 +173,7 @@ class PackingPartItem {
     this.imageUrl,
     required this.requiredQty,
     required this.scannedQty,
+    this.serialRequire = false,
     this.availableSerials = const [],
   });
 
@@ -184,6 +186,7 @@ class PackingPartItem {
         imageUrl: json['imageUrl'],
         requiredQty: json['requiredQty'] ?? 0,
         scannedQty: json['scannedQty'] ?? 0,
+        serialRequire: json['serialRequire'] ?? false,
         availableSerials: (json['availableSerials'] as List?)
                 ?.map((e) => e.toString())
                 .toList() ??
